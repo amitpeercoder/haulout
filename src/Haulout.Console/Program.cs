@@ -2,7 +2,7 @@ using Haulout.Sim.Play;
 
 var game = Game.NewFirstFault();
 
-if (game.Ask(new Briefing()) is BriefingView briefing) ResultPrinter.PrintBriefing(briefing);
+if (game.Ask(new Briefing()) is BriefingView briefing) Console.Write(Haulout.Prose.Prose.Briefing(briefing));
 
 while (true)
 {
@@ -20,12 +20,12 @@ while (true)
             Console.WriteLine(p.Message);
             break;
         case RunQuery q:
-            ResultPrinter.Print(game.Ask(q.Query));
+            Console.Write(Haulout.Prose.Prose.Query(game.Ask(q.Query)));
             break;
         case RunCommand c:
             var result = game.Execute(c.Command);
             var status = (StatusView)game.Ask(new Status());
-            ResultPrinter.Print(result, status);
+            Console.Write(Haulout.Prose.Prose.Result(result, status));
             if (result.Finished) return 0;
             break;
     }

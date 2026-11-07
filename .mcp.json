@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "haulout": {
+      "command": "/opt/homebrew/opt/dotnet@8/bin/dotnet",
+      "args": ["src/Haulout.Mcp/bin/Debug/net8.0/Haulout.Mcp.dll"]
+    }
+  }
+}
