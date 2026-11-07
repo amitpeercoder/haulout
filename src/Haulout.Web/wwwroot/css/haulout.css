@@ -26,6 +26,7 @@
 
     /* motion: slow, sparse, nothing bounces */
     --fade: 300ms;
+    --zoom: 320ms;
     --ease: ease-in-out;
 }
 

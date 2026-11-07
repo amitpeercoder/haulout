@@ -1,0 +1,88 @@
+@using Haulout.Web.Art
+@using Haulout.Web.Art.CloseUps
+@using Haulout.Sim.Play
+@inject GameSession Session
+@implements IDisposable
+
+@* The close-up of the place the player is in (docs/design/004). Drawn from Art/CloseUps; state comes from the facade. *@
+<div class="closeup-wrap">
+    <button class="zoom-out" data-action="zoom-out" @onclick="Session.ZoomOut">Zoom out</button>
+    @{
+        var aboard = Session.Aboard;
+        var scene = CloseUps.For(aboard.Place);
+    }
+    <svg class="closeup" viewBox="@CloseUpScene.ViewBox" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="@aboard.Place">
+        <defs>
+            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6" class="hatch-line" />
+            </pattern>
+        </defs>
+        <rect class="sheet" x="0.5" y="0.5" width="999" height="599" />
+        @if (scene is null)
+        {
+            <g>
+                <text class="title" x="500" y="290" text-anchor="middle">@aboard.Place.ToUpperInvariant()</text>
+                <text class="quiet" x="500" y="315" text-anchor="middle">Nothing drawn here yet.</text>
+            </g>
+        }
+        else
+        {
+            @foreach (var p in scene.Backdrop)
+            {
+                <path class="@p.Class" d="@p.D" />
+            }
+            @foreach (var cover in scene.Covers)
+            {
+                var removed = IsRemoved(aboard, cover.Cover);
+                var state = removed ? "off" : "on";
+                <g class="cover @(removed ? "removed" : "in-place")" data-cover="@cover.Cover" role="button" tabindex="0"
+                   aria-label="@cover.Cover (@state)"
+                   @onclick="() => Session.ClickCover(cover.Cover)"
+                   @onkeydown="e => OnCoverKey(e, cover.Cover)">
+                    @foreach (var p in (removed ? cover.Removed : cover.InPlace))
+                    {
+                        <path class="@p.Class" d="@p.D" />
+                    }
+                    <path class="hit" d="@cover.HitD" />
+                    @if (cover.Caption.Length > 0)
+                    {
+                        <g><text class="cover-caption" x="@cover.LabelX" y="@cover.LabelY">@cover.Caption</text></g>
+                    }
+                </g>
+            }
+            @foreach (var p in scene.Overlay)
+            {
+                <path class="@p.Class" d="@p.D" />
+            }
+            var slot = 0;
+            @foreach (var c in aboard.Components)
+            {
+                if (!c.VisibleHere) continue;
+                var spot = scene.SpotFor(c.Name, slot++);
+                <g class="@(c.ReachableHere ? "in-reach" : "out-of-reach")">
+                    <Marker Name="@c.Name" Spot="@spot" Fault="@c.KnownProblem"
+                            Selected="@Same(Session.SelectedComponent, c.Name)"
+                            Radius="7" FontSize="13" Clicked="@(n => Session.SelectComponent(n))" />
+                </g>
+            }
+        }
+    </svg>
+</div>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private static bool Same(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRemoved(AboardView aboard, string cover) =>
+        aboard.Covers.Any(c => Same(c.Name, cover) && c.Removed);
+
+    private void OnCoverKey(KeyboardEventArgs e, string cover)
+    {
+        if (e.Key is "Enter" or " " or "Spacebar") Session.ClickCover(cover);
+    }
+}

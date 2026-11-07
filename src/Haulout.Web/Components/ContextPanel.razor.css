@@ -30,3 +30,9 @@
 .why { font-size: 0.8rem; color: var(--ink-faint); margin-top: 0.2rem; }
 .option button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-align: left; }
 .option .meta { font-size: 0.75rem; color: var(--ink-faint); }
+.here { display: flex; flex-direction: column; gap: 0.5rem; }
+.here h2 { font-family: var(--face-type); font-weight: normal; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--water-pale); }
+.covers { display: flex; flex-direction: column; gap: 0.35rem; }
+.cover-toggle { font-size: 0.9rem; padding: 0.3rem 0.6rem; }
+.cover-toggle .state { color: var(--ink-faint); font-family: var(--face-type); font-size: 0.8rem; margin-left: 0.4rem; }
+.position { font-family: var(--face-type); font-size: 0.8rem; color: var(--water-pale); }

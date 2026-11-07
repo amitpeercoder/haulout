@@ -110,3 +110,33 @@ Refusals are free and not logged. There are three levels:
 5. Can you see the solenoid from the companionway with the steps off? I said yes, but you cannot reach it from there.
 6. Is the starter visible from the front at all? I said no.
 7. Should moving cost more than 1 min when you climb (on deck to beside the hull, by ladder)?
+
+## Implementation notes — web UI (order of work step 2)
+
+**Date:** 2026-11-07. The web adapter now draws the two levels. No facade changes were needed: `Aboard()` (places with Here/Visited/Adjacent, covers with place and state, found components with position label and VisibleHere/ReachableHere) and `ComponentActions()` carry everything.
+
+### File layout (`src/Haulout.Web`)
+
+- `Services/GameSession.cs`: the only door to the facade. `Level` (Map or CloseUp), `SelectedComponent` (by name). `ClickPlace` issues GoTo unless already there and zooms in only if the sim accepts; a refusal stays as the last result for the panel. `ClickMapMarker` selects, and zooms in when the part is visible from where the player is. `ClickCover` issues Remove or Refit from the cover's current state. `ZoomOut`. The temporary shape-to-place click map is gone.
+- `Art/Shapes.cs`: the drawing contract shared by both levels: `DecorPath`, `MarkerSpot`, `PlaceShape`, `CoverShape` (InPlace / Removed drawings plus a hit path), `CloseUpScene`. All names are the facade's display names, matched case-insensitively. No ids.
+- `Art/CutawayGeometry.cs`: the map (viewBox 1000 x 600): yard, hull, fin keel, spade rudder, rig stub, interior ink, the seven place regions, the five covers drawn in state, the position map.
+- `Art/CloseUps/<Place>.cs`: one static `Scene` per place; `Art/CloseUps/CloseUps.cs` maps a place name to its scene.
+- `Components/Cutaway.razor`: renders the map. `Components/CloseUp.razor`: renders the current place's scene, covers clickable, markers for known components visible from here (visible-but-not-reachable ones dimmed). `Components/Marker.razor`: the one marker (hollow found, dull red known fault, amber ring selected), used by both. `Components/ContextPanel.razor`: place header with its covers (toggle buttons), Try to start, Buy remote start button, last result, selected part with verbs and the facade's reasons.
+- `Pages/Play.razor`: both layers stacked in one grid cell; opacity crossfade over `--zoom` (320 ms). The hidden layer is inert.
+- `wwwroot/css/drawing.css`: ink classes shared by map and close-ups (`hull-line`, `detail`, `ink`, `paper-fill`, `hatch-fill`, ...), place, cover and marker styles. Every SVG defines `<pattern id="hatch">`.
+
+### The position map
+
+A component's map position is `CutawayGeometry.SpotFor(name, positionLabel, index)`: the anchor for its position label (`PositionAnchors`, one per label in `sloop28.json` positions) plus a per-component offset and short label from a table keyed by component name, so engine parts sit round the engine outline, battery parts in the box, fuel gear round the tank. A name missing from the table falls back to the anchor plus an index offset, so a new component shows up somewhere sensible before it is placed by hand. Dense clusters (engine, battery box) show labels on hover, focus, selection or a known fault only.
+
+### Adding a close-up
+
+1. Add `Art/CloseUps/<Place>.cs` with `public static readonly CloseUpScene Scene`, viewBox 1000 x 600, leaving the top-left ~260 x 40 (Zoom out) and y > 575 free.
+2. Backdrop for what is always there; one `CoverShape` per cover removed from this place, with what it hides in its `Removed` paths; `Spots` keyed by component name for everything visible from here (check the reach lists in `sloop28.json`); a few `Fallback` points.
+3. Add the place name to `CloseUps.For`.
+4. Use only classes from `drawing.css`. If the place gets a new cover, also draw it in state in `CutawayGeometry.Covers`.
+
+### Notes
+
+- The place graph is the sim's: from the quarter berth the cockpit is two moves (via the companionway); clicking it directly shows the refusal.
+- Space on a focused place or cover may also scroll; Blazor cannot prevent default conditionally.

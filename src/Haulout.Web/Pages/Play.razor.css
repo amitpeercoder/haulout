@@ -25,6 +25,11 @@
     animation: fade-in 300ms ease-in-out;
 }
 .left { display: flex; flex-direction: column; gap: 18px; min-height: 0; min-width: 0; }
-.cutaway { flex: 0 0 auto; }
+.stage {
+    flex: 0 0 auto;
+    display: grid;
+    width: min(100%, calc((100vh - 200px) * 1.6667));
+}
+.layer { grid-area: 1 / 1; transition: opacity var(--zoom) var(--ease); }
 .log { flex: 1 1 0; min-height: 0; display: flex; }
 .right { min-height: 0; min-width: 0; display: flex; }

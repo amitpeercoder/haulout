@@ -1,0 +1,15 @@
+.closeup-wrap { position: relative; }
+.zoom-out {
+    position: absolute; top: 10px; left: 10px; z-index: 1;
+    background: var(--paper); color: var(--ink);
+    border-color: var(--ink-faint);
+    font-size: 0.85rem; padding: 0.3rem 0.7rem;
+}
+.zoom-out:hover:not(:disabled) { background: var(--paper-shade); color: var(--ink); border-color: var(--ink); }
+
+/* visible but not within reach: quiet, dashed */
+.out-of-reach { opacity: 0.6; }
+.out-of-reach ::deep .dot { fill: transparent; stroke-dasharray: 2.5 2.5; }
+.out-of-reach ::deep .label { fill: var(--ink-faint); }
+.out-of-reach ::deep .fault .dot { fill: transparent; stroke: var(--fault); }
+.out-of-reach ::deep .fault .label { fill: var(--fault); }

@@ -1,0 +1,40 @@
+@* One component marker, shared by the map and the close-ups: hollow when found, dull red with a known fault, amber ring when selected. *@
+
+<g class="marker @(Fault ? "fault" : "") @(Selected ? "selected" : "")"
+   data-component="@Name" role="button" tabindex="0"
+   aria-label="@(Fault ? Name + ", known fault" : Name)"
+   @onclick="OnClick" @onclick:stopPropagation="true"
+   @onkeydown="OnKey" @onkeydown:stopPropagation="true">
+    @if (Spot.LeaderX is { } lx && Spot.LeaderY is { } ly)
+    {
+        <line class="leader" x1="@Spot.X" y1="@Spot.Y" x2="@lx" y2="@ly" />
+    }
+    <circle class="hit" cx="@Spot.X" cy="@Spot.Y" r="@(Radius + 7)" />
+    <circle class="ring" cx="@Spot.X" cy="@Spot.Y" r="@(Radius + 6)" />
+    @if (Fault)
+    {
+        <circle class="fault-ring" cx="@Spot.X" cy="@Spot.Y" r="@(Radius + 3)" />
+    }
+    <circle class="dot" cx="@Spot.X" cy="@Spot.Y" r="@Radius" />
+    @if (ShowLabel)
+    {
+        <g><text class="label" x="@Spot.LabelX" y="@Spot.LabelY" text-anchor="@Spot.Anchor" style="@(FontSize is { } f ? $"font-size:{f}px" : null)">@Spot.Label</text></g>
+    }
+</g>
+
+@code {
+    /// <summary>The facade's component name.</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public MarkerSpot Spot { get; set; } = default!;
+    [Parameter] public bool Fault { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public bool ShowLabel { get; set; } = true;
+    /// <summary>Dot radius in viewBox units (map 5, close-ups larger).</summary>
+    [Parameter] public double Radius { get; set; } = 5;
+    [Parameter] public double? FontSize { get; set; }
+    [Parameter] public EventCallback<string> Clicked { get; set; }
+
+    private Task OnClick() => Clicked.InvokeAsync(Name);
+
+    private Task OnKey(KeyboardEventArgs e) => e.Key is "Enter" or " " or "Spacebar" ? Clicked.InvokeAsync(Name) : Task.CompletedTask;
+}

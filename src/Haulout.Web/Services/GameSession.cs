@@ -2,6 +2,9 @@ using Haulout.Sim.Play;
 
 namespace Haulout.Web.Services;
 
+/// <summary>The two UI levels of docs/design/004: the map, and the close-up of the current place.</summary>
+public enum ViewLevel { Map, CloseUp }
+
 /// <summary>
 /// The web adapter's one door into the sim. Holds the Game, forwards commands and queries,
 /// and remembers what the UI needs between clicks (selection, last result, what the player read).
@@ -21,11 +24,11 @@ public sealed class GameSession
 
     public CommandResult? LastResult { get; private set; }
 
-    /// <summary>Name of the selected component, if any.</summary>
-    public string? SelectedComponentId { get; private set; }
+    /// <summary>Name of the selected component, if any (the facade's display name).</summary>
+    public string? SelectedComponent { get; private set; }
 
-    /// <summary>Compartment id last clicked, if any.</summary>
-    public string? SelectedCompartmentId { get; private set; }
+    /// <summary>Map (overview cutaway) or the close-up of the place the player is in.</summary>
+    public ViewLevel Level { get; private set; } = ViewLevel.Map;
 
     public bool Finished => Status.Finished;
 
@@ -41,8 +44,8 @@ public sealed class GameSession
     public LogView Log => Ask<LogView>(new Logbook());
     public AboardView Aboard => Ask<AboardView>(new Aboard());
 
-    public ComponentActionsView ActionsFor(string componentId) =>
-        Ask<ComponentActionsView>(new ComponentActions(componentId));
+    public ComponentActionsView ActionsFor(string componentName) =>
+        Ask<ComponentActionsView>(new ComponentActions(componentName));
 
     public bool HasTool(string tool) => Status.Tools.Contains(tool);
 
@@ -51,14 +54,22 @@ public sealed class GameSession
     public int RemoteStartButtonCostNok => Shop.Find(Shop.RemoteStartButton)?.CostNok ?? 0;
 
     /// <summary>The text of the last Inspect on this component, if the player has inspected it.</summary>
-    public string? LastInspectText(string componentId) => _lastInspect.GetValueOrDefault(componentId);
+    public string? LastInspectText(string componentName) => _lastInspect.GetValueOrDefault(componentName);
 
     /// <summary>The text of the last meter reading on this component, if any.</summary>
-    public string? LastMeterText(string componentId) => _lastMeter.GetValueOrDefault(componentId);
+    public string? LastMeterText(string componentName) => _lastMeter.GetValueOrDefault(componentName);
 
     // ------------------------------------------------------------ commands
 
     public CommandResult Execute(Command command)
+    {
+        var result = Run(command);
+        Changed?.Invoke();
+        return result;
+    }
+
+    /// <summary>Executes without raising Changed, so a caller can update view state first.</summary>
+    private CommandResult Run(Command command)
     {
         var result = _game.Execute(command);
         LastResult = result;
@@ -71,7 +82,6 @@ public sealed class GameSession
                 case (Measure c, MeterReading m): _lastMeter[c.Component] = m.Text; break;
             }
         }
-        Changed?.Invoke();
         return result;
     }
 
@@ -83,63 +93,66 @@ public sealed class GameSession
         Execute(new Look());
     }
 
-    /// <summary>Cutaway shape id -> (position label, place to stand in, cover to take off or null). Interim mapping until the Web is redone.</summary>
-    private static readonly Dictionary<string, (string Position, string Place, string? Cover)> Shapes = new()
-    {
-        ["deck"] = ("Deck", "on deck", null),
-        ["cockpit"] = ("Cockpit", "cockpit", null),
-        ["cockpit-locker"] = ("Under the cockpit locker", "cockpit", "cockpit-locker lid"),
-        ["battery-box"] = ("Under the quarter berth", "quarter berth", "battery-box lid"),
-        ["engine-side"] = ("Engine bay, quarter-berth side", "quarter berth", "quarter-berth panel"),
-        ["engine-front"] = ("Engine bay, front (under the steps)", "companionway", "companionway steps"),
-        ["bilge"] = ("Bilge under the saloon", "saloon", "saloon floorboards"),
-        ["hull-outside"] = ("Hull, outside", "beside the hull", null),
-    };
+    // ------------------------------------------------------------ the two levels (docs/design/004)
 
-    /// <summary>Components found so far that sit at this cutaway shape.</summary>
-    public IReadOnlyList<FoundComponent> ComponentsIn(string shapeId) =>
-        Shapes.TryGetValue(shapeId, out var s) ? Aboard.Components.Where(c => c.Position == s.Position).ToList() : [];
-
-    /// <summary>The shape counts as open when its cover is off, or it has no cover and the player has been to its place.</summary>
-    public bool IsOpen(string shapeId)
+    /// <summary>A click on a place on the map. Here already: zoom in. Otherwise ask the sim to go there; zoom in only if it agrees.
+    /// A refusal ("You can't get to the forepeak from here.") stays as the last result for the panel.</summary>
+    public void ClickPlace(string placeName)
     {
-        if (!Shapes.TryGetValue(shapeId, out var s)) return false;
-        var view = Aboard;
-        if (s.Cover is null) return view.Places.Any(p => p.Visited && p.Name.Equals(s.Place, StringComparison.OrdinalIgnoreCase));
-        return view.Covers.Any(c => c.Removed && c.Name.Equals(s.Cover, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>A click on a shape: go to its place and take its cover off, as far as the sim allows.</summary>
-    public void ClickCompartment(string shapeId)
-    {
-        SelectedCompartmentId = shapeId;
-        SelectedComponentId = null;
-        if (!Shapes.TryGetValue(shapeId, out var s)) { Changed?.Invoke(); return; }
-        var view = Aboard;
-        if (!view.Place.Equals(s.Place, StringComparison.OrdinalIgnoreCase) && !Execute(new GoTo(s.Place)).Accepted) return;
-        if (s.Cover is not null && !IsOpen(shapeId)) Execute(new Remove(s.Cover));
-        else Changed?.Invoke();
-    }
-
-    public void SelectComponent(string? componentName)
-    {
-        SelectedComponentId = componentName;
-        if (componentName is not null)
+        if (!IsAboard) return;
+        if (Same(Aboard.Place, placeName))
         {
-            var pos = Aboard.Components.FirstOrDefault(c => c.Name == componentName)?.Position;
-            SelectedCompartmentId = Shapes.FirstOrDefault(kv => kv.Value.Position == pos).Key ?? SelectedCompartmentId;
+            Level = ViewLevel.CloseUp;
+            Changed?.Invoke();
+            return;
+        }
+        var result = Run(new GoTo(placeName));
+        if (result.Accepted)
+        {
+            Level = ViewLevel.CloseUp;
+            SelectedComponent = null;
         }
         Changed?.Invoke();
     }
 
-    /// <summary>Runs a verb from <see cref="ComponentActionsView"/> on a component.</summary>
-    public CommandResult RunVerb(string verb, string componentId) => Execute(verb switch
+    /// <summary>A click on a marker on the map: select it, and zoom in when it can be seen from where the player is.</summary>
+    public void ClickMapMarker(string componentName)
     {
-        "inspect" => new Inspect(componentId),
-        "measure" => new Measure(componentId),
-        "clean" => new Clean(componentId),
-        "replace" => new Replace(componentId),
-        "charge" => new Charge(componentId),
+        SelectedComponent = componentName;
+        if (Aboard.Components.FirstOrDefault(c => Same(c.Name, componentName)) is { VisibleHere: true }) Level = ViewLevel.CloseUp;
+        Changed?.Invoke();
+    }
+
+    /// <summary>A click on a cover in a close-up: take it off if it is on, put it back if it is off. The sim decides.</summary>
+    public void ClickCover(string coverName)
+    {
+        var cover = Aboard.Covers.FirstOrDefault(c => Same(c.Name, coverName));
+        Run(cover is { Removed: true } ? new Refit(coverName) : new Remove(coverName));
+        Changed?.Invoke();
+    }
+
+    public void ZoomOut()
+    {
+        Level = ViewLevel.Map;
+        Changed?.Invoke();
+    }
+
+    public void SelectComponent(string? componentName)
+    {
+        SelectedComponent = componentName;
+        Changed?.Invoke();
+    }
+
+    private static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Runs a verb from <see cref="ComponentActionsView"/> on a component.</summary>
+    public CommandResult RunVerb(string verb, string componentName) => Execute(verb switch
+    {
+        "inspect" => new Inspect(componentName),
+        "measure" => new Measure(componentName),
+        "clean" => new Clean(componentName),
+        "replace" => new Replace(componentName),
+        "charge" => new Charge(componentName),
         "check-filter-bowl" => new CheckFilterBowl(),
         "check-raw-water-flow" => new CheckRawWaterFlow(),
         _ => throw new ArgumentException($"Unknown verb '{verb}'.", nameof(verb)),

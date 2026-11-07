@@ -20,7 +20,10 @@ else
 {
     <div class="play">
         <div class="left">
-            <div class="cutaway"><Cutaway /></div>
+            <div class="stage" data-level-now="@(Session.Level == ViewLevel.Map ? "map" : "closeup")">
+                <div class="layer" data-level="map" aria-hidden="@(Map ? null : "true")" inert="@(!Map)" style="opacity:@(Map ? 1 : 0);pointer-events:@(Map ? "auto" : "none")"><Cutaway /></div>
+                <div class="layer" data-level="closeup" aria-hidden="@(Map ? "true" : null)" inert="@(Map)" style="opacity:@(Map ? 0 : 1);pointer-events:@(Map ? "none" : "auto")"><CloseUp /></div>
+            </div>
             <div class="log"><Logbook /></div>
         </div>
         <div class="right"><ContextPanel /></div>
@@ -29,6 +32,8 @@ else
 
 @code {
     protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private bool Map => Session.Level == ViewLevel.Map;
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
 

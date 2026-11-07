@@ -1,10 +1,17 @@
 @implements IDisposable
 @inject GameSession Session
+@using System.Globalization
+
+@{
+    var ab = Session.Aboard;
+    var perPosition = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    var here = CutawayGeometry.Places.FirstOrDefault(p => Same(p.Place, ab.Place));
+}
 
 <svg class="cutaway" viewBox="@CutawayGeometry.ViewBox" xmlns="http://www.w3.org/2000/svg"
      role="group" aria-label="Cutaway of the boat">
     <defs>
-        <pattern id="cutaway-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line class="hatch-line" x1="0" y1="0" x2="0" y2="6" />
         </pattern>
     </defs>
@@ -12,6 +19,7 @@
     <rect class="sheet" x="0" y="0" width="@CutawayGeometry.Width" height="@CutawayGeometry.Height" />
     <path class="detail" d="@CutawayGeometry.SheetFrame" />
 
+    @* the yard *@
     <rect class="concrete" x="@CutawayGeometry.GroundTone.X" y="@CutawayGeometry.GroundTone.Y"
           width="@CutawayGeometry.GroundTone.W" height="@CutawayGeometry.GroundTone.H" />
     @foreach (var d in CutawayGeometry.Backdrop)
@@ -19,80 +27,82 @@
         <path class="@d.Class" d="@d.D" />
     }
 
-    <path class="hull-base" d="@CutawayGeometry.HullOutline" />
+    @* hull, then the clickable places under the ink *@
+    <path class="hull-base" d="@CutawayGeometry.HullFill" />
 
-    @foreach (var shape in CutawayGeometry.Compartments)
+    @foreach (var shape in CutawayGeometry.Places)
     {
-        var opened = Session.IsOpen(shape.Id);
-        var name = shape.Caption;
-        var id = shape.Id;
-        var regionSelected = Session.SelectedCompartmentId == id;
-        var found = Session.ComponentsIn(id);
-
-        <g class="region @(opened ? "open" : "closed") @(regionSelected ? "selected" : "")"
-           data-compartment="@id" role="button" tabindex="0" aria-label="@name"
-           @onclick="() => Session.ClickCompartment(id)"
-           @onkeydown="e => OnKey(e, () => Session.ClickCompartment(id))">
-            <path class="panel" d="@shape.PathData" />
-            <path class="hatch" d="@shape.PathData" fill="url(#cutaway-hatch)" />
-            <path class="outline" d="@shape.PathData" />
-            @if (opened && !shape.Furniture.IsDefaultOrEmpty)
-            {
-                @foreach (var f in shape.Furniture)
-                {
-                    <path class="furniture" d="@f" />
-                }
-            }
-            <g class="caption"><text x="@shape.LabelX" y="@shape.LabelY">@shape.Caption</text></g>
-
-            @for (var i = 0; i < found.Count; i++)
-            {
-                var item = found[i];
-                var itemId = item.Name;
-                var slot = shape.Slots[Math.Min(i, shape.Slots.Length - 1)];
-                var spot = CutawayGeometry.Spots.TryGetValue(itemId, out var mapped) ? mapped : MarkerSpot.FromSlot(slot, item.Name);
-                var selected = Session.SelectedComponentId == itemId;
-
-                <g class="marker @(item.KnownProblem ? "fault" : "") @(selected ? "selected" : "")"
-                   data-component="@itemId" role="button" tabindex="0"
-                   aria-label="@(item.KnownProblem ? item.Name + ", known fault" : item.Name)"
-                   @onclick="() => Session.SelectComponent(itemId)" @onclick:stopPropagation="true"
-                   @onkeydown="e => OnKey(e, () => Session.SelectComponent(itemId))" @onkeydown:stopPropagation="true">
-                    @if (spot.LeaderX is { } lx && spot.LeaderY is { } ly)
-                    {
-                        <line class="leader" x1="@spot.X" y1="@spot.Y" x2="@lx" y2="@ly" />
-                    }
-                    <circle class="hit" cx="@spot.X" cy="@spot.Y" r="12" />
-                    <circle class="ring" cx="@spot.X" cy="@spot.Y" r="11" />
-                    @if (item.KnownProblem)
-                    {
-                        <circle class="fault-ring" cx="@spot.X" cy="@spot.Y" r="8" />
-                    }
-                    <circle class="dot" cx="@spot.X" cy="@spot.Y" r="5" />
-                    <text class="label" x="@spot.LabelX" y="@spot.LabelY" text-anchor="@spot.Anchor">@spot.Label</text>
-                </g>
-            }
+        var name = shape.Place;
+        var st = ab.Places.FirstOrDefault(p => Same(p.Name, name));
+        var isHere = st?.Here ?? false;
+        var visited = st?.Visited ?? false;
+        <g class="place @(visited ? "visited" : "") @(isHere ? "here" : "")" data-place="@name" role="button" tabindex="0"
+           aria-label="@(isHere ? name + ", you are here" : visited ? name + ", visited" : name)"
+           @onclick="() => Session.ClickPlace(name)"
+           @onkeydown="e => OnKey(e, name)">
+            <path class="area" d="@shape.D" />
         </g>
     }
 
-    <path class="hull-line" d="@CutawayGeometry.HullOutline" />
-    <path class="hull-line" d="@CutawayGeometry.CabinTop" />
-    <path class="hull-line" d="@CutawayGeometry.SheerLine" />
-    <path class="rig-line" d="@CutawayGeometry.Mast" />
+    @* interior, covers in state, outer lines *@
+    @foreach (var d in CutawayGeometry.Interior)
+    {
+        <path class="@d.Class" d="@d.D" />
+    }
+    @foreach (var cover in CutawayGeometry.Covers)
+    {
+        var removed = ab.Covers.Any(c => Same(c.Name, cover.Cover) && c.Removed);
+        <g class="cover-state @(removed ? "removed" : "in-place")" data-cover="@cover.Cover">
+            @foreach (var d in removed ? cover.Removed : cover.InPlace)
+            {
+                <path class="@d.Class" d="@d.D" />
+            }
+        </g>
+    }
+    <path class="hull-line" d="@CutawayGeometry.HullStroke" />
+    @foreach (var d in CutawayGeometry.Topsides)
+    {
+        <path class="@d.Class" d="@d.D" />
+    }
     @foreach (var d in CutawayGeometry.Overlay)
     {
         <path class="@d.Class" d="@d.D" />
     }
-    @foreach (var d in CutawayGeometry.Details)
-    {
-        <path class="detail" d="@d" />
-    }
-    <g class="quiet"><text x="@CutawayGeometry.QuarterBerthX" y="@CutawayGeometry.QuarterBerthY">@CutawayGeometry.QuarterBerthCaption</text></g>
 
     <line class="waterline" x1="@CutawayGeometry.WaterlineX1" y1="@CutawayGeometry.WaterlineY"
           x2="@CutawayGeometry.WaterlineX2" y2="@CutawayGeometry.WaterlineY" />
-    <text class="waterline-label" x="@(CutawayGeometry.WaterlineX1 + 4)" y="@(CutawayGeometry.WaterlineY - 5)">@CutawayGeometry.WaterlineLabel</text>
-    <text class="title" x="@CutawayGeometry.TitleX" y="@CutawayGeometry.TitleY">@CutawayGeometry.Title</text>
+    <g><text class="waterline-label" x="@(CutawayGeometry.WaterlineX1 + 4)" y="@(CutawayGeometry.WaterlineY - 5)">@CutawayGeometry.WaterlineLabel</text></g>
+
+    @* place captions and the player *@
+    @foreach (var shape in CutawayGeometry.Places)
+    {
+        var name = shape.Place;
+        var isHere = ab.Places.Any(p => Same(p.Name, name) && p.Here);
+        <g><text class="place-caption @(isHere ? "here" : "")" x="@shape.LabelX" y="@shape.LabelY">@shape.Caption</text></g>
+    }
+    @if (here is not null)
+    {
+        <g class="figure-g" style="@FigureStyle(here)">
+            <circle class="figure" cx="0" cy="-30" r="5" />
+            <path class="figure" d="M-5,0 L-4,-24 L4,-24 L5,0 Z" />
+        </g>
+    }
+
+    <g><text class="title" x="@CutawayGeometry.TitleX" y="@CutawayGeometry.TitleY">@CutawayGeometry.Title</text></g>
+
+    @* found components, last so they sit on top *@
+    @foreach (var c in ab.Components)
+    {
+        perPosition.TryGetValue(c.Position, out var idx);
+        perPosition[c.Position] = idx + 1;
+        var spot = CutawayGeometry.SpotFor(c.Name, c.Position, idx);
+        var dense = CutawayGeometry.IsDense(c.Name);
+        <g class="@(dense ? "dense" : "")">
+            <title>@c.Name</title>
+            <Marker Name="@c.Name" Spot="@spot" Fault="@c.KnownProblem" Selected="@(Same(Session.SelectedComponent, c.Name))"
+                    FontSize="10.5" Clicked="@(n => Session.ClickMapMarker(n))" />
+        </g>
+    }
 </svg>
 
 @code {
@@ -102,8 +112,13 @@
 
     public void Dispose() => Session.Changed -= OnSessionChanged;
 
-    private static void OnKey(KeyboardEventArgs e, Action activate)
+    private static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    private void OnKey(KeyboardEventArgs e, string place)
     {
-        if (e.Key is "Enter" or " " or "Spacebar") activate();
+        if (e.Key is "Enter" or " " or "Spacebar") Session.ClickPlace(place);
     }
+
+    private static string FigureStyle(PlaceShape p) =>
+        string.Create(CultureInfo.InvariantCulture, $"transform:translate({p.FigureX}px,{p.FigureY}px)");
 }

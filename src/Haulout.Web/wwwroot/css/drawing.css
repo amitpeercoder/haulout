@@ -1,0 +1,97 @@
+/* Shared ink classes for the map and the close-ups (docs/design/003, 004). */
+.cutaway, .closeup {
+    display: block;
+    width: 100%;
+    height: auto;
+    font-family: var(--face-ui);
+}
+
+:root { --concrete: #c6c5be; }
+
+.sheet { fill: var(--paper); stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.concrete { fill: var(--concrete); stroke: none; pointer-events: none; }
+.ground { fill: none; stroke: var(--ink); stroke-width: var(--line); pointer-events: none; }
+.yard { fill: none; stroke: var(--ink); stroke-width: var(--line-thin); stroke-linejoin: round; pointer-events: none; }
+.furniture { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); stroke-linejoin: round; pointer-events: none; }
+.leader { stroke: var(--ink-faint); stroke-width: var(--line-thin); pointer-events: none; }
+.waterline { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); stroke-dasharray: 7 5; pointer-events: none; }
+.waterline-label { fill: var(--slate-soft); font-family: var(--face-type); font-size: 10px; letter-spacing: 0.1em; pointer-events: none; }
+.title { fill: var(--slate-soft); font-family: var(--face-type); font-size: 10px; letter-spacing: 0.12em; }
+
+.hull-base { fill: var(--paper); stroke: none; }
+.hull-line, .rig-line { fill: none; stroke: var(--ink); stroke-width: var(--line); stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.sprayhood { fill: none; stroke: var(--ink); stroke-width: 1.1px; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.detail { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); pointer-events: none; }
+.quiet { fill: var(--ink-faint); font-size: 11px; font-style: italic; pointer-events: none; }
+
+.hatch-line { stroke: var(--ink-faint); stroke-width: 0.6; }
+
+/* markers */
+.marker { cursor: pointer; outline: none; }
+.marker .dot {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: var(--line);
+    transition: fill var(--fade) var(--ease), stroke-width var(--fade) var(--ease);
+}
+.marker .hit { fill: transparent; stroke: none; }
+.marker .fault-ring { fill: none; stroke: var(--fault); stroke-width: var(--line-thin); pointer-events: none; }
+.marker .ring {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 2.4;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--fade) var(--ease);
+}
+.marker .label {
+    fill: var(--ink);
+    font-family: var(--face-ui);
+    font-size: 11.5px;
+    paint-order: stroke;
+    stroke: var(--paper);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    transition: fill var(--fade) var(--ease);
+}
+
+.marker.fault .dot { fill: var(--fault); stroke: var(--fault); }
+.marker.fault .label { fill: var(--fault); }
+
+.marker.selected .ring { opacity: 1; }
+.marker.selected .label { font-weight: 700; }
+
+.marker:hover .dot { stroke-width: 2.2; }
+.marker:hover .label { text-decoration: underline; }
+.marker:focus-visible .ring { stroke: var(--water); opacity: 1; }
+.marker.selected:focus-visible .ring { stroke: var(--amber); }
+
+/* fills (no stroke) */
+.paper-fill { fill: var(--paper); stroke: none; pointer-events: none; }
+.tone-fill { fill: var(--concrete); stroke: none; pointer-events: none; }
+.wood-fill { fill: var(--wood-pale); fill-opacity: 0.35; stroke: none; pointer-events: none; }
+.hatch-fill { fill: url(#hatch); stroke: none; pointer-events: none; }
+.fault-fill { fill: var(--fault); fill-opacity: 0.25; stroke: none; pointer-events: none; }
+.dash { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); stroke-dasharray: 4 3; pointer-events: none; }
+.ink { fill: none; stroke: var(--ink); stroke-width: var(--line); stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.ink-thin { fill: none; stroke: var(--ink); stroke-width: var(--line-thin); stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.wood-line { fill: none; stroke: var(--wood); stroke-width: var(--line); stroke-linejoin: round; pointer-events: none; }
+.water-line { fill: none; stroke: var(--water); stroke-width: var(--line-thin); pointer-events: none; }
+
+/* places on the map: no fill unvisited, faint paper-grey visited, thin amber outline where the player is */
+.place { cursor: pointer; outline: none; }
+.place .area { fill: transparent; stroke: none; transition: fill var(--fade) var(--ease), stroke var(--fade) var(--ease); }
+.place.visited .area { fill: var(--paper-shade); fill-opacity: 0.55; }
+.place:hover .area { stroke: var(--ink-faint); stroke-width: var(--line-thin); stroke-dasharray: 3 3; }
+.place.here .area, .place.here:hover .area { stroke: var(--amber); stroke-width: 1.6; stroke-dasharray: none; }
+.place:focus-visible .area { stroke: var(--water); stroke-width: 2; }
+.place-caption { fill: var(--slate-soft); font-family: var(--face-type); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; }
+.place.here .place-caption { fill: var(--ink); }
+.figure { fill: var(--amber); stroke: var(--ink); stroke-width: var(--line-thin); pointer-events: none; transition: transform var(--fade) var(--ease); }
+
+/* covers in a close-up: clickable */
+.cover { cursor: pointer; outline: none; }
+.cover .hit { fill: transparent; stroke: none; }
+.cover:hover .hit { stroke: var(--amber); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.cover:focus-visible .hit { stroke: var(--water); stroke-width: 2; }
+.cover-caption { fill: var(--slate-soft); font-family: var(--face-type); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; }

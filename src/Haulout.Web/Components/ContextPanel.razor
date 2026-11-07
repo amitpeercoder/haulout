@@ -12,6 +12,20 @@
         }
     </div>
 
+    @{ var aboard = Session.Aboard; var here = aboard.Covers.Where(c => c.Place.Equals(aboard.Place, StringComparison.OrdinalIgnoreCase)).ToList(); }
+    <section class="here">
+        <h2 data-place>@aboard.Place</h2>
+        @if (here.Count > 0)
+        {
+            <div class="covers">
+                @foreach (var c in here)
+                {
+                    <button class="cover-toggle" data-cover-toggle="@c.Name" @onclick="() => Session.ClickCover(c.Name)">@c.Name <span class="state">@(c.Removed ? "off" : "in place")</span></button>
+                }
+            </div>
+        }
+    </section>
+
     @if (Session.LastResult is { } r && !ReferenceEquals(r.Narrative, Session.ClosingNarrative))
     {
         <section class="result @(r.Accepted ? "" : "refused")">
@@ -42,7 +56,7 @@
     }
 
     <section class="selection">
-        @if (Session.SelectedComponentId is { } id)
+        @if (Session.SelectedComponent is { } id)
         {
             var view = Session.ActionsFor(id);
             if (view.Found)
@@ -50,6 +64,10 @@
                 var inspect = Session.LastInspectText(id);
                 var meter = Session.LastMeterText(id);
                 <h2>@view.ComponentName</h2>
+                if (aboard.Components.FirstOrDefault(c => string.Equals(c.Name, view.ComponentName, StringComparison.OrdinalIgnoreCase)) is { } fc)
+                {
+                    <p class="position">@fc.Position</p>
+                }
                 <div class="known">
                     @if (inspect is not null && !LastIsInspect(inspect)) { <p><span class="label">Inspected:</span> @inspect</p> }
                     @if (meter is not null && !LastIsMeter(meter)) { <p><span class="label">Meter:</span> @meter</p> }
@@ -69,19 +87,9 @@
                 </div>
             }
         }
-        else if (Session.SelectedCompartmentId is { } cid)
-        {
-            <h2>@Session.Aboard.Place</h2>
-            <div class="parts">
-                @foreach (var c in Session.ComponentsIn(cid))
-                {
-                    <button class="part @(c.KnownProblem ? "faulty" : "")" data-component="@c.Name" @onclick="() => Session.SelectComponent(c.Name)">@c.Name</button>
-                }
-            </div>
-        }
         else
         {
-            <p class="faint">Click a part of the boat to open it up.</p>
+            <p class="faint">@(Session.Level == ViewLevel.Map ? "Click a place to go there, or a part to look at it." : "Click a cover to take it off, or a part to work on it.")</p>
         }
     </section>
 </aside>
