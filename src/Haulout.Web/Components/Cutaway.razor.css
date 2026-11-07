@@ -1,0 +1,92 @@
+.cutaway {
+    display: block;
+    width: 100%;
+    height: auto;
+    font-family: var(--face-ui);
+}
+
+.sheet { fill: var(--paper); stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.water-tone { fill: var(--water-pale); fill-opacity: 0.28; }
+.waterline { fill: none; stroke: var(--water); stroke-width: var(--line-thin); stroke-dasharray: 7 5; pointer-events: none; }
+.waterline-label { fill: var(--water); font-family: var(--face-type); font-size: 10px; letter-spacing: 0.1em; pointer-events: none; }
+.title { fill: var(--ink-faint); font-family: var(--face-type); font-size: 10px; letter-spacing: 0.12em; }
+
+.hull-base { fill: var(--paper); stroke: none; }
+.hull-line, .rig-line { fill: none; stroke: var(--ink); stroke-width: var(--line); stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.detail { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); pointer-events: none; }
+.quiet { fill: var(--ink-faint); font-size: 11px; font-style: italic; pointer-events: none; }
+
+.hatch-line { stroke: var(--ink-faint); stroke-width: 0.6; }
+
+/* regions */
+.region { cursor: pointer; outline: none; }
+
+.region .panel {
+    fill: var(--wood-pale);
+    fill-opacity: 0.45;
+    transition: fill var(--fade) var(--ease), fill-opacity var(--fade) var(--ease);
+}
+.region .hatch {
+    opacity: 1;
+    pointer-events: none;
+    transition: opacity var(--fade) var(--ease);
+}
+.region .outline {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: var(--line);
+    stroke-linejoin: round;
+    pointer-events: none;
+    transition: stroke var(--fade) var(--ease), stroke-width var(--fade) var(--ease);
+}
+
+.region.open .panel { fill: var(--paper); fill-opacity: 1; }
+.region.open .hatch { opacity: 0; }
+
+.region:hover .outline { stroke-width: 1.9; }
+.region.closed:hover .panel { fill-opacity: 0.6; }
+.region:focus-visible .outline { stroke: var(--water); stroke-width: 2.5; }
+.region.selected .outline,
+.region.selected:hover .outline { stroke: var(--amber); stroke-width: 2.6; }
+
+.caption {
+    fill: var(--ink);
+    font-family: var(--face-type);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+/* markers */
+.marker { cursor: pointer; outline: none; }
+.marker .dot {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: var(--line);
+    transition: fill var(--fade) var(--ease), stroke-width var(--fade) var(--ease);
+}
+.marker .ring {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 2.4;
+    opacity: 0;
+    transition: opacity var(--fade) var(--ease);
+}
+.marker .label {
+    fill: var(--ink);
+    font-family: var(--face-ui);
+    font-size: 11.5px;
+    transition: fill var(--fade) var(--ease);
+}
+
+.marker.fault .dot { fill: var(--fault); stroke: var(--fault); }
+.marker.fault .label { fill: var(--fault); }
+
+.marker.selected .ring { opacity: 1; }
+.marker.selected .label { font-weight: 700; }
+
+.marker:hover .dot { stroke-width: 2.2; }
+.marker:hover .label { text-decoration: underline; }
+.marker:focus-visible .ring { stroke: var(--water); opacity: 1; }
+.marker.selected:focus-visible .ring { stroke: var(--amber); }

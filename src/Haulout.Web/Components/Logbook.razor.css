@@ -1,0 +1,30 @@
+.logbook {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+    background-color: var(--paper); color: var(--ink);
+    border: 1px solid var(--ink);
+}
+header {
+    font-family: var(--face-type); font-size: 0.85rem;
+    padding: 0.5rem 1rem 0.5rem 3.2rem;
+    border-bottom: 1px solid var(--ink);
+}
+.scroll {
+    flex: 1; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column-reverse;
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 27px, var(--paper-shade) 27px, var(--paper-shade) 28px);
+    background-attachment: local;
+    border-left: 1px solid var(--fault);
+    margin-left: 2.6rem;
+}
+ol { list-style: none; margin: 0; padding: 0.2rem 1rem 0.2rem 0.8rem; }
+li {
+    display: flex; gap: 0.9rem; align-items: baseline;
+    min-height: 28px; line-height: 28px;
+    animation: fade-in 300ms ease-in-out;
+}
+.stamp { font-family: var(--face-type); font-size: 0.78rem; color: var(--ink-faint); white-space: nowrap; flex: 0 0 6.2em; }
+.text { font-family: var(--face-hand); font-size: 1rem; line-height: 1.4; padding: 0.15rem 0; }
+li.found .text { color: var(--fault); }
+li.receipt .text { font-family: var(--face-type); font-size: 0.9rem; }
+li.empty { color: var(--ink-faint); font-family: var(--face-hand); }

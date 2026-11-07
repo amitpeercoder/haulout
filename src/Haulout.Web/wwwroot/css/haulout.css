@@ -1,0 +1,75 @@
+/* Haulout design tokens (docs/design/003). Every colour, face and duration lives here. */
+:root {
+    /* palette: Nordic late summer */
+    --water: #5b7384;
+    --water-pale: #a9b8c2;
+    --slate: #2f3a44;
+    --slate-soft: #4a5762;
+    --wood: #6b4f3a;
+    --wood-pale: #a08468;
+    --paper: #efe9dc;
+    --paper-shade: #e2d9c6;
+    --ink: #22292f;
+    --ink-faint: #7d8790;
+    --amber: #d9a441;
+    --fault: #9b3d32;
+    --fault-on-slate: #c46a5c; /* the same dull red, lifted just enough to read on slate */
+
+    /* drawing */
+    --line: 1.25px;
+    --line-thin: 0.75px;
+
+    /* type: no web fonts, everything offline */
+    --face-hand: "Segoe Print", "Bradley Hand", "Comic Neue", "Chalkboard SE", cursive;
+    --face-type: "Courier Prime", "American Typewriter", "Courier New", Courier, monospace;
+    --face-ui: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+
+    /* motion: slow, sparse, nothing bounces */
+    --fade: 300ms;
+    --ease: ease-in-out;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--slate);
+    color: var(--paper);
+    font-family: var(--face-ui);
+}
+
+.booting { padding: 2rem; color: var(--water-pale); font-family: var(--face-type); }
+
+#blazor-error-ui {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 0.6rem 1rem;
+    background: var(--fault); color: var(--paper);
+    font-family: var(--face-type);
+}
+#blazor-error-ui .reload { color: var(--paper); }
+
+/* ---- page-level and shared UI styles ---- */
+body { overflow: hidden; line-height: 1.45; }
+h1, h2, h3, p { margin: 0; }
+
+button {
+    font-family: var(--face-ui);
+    font-size: 0.95rem;
+    color: var(--paper);
+    background: transparent;
+    border: 1px solid var(--water-pale);
+    border-radius: 2px;
+    padding: 0.45rem 0.8rem;
+    cursor: pointer;
+    text-align: left;
+    transition: opacity var(--fade) var(--ease);
+}
+button:hover:not(:disabled) { border-color: var(--paper); background: var(--slate-soft); }
+button:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.primary { border-color: var(--amber); color: var(--amber); }
+button.primary:hover:not(:disabled) { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

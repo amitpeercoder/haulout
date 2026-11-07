@@ -1,0 +1,36 @@
+@page "/"
+@using Haulout.Web.Services
+@using Haulout.Web.Components
+@inject GameSession Session
+@implements IDisposable
+
+<PageTitle>Haulout</PageTitle>
+
+@if (!Session.IsAboard)
+{
+    <div class="intro">
+        <article class="card">
+            <h1>Haulout</h1>
+            <p>@string.Join(" ", Session.Briefing.Lines)</p>
+            <button class="primary" data-action="go-aboard" @onclick="Session.GoAboard">Go aboard</button>
+        </article>
+    </div>
+}
+else
+{
+    <div class="play">
+        <div class="left">
+            <div class="cutaway"><Cutaway /></div>
+            <div class="log"><Logbook /></div>
+        </div>
+        <div class="right"><ContextPanel /></div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+}

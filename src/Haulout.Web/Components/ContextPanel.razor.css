@@ -1,0 +1,30 @@
+.contextpanel {
+    flex: 1; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 1.1rem;
+    padding: 1rem;
+    border: 1px solid var(--slate-soft);
+    color: var(--paper);
+}
+.top { display: flex; flex-direction: column; gap: 0.5rem; }
+.result { display: flex; flex-direction: column; gap: 0.6rem; animation: fade-in 300ms ease-in-out; }
+.result.refused p { color: var(--ink-faint); font-style: italic; }
+.result .cost { font-family: var(--face-type); font-size: 0.85rem; color: var(--water-pale); font-style: normal; }
+.result .noted { color: var(--fault-on-slate); font-family: var(--face-type); font-size: 0.9rem; font-style: normal; }
+.closing {
+    background: var(--paper); color: var(--ink);
+    border: 1px solid var(--ink);
+    padding: 1.4rem 1.25rem; display: flex; flex-direction: column; gap: 0.7rem;
+    animation: fade-in 300ms ease-in-out;
+}
+.closing h2 { font-family: var(--face-type); font-weight: normal; font-size: 1.2rem; }
+.selection { display: flex; flex-direction: column; gap: 0.7rem; }
+.selection h2 { font-size: 1.15rem; font-weight: normal; border-bottom: 1px solid var(--slate-soft); padding-bottom: 0.3rem; }
+.label { font-family: var(--face-type); font-size: 0.8rem; color: var(--water-pale); }
+.known { display: flex; flex-direction: column; gap: 0.4rem; }
+.faint { color: var(--ink-faint); }
+.options, .parts { display: flex; flex-direction: column; gap: 0.5rem; }
+.parts { flex-direction: row; flex-wrap: wrap; }
+.part { font-size: 0.9rem; padding: 0.3rem 0.6rem; }
+.part.faulty { color: var(--fault-on-slate); border-color: var(--fault-on-slate); }
+.option button { width: 100%; }
+.why { font-size: 0.8rem; color: var(--ink-faint); margin-top: 0.2rem; }

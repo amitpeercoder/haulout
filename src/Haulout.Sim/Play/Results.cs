@@ -56,6 +56,8 @@ public sealed record RepairView(string ComponentName, string Text) : Observation
 [JsonDerivedType(typeof(LogView), "log-view")]
 [JsonDerivedType(typeof(CompartmentsView), "compartments-view")]
 [JsonDerivedType(typeof(CommandList), "command-list")]
+[JsonDerivedType(typeof(AboardView), "aboard-view")]
+[JsonDerivedType(typeof(ComponentActionsView), "component-actions-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -81,3 +83,20 @@ public sealed record CompartmentsView(IReadOnlyList<CompartmentSummary> Compartm
 public sealed record CommandInfo(string Verb, string? Argument, string Description);
 
 public sealed record CommandList(IReadOnlyList<CommandInfo> Commands) : QueryResult;
+
+/// <summary>A component the player has found. HasKnownFault: a discovered fault is still present on it.</summary>
+public sealed record FoundComponent(string Id, string Name, bool HasKnownFault);
+
+/// <summary>Opened: the player has opened it, or it is in plain view and they have looked around.</summary>
+public sealed record AboardCompartment(string Id, string Name, bool Opened, IReadOnlyList<FoundComponent> Components);
+
+public sealed record AboardView(IReadOnlyList<AboardCompartment> Compartments) : QueryResult;
+
+/// <summary>
+/// One verb on a component. Verb is the Command it maps to: "inspect" | "measure" | "clean" | "replace" | "charge"
+/// | "check-filter-bowl" | "check-raw-water-flow". UnavailableReason is set when Available is false.
+/// </summary>
+public sealed record ActionOption(string Verb, string Label, bool Available, string? UnavailableReason, int Minutes, int CostNok);
+
+/// <summary>Found is false (and Options empty) when the player has not found anything by that name.</summary>
+public sealed record ComponentActionsView(string Component, bool Found, string? ComponentName, IReadOnlyList<ActionOption> Options) : QueryResult;

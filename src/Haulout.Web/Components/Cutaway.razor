@@ -1,0 +1,89 @@
+@implements IDisposable
+@inject GameSession Session
+
+@{
+    var compartments = Session.Aboard.Compartments.ToDictionary(c => c.Id);
+}
+
+<svg class="cutaway" viewBox="@CutawayGeometry.ViewBox" xmlns="http://www.w3.org/2000/svg"
+     role="group" aria-label="Cutaway of the boat">
+    <defs>
+        <pattern id="cutaway-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line class="hatch-line" x1="0" y1="0" x2="0" y2="6" />
+        </pattern>
+    </defs>
+
+    <rect class="sheet" x="0" y="0" width="@CutawayGeometry.Width" height="@CutawayGeometry.Height" />
+    <path class="detail" d="@CutawayGeometry.SheetFrame" />
+
+    <rect class="water-tone" x="@CutawayGeometry.WaterTone.X" y="@CutawayGeometry.WaterTone.Y"
+          width="@CutawayGeometry.WaterTone.W" height="@CutawayGeometry.WaterTone.H" />
+
+    <path class="hull-base" d="@CutawayGeometry.HullOutline" />
+
+    @foreach (var shape in CutawayGeometry.Compartments)
+    {
+        compartments.TryGetValue(shape.Id, out var comp);
+        var opened = comp?.Opened ?? false;
+        var name = comp?.Name ?? shape.Caption;
+        var id = shape.Id;
+        var regionSelected = Session.SelectedCompartmentId == id;
+        var found = comp?.Components ?? Array.Empty<FoundComponent>();
+
+        <g class="region @(opened ? "open" : "closed") @(regionSelected ? "selected" : "")"
+           data-compartment="@id" role="button" tabindex="0" aria-label="@name"
+           @onclick="() => Session.ClickCompartment(id)"
+           @onkeydown="e => OnKey(e, () => Session.ClickCompartment(id))">
+            <path class="panel" d="@shape.PathData" />
+            <path class="hatch" d="@shape.PathData" fill="url(#cutaway-hatch)" />
+            <path class="outline" d="@shape.PathData" />
+            <g class="caption"><text x="@shape.LabelX" y="@shape.LabelY">@shape.Caption</text></g>
+
+            @for (var i = 0; i < found.Count; i++)
+            {
+                var item = found[i];
+                var itemId = item.Id;
+                var slot = shape.Slots[Math.Min(i, shape.Slots.Length - 1)];
+                var selected = Session.SelectedComponentId == itemId;
+
+                <g class="marker @(item.HasKnownFault ? "fault" : "") @(selected ? "selected" : "")"
+                   data-component="@itemId" role="button" tabindex="0"
+                   aria-label="@(item.HasKnownFault ? item.Name + ", known fault" : item.Name)"
+                   @onclick="() => Session.SelectComponent(itemId)" @onclick:stopPropagation="true"
+                   @onkeydown="e => OnKey(e, () => Session.SelectComponent(itemId))" @onkeydown:stopPropagation="true">
+                    <circle class="ring" cx="@slot.X" cy="@slot.Y" r="9" />
+                    <circle class="dot" cx="@slot.X" cy="@slot.Y" r="5" />
+                    <text class="label" x="@(slot.X + 11)" y="@(slot.Y + 4)">@item.Name</text>
+                </g>
+            }
+        </g>
+    }
+
+    <path class="hull-line" d="@CutawayGeometry.HullOutline" />
+    <path class="hull-line" d="@CutawayGeometry.CabinTop" />
+    <path class="hull-line" d="@CutawayGeometry.SheerLine" />
+    <path class="rig-line" d="@CutawayGeometry.Mast" />
+    @foreach (var d in CutawayGeometry.Details)
+    {
+        <path class="detail" d="@d" />
+    }
+    <g class="quiet"><text x="@CutawayGeometry.QuarterBerthX" y="@CutawayGeometry.QuarterBerthY">@CutawayGeometry.QuarterBerthCaption</text></g>
+
+    <line class="waterline" x1="@CutawayGeometry.WaterlineX1" y1="@CutawayGeometry.WaterlineY"
+          x2="@CutawayGeometry.WaterlineX2" y2="@CutawayGeometry.WaterlineY" />
+    <text class="waterline-label" x="@(CutawayGeometry.WaterlineX1 + 4)" y="@(CutawayGeometry.WaterlineY - 5)">WATERLINE</text>
+    <text class="title" x="@CutawayGeometry.TitleX" y="@CutawayGeometry.TitleY">@CutawayGeometry.Title</text>
+</svg>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    private void OnSessionChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+
+    private static void OnKey(KeyboardEventArgs e, Action activate)
+    {
+        if (e.Key is "Enter" or " " or "Spacebar") activate();
+    }
+}

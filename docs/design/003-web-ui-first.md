@@ -30,3 +30,22 @@ The engine decision stays open. The three views in CONCEPT.md (cutaway, chart, l
 ## Non-goals for this round
 
 Chart view, seasons, economy, sound, mobile layout, the MCP adapter.
+
+## Implementation notes
+
+**Run it.** `dotnet run --project src/Haulout.Web --urls http://localhost:5180`, then open http://localhost:5180. Blazor WebAssembly, no server project: the sim runs in the browser. Everything is offline (no web fonts, no CDN, no CSS framework). Laid out for desktop, ~1280 px wide and up.
+
+**Structure.**
+- `Services/GameSession.cs`: holds the `Game`; the only place the facade is touched. Execute/Ask, a `Changed` event, the selection, the last result, and the last inspect/meter text per component.
+- `Pages/Play.razor`: the briefing with "Go aboard" (issues Look), then the three regions.
+- `Components/Cutaway.razor`: SVG cutaway. All geometry is in `Art/CutawayGeometry.cs` (paths, captions, marker slots), so the art pass edits only that file.
+- `Components/ContextPanel.razor`: Try to start, Buy remote start button, the last result as prose, the closing card, and the selected component's verbs.
+- `Components/Logbook.razor`: the paper logbook with the time/money header line.
+- `wwwroot/css/haulout.css`: design tokens (palette, line weights, faces, fade) as custom properties.
+
+**Facade additions** (`Haulout.Sim.Play`, tested in `tests/Haulout.Sim.Tests/Play/AdapterQueryTests.cs`):
+- `Aboard()` → `AboardView`: each compartment with `Opened` (opened, or in plain view after Look) and the components found in it (`FoundComponent(Id, Name, HasKnownFault)`; HasKnownFault means a discovered fault is still present). Unfound components are not in it, so they are not in the DOM.
+- `ComponentActions(component)` → `ComponentActionsView`: the verbs that make sense on a found component (`ActionOption(Verb, Label, Available, UnavailableReason, Minutes, CostNok)`), e.g. Measure on a cranking-circuit part is unavailable without the remote start button, and Check flow is unavailable while the engine is not running. An unfound name gets `Found = false`, the same answer as a non-existent one.
+Both are queries: no time passes. The MCP adapter can reuse them.
+
+**Clicking.** Clicking a closed compartment issues Open (2 min); clicking it again only selects it. Clicking a marker selects the component; the panel's buttons issue the commands.

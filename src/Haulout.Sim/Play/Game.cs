@@ -20,6 +20,8 @@ public sealed class Game
     private readonly List<KnownFault> _discovered = [];
     /// <summary>Component ids the player has seen. Commands can only name what the player has found.</summary>
     private readonly HashSet<string> _seen = [];
+    /// <summary>Compartment ids the player has opened, or looked into from the yard.</summary>
+    private readonly HashSet<string> _opened = [];
     /// <summary>Compartments whose contents are in plain view from the yard: no need to open anything.</summary>
     private static readonly string[] InPlainView = ["cockpit", "deck", "hull-outside"];
     private int _minutes;
@@ -56,6 +58,8 @@ public sealed class Game
             Logbook => new LogView(_log.ToList()),
             Compartments => new CompartmentsView(CompartmentSummaries()),
             Commands => new CommandList(CommandCatalogue),
+            Aboard => AboardSnapshot(),
+            ComponentActions q => ActionsFor(q.Component),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -77,6 +81,46 @@ public sealed class Game
         new("help", null, "List the commands"),
         new("quit", null, "Leave the boat for now"),
     ];
+
+    private AboardView AboardSnapshot() => new(_boat.Compartments.Select(comp => new AboardCompartment(
+        comp.Id, comp.Name, _opened.Contains(comp.Id),
+        _boat.In(comp.Id).Where(c => _seen.Contains(c.Id))
+            .Select(c => new FoundComponent(c.Id, c.Name, c.Faults.Any(f => f.Discovered && f.Present)))
+            .ToList())).ToList());
+
+    private ComponentActionsView ActionsFor(string name)
+    {
+        var seen = _boat.Components.Where(c => _seen.Contains(c.Id));
+        var r = NameResolver.Resolve(seen, name, c => c.Id, c => c.Name, c => c.Aliases);
+        if (r.Match is not { } c) return new ComponentActionsView(name, false, null, []);
+
+        bool hasButton = _tools.Contains(Shop.RemoteStartButton);
+        var options = new List<ActionOption> { new("inspect", "Inspect", true, null, 5, 0) };
+
+        if (c.Id == "start-battery")
+            options.Add(new("measure", "Measure", true, null, 10, 0));
+        else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
+            options.Add(hasButton
+                ? new("measure", "Measure", true, null, 10, 0)
+                : new("measure", "Measure", false, "Needs someone to crank while you hold the probes: a remote start button.", 10, 0));
+        else if (c.Id == "glow-plugs")
+            options.Add(new("measure", "Measure", true, null, 10, 0));
+
+        if (c.Cleanable) options.Add(new("clean", "Clean", true, null, 30, 0));
+        if (c.ReplaceCostNok > 0) options.Add(new("replace", "Replace", true, null, c.ReplaceMinutes, c.ReplaceCostNok));
+        if (c.Id == "start-battery") options.Add(new("charge", "Charge", true, null, 480, 0));
+        if (c.Id == "primary-filter") options.Add(new("check-filter-bowl", "Check filter bowl", true, null, 10, 0));
+        if (RawWaterParts.Contains(c.Id))
+            options.Add(_running
+                ? new("check-raw-water-flow", "Check flow", true, null, 5, 0)
+                : new("check-raw-water-flow", "Check flow", false, "Only tells you anything with the engine running.", 5, 0));
+
+        return new ComponentActionsView(name, true, c.Name, options);
+    }
+
+    /// <summary>Parts on the raw-water side, where watching the exhaust flow is the natural check.</summary>
+    private static readonly string[] RawWaterParts =
+        ["raw-water-seacock", "raw-water-strainer", "raw-water-pump", "impeller", "exhaust-elbow", "exhaust-hose"];
 
     // --------------------------------------------------------------- commands
 
@@ -113,6 +157,7 @@ public sealed class Game
         t.Narrative.Add("You could open up: " + string.Join(", ", _boat.Compartments.Select(c => c.Name)) + ".");
         var obvious = InPlainView.SelectMany(_boat.In).ToList();
         foreach (var c in obvious) _seen.Add(c.Id);
+        foreach (var id in InPlainView) _opened.Add(id);
         t.Narrative.Add("In plain view: " + string.Join(", ", obvious.Select(c => c.Name)) + ".");
         return Accept(t, "look", 2, 0, new CompartmentList(CompartmentSummaries()), "Looked around the boat.");
     }
@@ -124,6 +169,7 @@ public sealed class Game
 
         var visible = _boat.In(comp.Id).Select(c => new SeenComponent(c.Id, c.Name)).ToList();
         foreach (var v in visible) _seen.Add(v.Id);
+        _opened.Add(comp.Id);
         t.Narrative.Add(comp.Description);
         t.Narrative.Add(visible.Count == 0
             ? "There is nothing in here worth naming."

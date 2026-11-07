@@ -1,0 +1,115 @@
+@using Haulout.Web.Services
+@using Haulout.Sim.Play
+@inject GameSession Session
+@implements IDisposable
+
+<aside class="contextpanel">
+    <div class="top">
+        <button class="primary" data-action="start" @onclick="() => Session.TryStart()">Try to start</button>
+        @if (!Session.HasRemoteStartButton)
+        {
+            <button data-action="buy-remote" @onclick="() => Session.BuyRemoteStartButton()">Buy remote start button (@Session.RemoteStartButtonCostNok NOK)</button>
+        }
+    </div>
+
+    @if (Session.LastResult is { } r && !ReferenceEquals(r.Narrative, Session.ClosingNarrative))
+    {
+        <section class="result @(r.Accepted ? "" : "refused")">
+            @foreach (var line in r.Narrative)
+            {
+                <p>@line</p>
+            }
+            @if (r.Accepted && (r.MinutesTaken > 0 || r.CostNok > 0))
+            {
+                <p class="cost">@Cost(r)</p>
+            }
+            @foreach (var f in r.NewlyDiscovered)
+            {
+                <p class="noted">Noted in the log: @f.Name.</p>
+            }
+        </section>
+    }
+
+    @if (Session.ClosingNarrative is { } closing)
+    {
+        <section class="closing">
+            <h2>She runs.</h2>
+            @foreach (var line in closing)
+            {
+                <p>@line</p>
+            }
+        </section>
+    }
+
+    <section class="selection">
+        @if (Session.SelectedComponentId is { } id)
+        {
+            var view = Session.ActionsFor(id);
+            if (view.Found)
+            {
+                var inspect = Session.LastInspectText(id);
+                var meter = Session.LastMeterText(id);
+                <h2>@view.ComponentName</h2>
+                <div class="known">
+                    @if (inspect is not null) { <p><span class="label">Inspected:</span> @inspect</p> }
+                    @if (meter is not null) { <p><span class="label">Meter:</span> @meter</p> }
+                    @if (inspect is null && meter is null) { <p class="faint">You haven't looked closely yet.</p> }
+                </div>
+                <div class="options">
+                    @foreach (var o in view.Options)
+                    {
+                        <div class="option">
+                            <button data-verb="@o.Verb" disabled="@(!o.Available)" @onclick="() => Session.RunVerb(o.Verb, id)">@OptionLabel(o)</button>
+                            @if (!o.Available && o.UnavailableReason is { } why)
+                            {
+                                <p class="why">@why</p>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (Session.SelectedCompartmentId is { } cid
+                 && Session.Aboard.Compartments.FirstOrDefault(c => c.Id == cid) is { } comp)
+        {
+            <h2>@comp.Name</h2>
+            <div class="parts">
+                @foreach (var c in comp.Components)
+                {
+                    <button class="part @(c.HasKnownFault ? "faulty" : "")" data-component="@c.Id" @onclick="() => Session.SelectComponent(c.Id)">@c.Name</button>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="faint">Click a part of the boat to open it up.</p>
+        }
+    </section>
+</aside>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private static string Duration(int minutes) =>
+        minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes} min";
+
+    private static string Cost(CommandResult r)
+    {
+        var parts = new List<string>();
+        if (r.MinutesTaken > 0) parts.Add($"+{Duration(r.MinutesTaken)}");
+        if (r.CostNok > 0) parts.Add($"{r.CostNok} NOK");
+        return string.Join(", ", parts);
+    }
+
+    private static string OptionLabel(ActionOption o)
+    {
+        var extra = new List<string>();
+        if (o.CostNok > 0) extra.Add($"{o.CostNok} NOK");
+        if (o.Minutes > 0) extra.Add(Duration(o.Minutes));
+        return extra.Count == 0 ? o.Label : $"{o.Label} — {string.Join(", ", extra)}";
+    }
+}

@@ -36,6 +36,8 @@ public sealed record CheckRawWaterFlow() : Command;
 [JsonDerivedType(typeof(Logbook), "logbook")]
 [JsonDerivedType(typeof(Compartments), "compartments")]
 [JsonDerivedType(typeof(Commands), "commands")]
+[JsonDerivedType(typeof(Aboard), "aboard")]
+[JsonDerivedType(typeof(ComponentActions), "component-actions")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -43,3 +45,7 @@ public sealed record Status() : Query;
 public sealed record Logbook() : Query;
 public sealed record Compartments() : Query;
 public sealed record Commands() : Query;
+/// <summary>What the player has opened and found so far, compartment by compartment.</summary>
+public sealed record Aboard() : Query;
+/// <summary>The verbs that make sense on a component the player has found, with time, cost and why one is unavailable.</summary>
+public sealed record ComponentActions(string Component) : Query;

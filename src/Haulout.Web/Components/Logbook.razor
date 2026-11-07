@@ -1,0 +1,36 @@
+@using Haulout.Web.Services
+@inject GameSession Session
+@implements IDisposable
+
+<section class="logbook">
+    @{ var status = Session.Status; var entries = Session.Log.Entries; }
+    <header>Day @status.Day · @status.TimeOfDay · time spent @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK</header>
+    <div class="scroll">
+        <ol>
+            @if (entries.Count == 0)
+            {
+                <li class="empty">The logbook is empty.</li>
+            }
+            @foreach (var (e, i) in entries.Select((e, i) => (e, i)))
+            {
+                <li @key="i" class="@Kind(e.Text)">
+                    <span class="stamp">D@(e.Day) @e.TimeOfDay</span>
+                    <span class="text">@e.Text</span>
+                </li>
+            }
+        </ol>
+    </div>
+</section>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private static string Kind(string text) =>
+        text.StartsWith("Found:") ? "found"
+        : text.StartsWith("Bought") || text.StartsWith("Replaced") ? "receipt"
+        : "";
+}
