@@ -51,15 +51,15 @@
                 var meter = Session.LastMeterText(id);
                 <h2>@view.ComponentName</h2>
                 <div class="known">
-                    @if (inspect is not null) { <p><span class="label">Inspected:</span> @inspect</p> }
-                    @if (meter is not null) { <p><span class="label">Meter:</span> @meter</p> }
+                    @if (inspect is not null && !LastIsInspect(inspect)) { <p><span class="label">Inspected:</span> @inspect</p> }
+                    @if (meter is not null && !LastIsMeter(meter)) { <p><span class="label">Meter:</span> @meter</p> }
                     @if (inspect is null && meter is null) { <p class="faint">You haven't looked closely yet.</p> }
                 </div>
                 <div class="options">
                     @foreach (var o in view.Options)
                     {
                         <div class="option">
-                            <button data-verb="@o.Verb" disabled="@(!o.Available)" @onclick="() => Session.RunVerb(o.Verb, id)">@OptionLabel(o)</button>
+                            <button data-verb="@o.Verb" disabled="@(!o.Available)" @onclick="() => Session.RunVerb(o.Verb, id)"><span class="verb">@o.Label</span>@if (OptionMeta(o) is { Length: > 0 } meta) { <span class="meta">@meta</span> }</button>
                             @if (!o.Available && o.UnavailableReason is { } why)
                             {
                                 <p class="why">@why</p>
@@ -105,11 +105,17 @@
         return string.Join(", ", parts);
     }
 
-    private static string OptionLabel(ActionOption o)
+    private bool LastIsInspect(string remembered) =>
+        Session.LastResult is { Accepted: true, Observation: InspectionView iv } && iv.Text == remembered;
+
+    private bool LastIsMeter(string remembered) =>
+        Session.LastResult is { Accepted: true, Observation: MeterReading mr } && mr.Text == remembered;
+
+    private static string OptionMeta(ActionOption o)
     {
         var extra = new List<string>();
         if (o.CostNok > 0) extra.Add($"{o.CostNok} NOK");
         if (o.Minutes > 0) extra.Add(Duration(o.Minutes));
-        return extra.Count == 0 ? o.Label : $"{o.Label} — {string.Join(", ", extra)}";
+        return string.Join(" · ", extra);
     }
 }

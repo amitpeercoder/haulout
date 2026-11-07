@@ -455,7 +455,7 @@ public sealed class Game
     {
         var stamp = FormatTime(_minutes);
         int day = Day;
-        _log.Add(new LogEntry(day, stamp, logText));
+        _log.Add(new LogEntry(day, stamp, logText, costNok));
         foreach (var k in t.Newly) _log.Add(new LogEntry(day, stamp, $"Found: {k.Name}."));
         _minutes += minutes;
         _money += costNok;

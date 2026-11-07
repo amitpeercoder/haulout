@@ -113,3 +113,20 @@ public class AdapterQueryTests
         Assert.Contains(Actions(g, "primary-filter").Options, o => o.Verb == "check-filter-bowl" && o.Available);
     }
 }
+
+public class LogReceiptTests
+{
+    [Fact]
+    public void Log_entries_carry_what_they_cost()
+    {
+        var g = Game.NewFirstFault();
+        g.Execute(new Look());
+        g.Execute(new Open("battery box"));
+        g.Execute(new Buy("remote start button"));
+        g.Execute(new Replace("start battery"));
+        var log = Assert.IsType<LogView>(g.Ask(new Logbook())).Entries;
+        Assert.Equal(400, log.Single(e => e.Text.StartsWith("Bought")).CostNok);
+        Assert.Equal(1900, log.Single(e => e.Text.StartsWith("Replaced")).CostNok);
+        Assert.Equal(0, log.Single(e => e.Text.StartsWith("Looked")).CostNok);
+    }
+}

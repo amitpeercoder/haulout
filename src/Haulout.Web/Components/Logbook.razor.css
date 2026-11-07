@@ -26,5 +26,6 @@ li {
 .stamp { font-family: var(--face-type); font-size: 0.78rem; color: var(--ink-faint); white-space: nowrap; flex: 0 0 6.2em; }
 .text { font-family: var(--face-hand); font-size: 1rem; line-height: 1.4; padding: 0.15rem 0; }
 li.found .text { color: var(--fault); }
-li.receipt .text { font-family: var(--face-type); font-size: 0.9rem; }
+li.receipt span.text { font-family: var(--face-type); font-size: 0.9rem; line-height: 28px; padding: 0; }
+li .amount { margin-left: auto; font-family: var(--face-type); font-size: 0.9rem; white-space: nowrap; }
 li.empty { color: var(--ink-faint); font-family: var(--face-hand); }

@@ -13,9 +13,10 @@
             }
             @foreach (var (e, i) in entries.Select((e, i) => (e, i)))
             {
-                <li @key="i" class="@Kind(e.Text)">
+                <li @key="i" class="@Kind(e)">
                     <span class="stamp">D@(e.Day) @e.TimeOfDay</span>
                     <span class="text">@e.Text</span>
+                    @if (e.CostNok > 0) { <span class="amount">@e.CostNok NOK</span> }
                 </li>
             }
         </ol>
@@ -29,8 +30,8 @@
 
     public void Dispose() => Session.Changed -= OnChanged;
 
-    private static string Kind(string text) =>
-        text.StartsWith("Found:") ? "found"
-        : text.StartsWith("Bought") || text.StartsWith("Replaced") ? "receipt"
+    private static string Kind(Haulout.Sim.Play.LogEntry e) =>
+        e.Text.StartsWith("Found:") ? "found"
+        : e.CostNok > 0 || e.Text.StartsWith("Bought") || e.Text.StartsWith("Replaced") ? "receipt"
         : "";
 }

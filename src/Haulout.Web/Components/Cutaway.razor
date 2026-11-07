@@ -16,8 +16,12 @@
     <rect class="sheet" x="0" y="0" width="@CutawayGeometry.Width" height="@CutawayGeometry.Height" />
     <path class="detail" d="@CutawayGeometry.SheetFrame" />
 
-    <rect class="water-tone" x="@CutawayGeometry.WaterTone.X" y="@CutawayGeometry.WaterTone.Y"
-          width="@CutawayGeometry.WaterTone.W" height="@CutawayGeometry.WaterTone.H" />
+    <rect class="concrete" x="@CutawayGeometry.GroundTone.X" y="@CutawayGeometry.GroundTone.Y"
+          width="@CutawayGeometry.GroundTone.W" height="@CutawayGeometry.GroundTone.H" />
+    @foreach (var d in CutawayGeometry.Backdrop)
+    {
+        <path class="@d.Class" d="@d.D" />
+    }
 
     <path class="hull-base" d="@CutawayGeometry.HullOutline" />
 
@@ -37,6 +41,13 @@
             <path class="panel" d="@shape.PathData" />
             <path class="hatch" d="@shape.PathData" fill="url(#cutaway-hatch)" />
             <path class="outline" d="@shape.PathData" />
+            @if (opened && !shape.Furniture.IsDefaultOrEmpty)
+            {
+                @foreach (var f in shape.Furniture)
+                {
+                    <path class="furniture" d="@f" />
+                }
+            }
             <g class="caption"><text x="@shape.LabelX" y="@shape.LabelY">@shape.Caption</text></g>
 
             @for (var i = 0; i < found.Count; i++)
@@ -44,6 +55,7 @@
                 var item = found[i];
                 var itemId = item.Id;
                 var slot = shape.Slots[Math.Min(i, shape.Slots.Length - 1)];
+                var spot = CutawayGeometry.Spots.TryGetValue(itemId, out var mapped) ? mapped : MarkerSpot.FromSlot(slot, item.Name);
                 var selected = Session.SelectedComponentId == itemId;
 
                 <g class="marker @(item.HasKnownFault ? "fault" : "") @(selected ? "selected" : "")"
@@ -51,9 +63,18 @@
                    aria-label="@(item.HasKnownFault ? item.Name + ", known fault" : item.Name)"
                    @onclick="() => Session.SelectComponent(itemId)" @onclick:stopPropagation="true"
                    @onkeydown="e => OnKey(e, () => Session.SelectComponent(itemId))" @onkeydown:stopPropagation="true">
-                    <circle class="ring" cx="@slot.X" cy="@slot.Y" r="9" />
-                    <circle class="dot" cx="@slot.X" cy="@slot.Y" r="5" />
-                    <text class="label" x="@(slot.X + 11)" y="@(slot.Y + 4)">@item.Name</text>
+                    @if (spot.LeaderX is { } lx && spot.LeaderY is { } ly)
+                    {
+                        <line class="leader" x1="@spot.X" y1="@spot.Y" x2="@lx" y2="@ly" />
+                    }
+                    <circle class="hit" cx="@spot.X" cy="@spot.Y" r="12" />
+                    <circle class="ring" cx="@spot.X" cy="@spot.Y" r="11" />
+                    @if (item.HasKnownFault)
+                    {
+                        <circle class="fault-ring" cx="@spot.X" cy="@spot.Y" r="8" />
+                    }
+                    <circle class="dot" cx="@spot.X" cy="@spot.Y" r="5" />
+                    <text class="label" x="@spot.LabelX" y="@spot.LabelY" text-anchor="@spot.Anchor">@spot.Label</text>
                 </g>
             }
         </g>
@@ -63,6 +84,10 @@
     <path class="hull-line" d="@CutawayGeometry.CabinTop" />
     <path class="hull-line" d="@CutawayGeometry.SheerLine" />
     <path class="rig-line" d="@CutawayGeometry.Mast" />
+    @foreach (var d in CutawayGeometry.Overlay)
+    {
+        <path class="@d.Class" d="@d.D" />
+    }
     @foreach (var d in CutawayGeometry.Details)
     {
         <path class="detail" d="@d" />
@@ -71,7 +96,7 @@
 
     <line class="waterline" x1="@CutawayGeometry.WaterlineX1" y1="@CutawayGeometry.WaterlineY"
           x2="@CutawayGeometry.WaterlineX2" y2="@CutawayGeometry.WaterlineY" />
-    <text class="waterline-label" x="@(CutawayGeometry.WaterlineX1 + 4)" y="@(CutawayGeometry.WaterlineY - 5)">WATERLINE</text>
+    <text class="waterline-label" x="@(CutawayGeometry.WaterlineX1 + 4)" y="@(CutawayGeometry.WaterlineY - 5)">@CutawayGeometry.WaterlineLabel</text>
     <text class="title" x="@CutawayGeometry.TitleX" y="@CutawayGeometry.TitleY">@CutawayGeometry.Title</text>
 </svg>
 

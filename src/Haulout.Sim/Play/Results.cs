@@ -73,7 +73,8 @@ public sealed record StatusView(
     IReadOnlyList<KnownFault> DiscoveredFaults,
     IReadOnlyList<string> Tools) : QueryResult;
 
-public sealed record LogEntry(int Day, string TimeOfDay, string Text);
+/// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
+public sealed record LogEntry(int Day, string TimeOfDay, string Text, int CostNok = 0);
 
 public sealed record LogView(IReadOnlyList<LogEntry> Entries) : QueryResult;
 
