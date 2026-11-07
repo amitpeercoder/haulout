@@ -65,3 +65,11 @@ Yes, as an architecture rule now and a dev tool soon; as a marketing promise onl
 ### Reference agent
 
 Sonnet, with `prompt.md` as written, is the reference agent for difficulty. A fault is a good fault when Sonnet solves it in a moderate number of steps, with some wasted effort. If Sonnet solves it straight away, the loop is too shallow. If it fails, the fault is not diagnosable. Opus and Haiku give the upper and lower bounds. The playtest runs on demand, not in CI, because each run costs model usage and needs a logged-in `claude`.
+
+## Playtest log
+
+| Date | Fault | Model | Solved | Steps | Game time | Money | Notes |
+|---|---|---|---|---|---|---|---|
+| 2026-11-07 | 001 corroded negative terminal | sonnet | yes | 13 | 1 h 30 min | 0 | Went straight to the battery box on the "click" symptom, inspected both terminals, cleaned the negative on the visible bloom alone. Never bought the remote start, never used the meter. Also cleaned the healthy positive terminal. |
+
+Finding: the visible green bloom on inspect makes the multimeter unnecessary for a player who knows the symptom. The meter lesson is only taught if the hint is removed or made conditional (e.g. only after lifting the boot).
