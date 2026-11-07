@@ -18,8 +18,8 @@ A sailboat-ownership sim. Buy a tired boat, keep it alive through the seasons, s
 ## Build order
 
 1. Sim core + tests + console (now).
-2. Engine decision after the sim is fun in a terminal. Default: Godot 4 with C#.
-3. Cutaway prototype: one hull, one marina, logbook UI, the first fault.
+2. Web UI (Blazor WebAssembly) as the first real UX: cutaway, actions, logbook, the first fault. See docs/design/003.
+3. Engine decision after the web slice exists. Godot 4 is an option, not the default; a desktop wrapper over the web UI is the other.
 
 ## Repository layout
 
@@ -28,7 +28,8 @@ CONCEPT.md            vision, pillars, scope
 CLAUDE.md             this file
 docs/design/          design notes: component graph, degradation, economy
 src/Haulout.Sim/      the sim core (library)
-src/Haulout.Console/  text interface (adapter)
+src/Haulout.Console/  text interface (adapter, dev tool)
+src/Haulout.Web/      Blazor WebAssembly UI (adapter) — see docs/design/003
 src/Haulout.Mcp/      MCP server for AI agents (adapter, planned)
 tests/Haulout.Sim.Tests/
 ```

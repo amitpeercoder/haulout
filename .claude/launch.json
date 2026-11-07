@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "/opt/homebrew/opt/dotnet@8/bin/dotnet",
+      "runtimeArgs": ["run", "--project", "src/Haulout.Web", "--urls", "http://localhost:5180"],
+      "port": 5180
+    }
+  ]
+}
