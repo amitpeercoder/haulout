@@ -15,13 +15,18 @@ public sealed record StartResult(
     int Rule,
     ElectricalReading Electrical,
     bool OverheatWarning,
+    bool LabouredCrank,
     string Description);
 
 public static class EngineModel
 {
     public const double DeadBatteryVolts = 10.5;
+    /// <summary>Unverified placeholder (design note 001, decision 2).</summary>
     public const double ClickBelowStarterVolts = 6.0;
+    /// <summary>Unverified placeholder (design note 001, decision 2).</summary>
     public const double SlowCrankBelowStarterVolts = 8.0;
+    /// <summary>Unverified placeholder (design note 001, decision 2). Below this the starter drags but the engine still catches.</summary>
+    public const double LabouredCrankBelowStarterVolts = 9.5;
     public const double FiresAndDiesRestriction = 0.85;
     public const double RunsRoughRestriction = 0.6;
     public const double RoughInjectorCondition = 0.3;
@@ -53,10 +58,13 @@ public static class EngineModel
         bool running = outcome is StartOutcome.RunsRough or StartOutcome.Runs;
         bool overheat = running && inputs.Cooling.RawWaterFlow < OverheatBelowFlow;
 
-        return new StartResult(outcome, rule, reading, overheat, Describe(outcome, overheat));
+        // Laboured only applies to outcomes where the engine actually cranked (rules 4-7).
+        bool laboured = rule >= 4 && reading.StarterVolts < LabouredCrankBelowStarterVolts;
+
+        return new StartResult(outcome, rule, reading, overheat, laboured, Describe(outcome, overheat, laboured));
     }
 
-    private static string Describe(StartOutcome outcome, bool overheat)
+    private static string Describe(StartOutcome outcome, bool overheat, bool laboured)
     {
         string text = outcome switch
         {
@@ -69,6 +77,17 @@ public static class EngineModel
             StartOutcome.Runs => "The engine catches and settles to a steady note. The cockpit hums quietly under the grey March light.",
             _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
         };
+        if (laboured)
+        {
+            text = outcome switch
+            {
+                StartOutcome.Runs => "The starter drags her round, slow and laboured, before she catches and settles to a steady note. The cockpit hums quietly under the grey March light.",
+                StartOutcome.CranksNoFire => "The starter drags the engine round, slow and laboured, and she never catches. The smell of cold diesel stays out of the exhaust.",
+                StartOutcome.FiresAndDies => "The starter drags her round, slow and laboured. She catches, coughs twice, shudders, and dies. The silence afterwards is longer than it should be.",
+                StartOutcome.RunsRough => "The starter drags her round, slow and laboured, before she catches and settles into a lumpy, hunting idle. The note rises and sags, and the cockpit shakes with it.",
+                _ => text,
+            };
+        }
         return overheat
             ? text + " No water spitting from the exhaust. The temperature alarm starts to whine."
             : text;

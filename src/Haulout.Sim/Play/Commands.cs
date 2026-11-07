@@ -12,6 +12,7 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(Clean), "clean")]
 [JsonDerivedType(typeof(Replace), "replace")]
 [JsonDerivedType(typeof(Charge), "charge")]
+[JsonDerivedType(typeof(Buy), "buy")]
 [JsonDerivedType(typeof(CheckFilterBowl), "check-filter-bowl")]
 [JsonDerivedType(typeof(CheckRawWaterFlow), "check-raw-water-flow")]
 public abstract record Command;
@@ -24,6 +25,7 @@ public sealed record StartEngine() : Command;
 public sealed record Clean(string Component) : Command;
 public sealed record Replace(string Component) : Command;
 public sealed record Charge(string Component) : Command;
+public sealed record Buy(string Item) : Command;
 public sealed record CheckFilterBowl() : Command;
 public sealed record CheckRawWaterFlow() : Command;
 

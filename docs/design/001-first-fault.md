@@ -2,7 +2,7 @@
 
 **Question.** What is the smallest sim that makes "click, no crank" a fun detective loop in a terminal?
 
-**Decision.** A data-driven component graph (`Data/sloop28.json`, 40 components in 9 compartments), faults as first-class objects on components, a pure rule table for the start attempt, and a command-driven `Session` that the console only feeds text into. The fault layout is fixed; no randomness in this slice.
+**Decision.** A data-driven component graph (`Data/sloop28.json`, 40 components in 8 compartments), faults as first-class objects on components, a pure rule table for the start attempt, and a command-driven `Game` facade that the console only feeds commands into. The fault layout is fixed; no randomness in this slice.
 
 ## Component graph (40)
 
@@ -57,12 +57,12 @@ Players will be humans in a terminal now and AI agents over MCP later, so the si
 
 look 2 min; open 2 min; inspect 5 min; measure 10 min; start 2 min; check filter bowl 10 min; check flow 5 min; clean 30 min; charge 8 h; replace per component (e.g. terminal 30 min / 60, battery 1 h / 1 900, starter 3 h / 3 800). All recorded in the logbook.
 
-## Open questions for Amit
+## Decisions (Amit, 2026-11-07)
 
-1. **Ashore or afloat?** "Launch in three weeks" means she is on the hard. We assume the yard hose is rigged to the raw-water intake so the engine can run. Is that what owners do, or should start attempts ashore be limited?
-2. **Starter voltage thresholds** (click < 6 V, slow crank < 8 V) and the 0.045 Ω effective starter resistance are game values. Are they believable for a small two- or three-cylinder marine diesel?
-3. **Measuring while cranking alone.** We let the player crank and read the meter at once. Real owners need a helper or a remote start switch. Model the helper?
-4. **Glow plugs.** Is "dead glow plugs → cranks, no fire" right in a Nordic March, and what resistance should a healthy plug read? (We use 0.8 Ω as a placeholder.)
-5. **Battery decoy.** Would a 60 % battery give a noticeably slower crank once the terminal is fixed? We currently say it cranks normally.
-6. **Does a corroded negative terminal show visibly?** We hint at it on inspect (green bloom at the boot edge) but only confirm it with the meter. Too easy, too hard?
-7. **Prices and hours** are placeholders in an abstract currency. Need a sanity pass.
+1. **Ashore.** She is on the hard with the yard hose on the raw-water intake. Standard practice; the first fault happens before launch.
+2. **Starter thresholds** (click < 6 V, slow crank < 8 V, starter 0.045 Ω) stay as placeholders, marked *unverified* until a mechanic confirms.
+3. **No helper modelled.** A remote start button is a cheap tool the player can buy; solo measurement is possible but costs something.
+4. **Glow plugs:** dead plugs in a Nordic March give "cranks, no fire" or "fires and dies" depending on temperature. 0.8 Ω placeholder, *unverified*.
+5. **Low battery cranks slower** once the terminal is fixed, and the start text says so. Otherwise the decoy teaches nothing.
+6. **Corrosion difficulty** stays hint-plus-meter. Difficulty comes from decoys and from later faults with no visible hint.
+7. **Prices and hours** stay placeholders until there is an economy; calibrate them all against a season's budget.

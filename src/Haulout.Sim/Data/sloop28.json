@@ -305,6 +305,7 @@
       "condition": 0.6,
       "wearYears": 12,
       "seriesOhms": 0.045,
+      "note": "seriesOhms 0.045 is an unverified placeholder, decision 2",
       "cleanable": false,
       "replaceCostNok": 3800,
       "replaceMinutes": 180
@@ -837,6 +838,7 @@
       "cleanable": false,
       "replaceCostNok": 640,
       "replaceMinutes": 90,
+      "note": "healthyOhms 0.8 is an unverified placeholder, decision 4",
       "properties": {
         "healthyOhms": 0.8
       }

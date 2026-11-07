@@ -28,6 +28,7 @@ public static class WordParser
             "start" or "crank" => new RunCommand(new StartEngine()),
             "clean" or "tighten" => WithArg(arg, "clean <component>", a => new Clean(a)),
             "replace" => WithArg(arg, "replace <component>", a => new Replace(a)),
+            "buy" => WithArg(arg, "buy <item>", a => new Buy(a)),
             "charge" => new RunCommand(new Charge(arg.Length == 0 ? "start battery" : arg)),
             "check" => ParseCheck(arg),
             "log" => new RunQuery(new Logbook()),

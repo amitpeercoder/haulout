@@ -22,6 +22,12 @@ public class GameScenarioTests
 
     private static Game ExploredGame() => Explored(Game.NewFirstFault());
 
+    private static Game WithButton(Game g)
+    {
+        Assert.True(g.Execute(new Buy("remote start button")).Accepted);
+        return g;
+    }
+
     [Fact]
     public void Decoys_alone_do_not_fix_the_click()
     {
@@ -64,7 +70,7 @@ public class GameScenarioTests
     [Fact]
     public void Multimeter_readings_add_up()
     {
-        var g = ExploredGame();
+        var g = WithButton(ExploredGame());
         string[] loop =
         [
             "positive terminal", "main positive cable", "battery switch", "starter solenoid",
@@ -113,6 +119,7 @@ public class GameScenarioTests
             g.Execute(new Open("battery")),
             g.Execute(new Inspect("negative terminal")),
             g.Execute(new StartEngine()),
+            g.Execute(new Buy("remote start button")),
             g.Execute(new Measure("start battery")),
             g.Execute(new Measure("negative terminal")),
             g.Execute(new Clean("negative terminal")),
@@ -120,14 +127,15 @@ public class GameScenarioTests
         };
         Assert.All(results, r => Assert.True(r.Accepted));
         Assert.Equal("Click", Outcome(results[3]));
-        Assert.Equal("Runs", Outcome(results[7]));
-        Assert.True(results[7].Finished);
-        Assert.Contains(results[7].Narrative, l => l.StartsWith("Time spent: 1 h 3 min. Money spent: 0"));
+        Assert.Equal("Runs", Outcome(results[8]));
+        Assert.True(results[8].Finished);
+        Assert.Contains(results[8].Narrative, l => l.StartsWith("Time spent: 1 h 33 min. Money spent: 400"));
 
         var s = Status(g);
-        Assert.Equal(63, s.MinutesSpent);
-        Assert.Equal(0, s.MoneySpentNok);
-        Assert.Equal("09:03", s.TimeOfDay);
+        Assert.Equal(93, s.MinutesSpent);
+        Assert.Equal(400, s.MoneySpentNok);
+        Assert.Equal("09:33", s.TimeOfDay);
+        Assert.Equal(["remote start button"], s.Tools);
         Assert.Equal(75, s.Day);
         Assert.Equal("Runs", s.LastStartOutcome);
         Assert.True(s.Finished);
@@ -159,7 +167,7 @@ public class GameScenarioTests
         {
             var reveal = fault.Reveals.First(r => r.Discovers);
             var boat = BoatLoader.LoadSloop28();
-            var g = Explored(new Game(boat));
+            var g = WithButton(Explored(new Game(boat)));
             var comp = reference.Get(fault.ComponentId).Name;
 
             if (reveal.Action == PlayerAction.CheckRawWaterFlow)
@@ -196,6 +204,7 @@ public class GameScenarioTests
         Ask(new Briefing()); Ask(new Commands()); Ask(new Compartments());
         Cmd(new Look()); Cmd(new Open("battery")); Cmd(new Inspect("negative terminal"));
         Cmd(new StartEngine()); Ask(new Status()); Cmd(new Measure("start battery"));
+        Cmd(new Buy("remote start button")); Cmd(new Measure("start battery"));
         Cmd(new Measure("filter")); // rejected
         Ask(new Logbook());
         return json;
@@ -282,6 +291,7 @@ public class GameScenarioTests
         Assert.True(g.Execute(new Inspect("rudder")).Accepted);
         Assert.True(g.Execute(new Open("battery")).Accepted);
         Assert.True(g.Execute(new Inspect("negative terminal")).Accepted);
+        WithButton(g);
         Assert.True(g.Execute(new Measure("negative terminal")).Accepted);
     }
 
@@ -303,9 +313,100 @@ public class GameScenarioTests
     }
 
     [Fact]
+    public void Without_the_button_cranking_measurements_are_refused_for_free()
+    {
+        var g = ExploredGame();
+        var logBefore = ((LogView)g.Ask(new Logbook())).Entries.Count;
+        int minutesBefore = Status(g).MinutesSpent;
+
+        foreach (var name in new[] { "negative terminal", "starter motor" })
+        {
+            var r = g.Execute(new Measure(name));
+            Assert.False(r.Accepted);
+            Assert.Equal(0, r.MinutesTaken);
+            Assert.Equal(0, r.CostNok);
+            Assert.Contains("You can't crank and hold the probes at once. A remote start button from the chandlery would let you.", r.Narrative);
+        }
+        Assert.Equal(minutesBefore, Status(g).MinutesSpent);
+        Assert.Equal(logBefore, ((LogView)g.Ask(new Logbook())).Entries.Count);
+
+        // The battery gives resting volts only, and still reveals the flat battery.
+        var b = g.Execute(new Measure("start battery"));
+        Assert.True(b.Accepted);
+        var m = Assert.IsType<MeterReading>(b.Observation);
+        Assert.Equal("volts-resting", m.Kind);
+        Assert.Null(m.CrankingVolts);
+        Assert.Contains("remote start button", string.Join(" ", b.Narrative));
+        Assert.NotEmpty(b.NewlyDiscovered);
+
+        // Glow plugs need no cranking.
+        Assert.True(g.Execute(new Measure("glow plugs")).Accepted);
+
+        int money = Status(g).MoneySpentNok;
+        var buy = g.Execute(new Buy("Remote Start"));
+        Assert.True(buy.Accepted);
+        Assert.Equal(400, buy.CostNok);
+        Assert.Equal(30, buy.MinutesTaken);
+        Assert.Equal(money + 400, Status(g).MoneySpentNok);
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Bought a remote start button.");
+
+        var n = g.Execute(new Measure("negative terminal"));
+        Assert.True(n.Accepted);
+        Assert.Equal("volts-drop", Assert.IsType<MeterReading>(n.Observation).Kind);
+        Assert.NotNull(Assert.IsType<MeterReading>(g.Execute(new Measure("start battery")).Observation).CrankingVolts);
+    }
+
+    [Fact]
+    public void Buying_twice_or_an_unknown_item_is_rejected_for_free()
+    {
+        var g = ExploredGame();
+        var unk = g.Execute(new Buy("anchor"));
+        Assert.False(unk.Accepted);
+        Assert.Contains("The chandlery doesn't have 'anchor'.", unk.Narrative);
+        WithButton(g);
+        int minutes = Status(g).MinutesSpent;
+        var again = g.Execute(new Buy("button"));
+        Assert.False(again.Accepted);
+        Assert.Contains("You already have one.", again.Narrative);
+        Assert.Equal(minutes, Status(g).MinutesSpent);
+        Assert.Equal(400, Status(g).MoneySpentNok);
+    }
+
+    [Fact]
+    public void Corroded_terminal_is_discoverable_without_the_button()
+    {
+        var g = ExploredGame();
+        Assert.True(g.Execute(new Clean("negative terminal")).Accepted);
+        Assert.Contains(Status(g).DiscoveredFaults, k => k.Name == "Corroded negative terminal");
+    }
+
+    [Fact]
+    public void Low_battery_cranks_laboured_then_runs()
+    {
+        var g = ExploredGame();
+        Assert.True(g.Execute(new Clean("negative terminal")).Accepted);
+        var r = g.Execute(new StartEngine());
+        var view = Assert.IsType<StartAttemptView>(r.Observation);
+        Assert.Equal("Runs", view.Outcome);
+        Assert.True(r.Finished);
+        Assert.True(view.LabouredCrank);
+        Assert.Contains("laboured", view.Description);
+
+        var g2 = ExploredGame();
+        Assert.True(g2.Execute(new Charge("battery")).Accepted);
+        Assert.True(g2.Execute(new Clean("negative terminal")).Accepted);
+        var r2 = g2.Execute(new StartEngine());
+        var v2 = Assert.IsType<StartAttemptView>(r2.Observation);
+        Assert.Equal("Runs", v2.Outcome);
+        Assert.False(v2.LabouredCrank);
+        Assert.DoesNotContain("laboured", v2.Description);
+    }
+
+    [Fact]
     public void Commands_query_lists_the_verbs()
     {
         var list = Assert.IsType<CommandList>(Game.NewFirstFault().Ask(new Commands()));
         Assert.Contains(list.Commands, c => c.Verb == "inspect" && c.Argument == "component");
+        Assert.Contains(list.Commands, c => c.Verb == "buy" && c.Argument == "item");
     }
 }

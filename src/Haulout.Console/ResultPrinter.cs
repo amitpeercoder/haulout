@@ -47,6 +47,7 @@ public static class ResultPrinter
             case StatusView s:
                 Console.WriteLine($"Day {s.Day}, {s.TimeOfDay}. Time spent: {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min. Money spent: {s.MoneySpentNok} NOK.");
                 Console.WriteLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
+                if (s.Tools.Count > 0) Console.WriteLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) Console.WriteLine($"  Known: {f.Name} ({f.ComponentName})");
                 break;
             case CompartmentsView c:

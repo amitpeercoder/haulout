@@ -27,6 +27,7 @@ public sealed class Game
     private bool _running;
     private bool _finished;
     private bool _measureNoted;
+    private readonly List<string> _tools = [];
     private StartOutcome? _lastStart;
 
     public Game(Boat boat, int startDay = 75)
@@ -51,7 +52,7 @@ public sealed class Game
                 "The yard hose is rigged to the raw-water intake, so the engine can run ashore.",
             ]),
             Status => new StatusView(
-                Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.ToList()),
+                Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.ToList(), _tools.ToList()),
             Logbook => new LogView(_log.ToList()),
             Compartments => new CompartmentsView(CompartmentSummaries()),
             Commands => new CommandList(CommandCatalogue),
@@ -64,10 +65,11 @@ public sealed class Game
         new("look", null, "Look around the boat"),
         new("open", "compartment", "Open up a compartment and see what is in it"),
         new("inspect", "component", "Take a closer look at something"),
-        new("measure", "component", "Put the multimeter on something while cranking"),
+        new("measure", "component", "Put the multimeter on something (cranking needs a remote start button)"),
         new("start", null, "Try to start the engine"),
         new("clean", "component", "Clean and tighten a part"),
         new("replace", "component", "Fit a new part"),
+        new("buy", "item", "Buy a tool at the yard chandlery"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
         new("check filter", null, "Look in the fuel filter bowl"),
         new("check flow", null, "Look at the cooling water at the exhaust (engine running)"),
@@ -92,6 +94,7 @@ public sealed class Game
             Clean c => DoClean(turn, c.Component),
             Replace c => DoReplace(turn, c.Component),
             Charge c => DoCharge(turn, c.Component),
+            Buy c => DoBuy(turn, c.Item),
             CheckFilterBowl => DoCheckFilterBowl(turn),
             CheckRawWaterFlow => DoCheckFlow(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
@@ -151,14 +154,28 @@ public sealed class Game
 
         var inputs = EngineInputsBuilder.Build(_boat);
         var reading = EngineModel.Attempt(inputs).Electrical;
+        bool hasButton = _tools.Contains(Shop.RemoteStartButton);
+        bool needsCranking = c.Id == EngineInputsBuilder.StarterId || reading.DropVolts.ContainsKey(c.Id);
+        if (needsCranking && !hasButton) return Reject("measure", NeedButtonMessage);
         var ci = CultureInfo.InvariantCulture;
         MeterReading meter;
         string log;
 
-        if (!_measureNoted)
+        if (hasButton && !_measureNoted && (needsCranking || c.Id == "start-battery"))
         {
-            t.Narrative.Add("You hold the probes on while someone cranks with the stop pulled, so she won't fire.");
+            t.Narrative.Add("You clip the remote start button onto the solenoid and pull the stop, so she won't fire. Probes on, you press the button.");
             _measureNoted = true;
+        }
+
+        if (c.Id == "start-battery" && !hasButton)
+        {
+            double ocv = inputs.Electrical.BatteryOpenCircuitVolts;
+            meter = new MeterReading(c.Name, "volts-resting", ocv, "V", $"Resting at {ocv.ToString("F2", ci)} V.");
+            log = $"Measured the start battery: {ocv.ToString("F2", ci)} V resting.";
+            t.Narrative.Add(meter.Text);
+            t.Narrative.Add(NeedButtonMessage);
+            foreach (var f in c.ActiveFaults.ToList()) Reveal(t, f, PlayerAction.Measure);
+            return Accept(t, "measure", 10, 0, meter, log);
         }
 
         if (c.Id == "start-battery")
@@ -226,7 +243,7 @@ public sealed class Game
             t.Narrative.Add("She'll do. Launch is in three weeks.");
             t.Narrative.Add($"Time spent: {total / 60} h {total % 60} min. Money spent: {_money} NOK.");
         }
-        return Accept(t, "start", minutes, 0, new StartAttemptView(result.Outcome.ToString(), result.Description),
+        return Accept(t, "start", minutes, 0, new StartAttemptView(result.Outcome.ToString(), result.Description, result.LabouredCrank),
             $"Tried to start the engine. Result: {result.Outcome}.");
     }
 
@@ -279,6 +296,20 @@ public sealed class Game
         var text = "You plug in the shore-power charger and wait out eight hours. By the end of it the battery is full.";
         t.Narrative.Add(text);
         return Accept(t, "charge", 480, 0, new RepairView(c.Name, text), "Charged the start battery for eight hours.");
+    }
+
+    private const string NeedButtonMessage =
+        "You can't crank and hold the probes at once. A remote start button from the chandlery would let you.";
+
+    private CommandResult DoBuy(Turn t, string item)
+    {
+        var shopItem = Shop.Find(item);
+        if (shopItem is null) return Reject("buy", $"The chandlery doesn't have '{item.Trim()}'.");
+        if (_tools.Contains(shopItem.Name)) return Reject("buy", "You already have one.");
+
+        _tools.Add(shopItem.Name);
+        t.Narrative.Add($"You walk over to the yard chandlery and buy a {shopItem.Name}.");
+        return Accept(t, "buy", shopItem.Minutes, shopItem.CostNok, null, shopItem.LogText);
     }
 
     private CommandResult DoCheckFilterBowl(Turn t)

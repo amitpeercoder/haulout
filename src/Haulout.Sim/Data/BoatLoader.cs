@@ -76,6 +76,8 @@ public static class BoatLoader
         public double WearYears { get; set; }
         public double WearPerUseHour { get; set; }
         public double? SeriesOhms { get; set; }
+        /// <summary>Authoring note, ignored by the sim.</summary>
+        public string? Note { get; set; }
         public bool Cleanable { get; set; }
         public int ReplaceCostNok { get; set; }
         public int ReplaceMinutes { get; set; }

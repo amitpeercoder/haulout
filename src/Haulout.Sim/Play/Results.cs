@@ -42,7 +42,7 @@ public sealed record InspectionView(string ComponentName, string Text) : Observa
 /// </summary>
 public sealed record MeterReading(string ComponentName, string Kind, double? Value, string Unit, string Text, double? CrankingVolts = null) : Observation;
 
-public sealed record StartAttemptView(string Outcome, string Description) : Observation;
+public sealed record StartAttemptView(string Outcome, string Description, bool LabouredCrank) : Observation;
 
 public sealed record FilterBowlView(string Text) : Observation;
 
@@ -68,7 +68,8 @@ public sealed record StatusView(
     string? LastStartOutcome,
     bool EngineRunning,
     bool Finished,
-    IReadOnlyList<KnownFault> DiscoveredFaults) : QueryResult;
+    IReadOnlyList<KnownFault> DiscoveredFaults,
+    IReadOnlyList<string> Tools) : QueryResult;
 
 public sealed record LogEntry(int Day, string TimeOfDay, string Text);
 

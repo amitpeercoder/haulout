@@ -32,6 +32,26 @@ public class EngineModelTests
         Assert.DoesNotContain("!", r.Description);
     }
 
+    [Theory]
+    [InlineData(0.6, true)]
+    [InlineData(0.75, false)]
+    [InlineData(1.0, false)]
+    public void LabouredCrank_OnlyWhenStarterVoltsBelowThreshold(double soc, bool laboured)
+    {
+        var r = EngineModel.Attempt(Make(ElectricalChainTests.Inputs(soc: soc)));
+        Assert.Equal(StartOutcome.Runs, r.Outcome);
+        Assert.Equal(laboured, r.LabouredCrank);
+        Assert.Equal(laboured, r.Electrical.StarterVolts < EngineModel.LabouredCrankBelowStarterVolts);
+        Assert.Equal(laboured, r.Description.Contains("laboured"));
+    }
+
+    [Fact]
+    public void LabouredCrank_IsFalseWhenItDidNotCrank()
+    {
+        Assert.False(EngineModel.Attempt(Make(ElectricalChainTests.Inputs(soc: 0.6, switchOn: false))).LabouredCrank);
+        Assert.False(EngineModel.Attempt(Make(ElectricalChainTests.Inputs(negTerminal: 0.02))).LabouredCrank);
+    }
+
     [Fact]
     public void SlowCrankNegTerminalFixtureIsActuallyBetween6And8Volts()
     {
