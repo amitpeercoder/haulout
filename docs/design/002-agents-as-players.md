@@ -71,5 +71,6 @@ Sonnet, with `prompt.md` as written, is the reference agent for difficulty. A fa
 | Date | Fault | Model | Solved | Steps | Game time | Money | Notes |
 |---|---|---|---|---|---|---|---|
 | 2026-11-07 | 001 corroded negative terminal | sonnet | yes | 13 | 1 h 30 min | 0 | Went straight to the battery box on the "click" symptom, inspected both terminals, cleaned the negative on the visible bloom alone. Never bought the remote start, never used the meter. Also cleaned the healthy positive terminal. |
+| 2026-11-07 | 001 corroded negative terminal | haiku | yes | 23 | 1 h 13 min | 0 | Wandered first (saloon, wrong turn to the quarter berth), then the same path: battery box, inspect terminals, clean the negative on the bloom. No meter, no remote start, no decoys touched. |
 
 Finding: the visible green bloom on inspect makes the multimeter unnecessary for a player who knows the symptom. The meter lesson is only taught if the hint is removed or made conditional (e.g. only after lifting the boot).
