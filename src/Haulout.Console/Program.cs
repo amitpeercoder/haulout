@@ -1,10 +1,32 @@
-using Haulout.Sim.Components;
-using Haulout.Sim.Time;
+using Haulout.Sim.Play;
 
-var clock = new GameClock(90); // April 1st: launch is close.
-var impeller = new Component("impeller", "Raw-water impeller", 0.4,
-    WearRate.CalendarYears(2, perUseHour: 1.0 / 200));
+var game = Game.NewFirstFault();
 
-Console.WriteLine($"Haulout — day {clock.Day}, {clock.Season}");
-Console.WriteLine($"{impeller.Name}: condition {impeller.Condition:P0}");
-Console.WriteLine("The boat was fine last year.");
+if (game.Ask(new Briefing()) is BriefingView briefing) ResultPrinter.PrintBriefing(briefing);
+
+while (true)
+{
+    Console.Write("> ");
+    var line = Console.In.ReadLine();
+    if (line is null) return 0; // EOF: leave quietly.
+
+    switch (WordParser.Parse(line))
+    {
+        case null:
+            break;
+        case Quit:
+            return 0;
+        case Problem p:
+            Console.WriteLine(p.Message);
+            break;
+        case RunQuery q:
+            ResultPrinter.Print(game.Ask(q.Query));
+            break;
+        case RunCommand c:
+            var result = game.Execute(c.Command);
+            var status = (StatusView)game.Ask(new Status());
+            ResultPrinter.Print(result, status);
+            if (result.Finished) return 0;
+            break;
+    }
+}

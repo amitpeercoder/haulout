@@ -1,0 +1,69 @@
+using Haulout.Sim.Components;
+using Haulout.Sim.Engine;
+using Haulout.Sim.Faults;
+
+namespace Haulout.Sim.Play;
+
+/// <summary>The one place that turns the boat's components and faults into plain numbers for the engine rules.</summary>
+internal static class EngineInputsBuilder
+{
+    public const string StarterId = "starter-motor";
+
+    public static readonly string[] LoopOrder =
+    [
+        "positive-terminal", "main-positive-cable", "battery-switch", "starter-solenoid",
+        "starter-motor", "engine-ground-stud", "negative-cable", "negative-terminal",
+    ];
+
+    public static EngineInputs Build(Boat boat)
+    {
+        var loop = LoopOrder.Select(id =>
+        {
+            var c = boat.Get(id);
+            double ohms = c.SeriesOhms ?? 0.0;
+            foreach (var f in c.ActiveFaults)
+            {
+                if (f.Effect.Kind == FaultEffectKind.OpenCircuit) ohms = double.PositiveInfinity;
+                else if (f.Effect.Kind == FaultEffectKind.SeriesOhms) ohms += f.Effect.Value;
+            }
+            return new SeriesElement(c.Id, c.Name, ohms);
+        }).ToList();
+
+        var battery = boat.Get("start-battery");
+        double soc = battery.Properties.GetValueOrDefault("stateOfCharge", 1.0);
+        var socFault = battery.ActiveFaults.FirstOrDefault(f => f.Effect.Kind == FaultEffectKind.StateOfCharge);
+        if (socFault is not null) soc = socFault.Effect.Value;
+
+        var electrical = new ElectricalInputs(
+            SwitchOn: boat.Get("battery-switch").Properties.GetValueOrDefault("on") == 1,
+            PanelLive: !boat.Get("ignition-panel").ActiveFaults.Any(f => f.Effect.Kind == FaultEffectKind.OpenCircuit),
+            BatteryOpenCircuitVolts: ElectricalChain.OpenCircuitVolts(soc),
+            BatteryInternalOhms: battery.Properties.GetValueOrDefault("internalOhms"),
+            Loop: loop,
+            StarterId: StarterId);
+
+        var activeFaults = boat.AllFaults.Where(f => f.Present).ToList();
+
+        bool fuelAvailable =
+            boat.Get("fuel-tank").Properties.GetValueOrDefault("litres") >= 2
+            && boat.Get("fuel-shutoff").Properties.GetValueOrDefault("open") == 1
+            && boat.Get("lift-pump").Condition > 0.2
+            && !activeFaults.Any(f => f.Effect.Kind == FaultEffectKind.NoFuel);
+
+        double restriction = activeFaults
+            .Where(f => f.Effect.Kind == FaultEffectKind.FuelRestriction)
+            .Select(f => f.Effect.Value).DefaultIfEmpty(0.0).Max();
+
+        var glow = boat.Get("glow-plugs");
+        var fuel = new FuelInputs(
+            fuelAvailable, restriction,
+            GlowPlugsWork: glow.Condition >= 0.15 && !glow.ActiveFaults.Any(f => f.Effect.Kind == FaultEffectKind.OpenCircuit),
+            InjectorCondition: boat.Get("injectors").Condition);
+
+        double flow = boat.Get("raw-water-seacock").Properties.GetValueOrDefault("open") == 1 ? 1.0 : 0.0;
+        foreach (var f in activeFaults.Where(f => f.Effect.Kind == FaultEffectKind.RawWaterFlowFactor))
+            flow *= f.Effect.Value;
+
+        return new EngineInputs(electrical, fuel, new CoolingInputs(flow));
+    }
+}

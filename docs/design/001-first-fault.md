@@ -49,6 +49,10 @@ Cooling is a warning on a running engine, not a gate: raw-water flow (seacock op
 
 Decoys are tuned so each fixed one leaves the outcome at *click*, and fixing only the terminal (with all decoys still present) gives *runs*.
 
+## Player interface (adapter-neutral)
+
+Players will be humans in a terminal now and AI agents over MCP later, so the sim exposes one facade, `Game`, with two doors: `Execute(Command)` for actions (Look, Open, Inspect, Measure, Start, Clean, Replace, Charge, CheckFilterBowl, CheckRawWaterFlow) and `Ask(Query)` for observations (Status, Logbook, Compartments, Commands). Commands name things the way a player would ("negative terminal"); the sim resolves names. Every result is a plain, JSON-serialisable record that carries only what the player could perceive: narrative text, meter readings, what is visible, discovered faults. Never conditions, hidden faults or the graph. A component can only be named once the player has seen it (Look shows the cockpit, deck and hull; Open shows a compartment); an unseen part and a non-existent one get the same refusal. The console only parses words into commands and prints results.
+
 ## Actions (time / money)
 
 look 2 min; open 2 min; inspect 5 min; measure 10 min; start 2 min; check filter bowl 10 min; check flow 5 min; clean 30 min; charge 8 h; replace per component (e.g. terminal 30 min / 60, battery 1 h / 1 900, starter 3 h / 3 800). All recorded in the logbook.

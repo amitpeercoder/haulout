@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data\sloop28.json" LogicalName="Haulout.Sim.Data.sloop28.json" />
+  </ItemGroup>
+
 </Project>

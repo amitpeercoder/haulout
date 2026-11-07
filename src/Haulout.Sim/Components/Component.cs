@@ -1,3 +1,5 @@
+using Haulout.Sim.Faults;
+
 namespace Haulout.Sim.Components;
 
 /// <summary>
@@ -7,19 +9,42 @@ namespace Haulout.Sim.Components;
 /// </summary>
 public sealed class Component
 {
+    private readonly List<Fault> _faults;
+
     public Component(string id, string name, double condition, WearRate wear)
+        : this(id, name, condition, wear, ComponentSpec.Default, null)
+    {
+    }
+
+    public Component(string id, string name, double condition, WearRate wear, ComponentSpec spec, IEnumerable<Fault>? faults)
     {
         if (condition is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(condition));
         Id = id;
         Name = name;
         Condition = condition;
         Wear = wear;
+        Spec = spec;
+        _faults = (faults ?? []).ToList();
     }
 
     public string Id { get; }
     public string Name { get; }
     public double Condition { get; private set; }
     public WearRate Wear { get; }
+    public ComponentSpec Spec { get; }
+
+    public Subsystem Subsystem => Spec.Subsystem;
+    public string Location => Spec.Location;
+    public IReadOnlyList<string> Aliases => Spec.Aliases;
+    public string Description => Spec.Description;
+    public double? SeriesOhms => Spec.SeriesOhms;
+    public bool Cleanable => Spec.Cleanable;
+    public int ReplaceCostNok => Spec.ReplaceCostNok;
+    public int ReplaceMinutes => Spec.ReplaceMinutes;
+    public IReadOnlyDictionary<string, double> Properties => Spec.Properties;
+
+    public IReadOnlyList<Fault> Faults => _faults;
+    public IEnumerable<Fault> ActiveFaults => _faults.Where(f => f.Present);
 
     /// <summary>Advance wear by elapsed calendar days and engine/use hours.</summary>
     public void Age(int days, double useHours)
@@ -28,7 +53,11 @@ public sealed class Component
         Condition = Math.Max(0, Condition - loss);
     }
 
-    public void Replace() => Condition = 1;
+    public void Replace()
+    {
+        foreach (var fault in _faults) fault.Clear();
+        Condition = 1;
+    }
 }
 
 /// <summary>Condition lost per calendar day (UV, salt, time) and per hour of use.</summary>

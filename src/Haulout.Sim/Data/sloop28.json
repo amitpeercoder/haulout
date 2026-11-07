@@ -1,0 +1,934 @@
+{
+  "name": "Sloop 28",
+  "compartments": [
+    {
+      "id": "battery-box",
+      "name": "Battery box",
+      "aliases": [
+        "battery",
+        "battery box",
+        "box"
+      ],
+      "description": "A plastic box under the quarter berth, smelling of acid and old rope. The lid hinges on one pin."
+    },
+    {
+      "id": "cockpit",
+      "name": "Cockpit",
+      "aliases": [
+        "cockpit",
+        "helm"
+      ],
+      "description": "Teak-slatted seats worn pale, a tiller and the key panel on the bulkhead."
+    },
+    {
+      "id": "cockpit-locker",
+      "name": "Cockpit locker",
+      "aliases": [
+        "locker",
+        "cockpit locker",
+        "lazarette"
+      ],
+      "description": "A deep locker under the cockpit seat, tank at the bottom, fenders and a rusted tin of rags on top."
+    },
+    {
+      "id": "engine-front",
+      "name": "Engine front (steps off)",
+      "aliases": [
+        "engine front",
+        "front of engine",
+        "front",
+        "steps",
+        "companionway"
+      ],
+      "description": "With the steps lifted away you face the front of the engine, belts and pump pulleys at hand."
+    },
+    {
+      "id": "engine-side",
+      "name": "Engine side (quarter-berth panel)",
+      "aliases": [
+        "engine side",
+        "side panel",
+        "quarter berth",
+        "engine"
+      ],
+      "description": "A plywood panel in the quarter berth, held by two screws, opens on the engine's side."
+    },
+    {
+      "id": "bilge",
+      "name": "Bilge under the steps",
+      "aliases": [
+        "bilge",
+        "under steps"
+      ],
+      "description": "A dark space under the companionway with a faint tidemark and a smell of brine."
+    },
+    {
+      "id": "hull-outside",
+      "name": "Hull outside",
+      "aliases": [
+        "hull outside",
+        "outside",
+        "underwater",
+        "cradle"
+      ],
+      "description": "She stands on the hard in her cradle, keel at head height, bottom paint like a bruise."
+    },
+    {
+      "id": "deck",
+      "name": "Deck",
+      "aliases": [
+        "deck",
+        "topsides",
+        "on deck"
+      ],
+      "description": "A scuffed non-slip deck, a mast stepped in the middle, dew on the cabin top."
+    }
+  ],
+  "components": [
+    {
+      "id": "start-battery",
+      "name": "Start battery",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "battery",
+        "start battery",
+        "engine battery"
+      ],
+      "description": "A black 70 Ah lead-acid battery, case dusty, date stamped three summers back. The vents are dry.",
+      "condition": 0.55,
+      "wearYears": 6,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 1900,
+      "replaceMinutes": 60,
+      "properties": {
+        "internalOhms": 0.008,
+        "stateOfCharge": 1.0
+      },
+      "faults": [
+        {
+          "id": "battery-low-charge",
+          "name": "Battery at 60 % charge",
+          "effect": {
+            "kind": "stateOfCharge",
+            "value": 0.6
+          },
+          "reveals": [
+            {
+              "action": "measure",
+              "text": "Resting voltage says about 60 %.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "charge",
+            "replace"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "battery-switch",
+      "name": "Battery switch",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "switch",
+        "battery switch",
+        "master switch"
+      ],
+      "description": "A red-knobbed rotary switch, knob faded pink on the sun side. It turns with a gritty click.",
+      "condition": 0.6,
+      "wearYears": 10,
+      "seriesOhms": 0.0005,
+      "cleanable": true,
+      "replaceCostNok": 450,
+      "replaceMinutes": 60,
+      "properties": {
+        "on": 1
+      }
+    },
+    {
+      "id": "positive-terminal",
+      "name": "Positive terminal",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "positive terminal",
+        "plus terminal",
+        "positive",
+        "+ terminal"
+      ],
+      "description": "A lead clamp with a red boot, bolt snug, metal bright where the boot has slipped back.",
+      "condition": 0.7,
+      "wearYears": 8,
+      "seriesOhms": 0.0003,
+      "cleanable": true,
+      "replaceCostNok": 60,
+      "replaceMinutes": 30
+    },
+    {
+      "id": "main-positive-cable",
+      "name": "Main positive cable",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "positive cable",
+        "plus cable",
+        "main cable",
+        "red cable"
+      ],
+      "description": "A fat red cable, sleeve stiff with age but unbroken. It runs forward along the box wall.",
+      "condition": 0.7,
+      "wearYears": 15,
+      "seriesOhms": 0.0015,
+      "cleanable": true,
+      "replaceCostNok": 400,
+      "replaceMinutes": 90
+    },
+    {
+      "id": "negative-terminal",
+      "name": "Negative terminal",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "negative terminal",
+        "minus terminal",
+        "negative",
+        "- terminal"
+      ],
+      "description": "A lead clamp under a black rubber boot, the boot greasy from some earlier owner's smear of vaseline.",
+      "condition": 0.5,
+      "wearYears": 8,
+      "seriesOhms": 0.0003,
+      "cleanable": true,
+      "replaceCostNok": 60,
+      "replaceMinutes": 30,
+      "faults": [
+        {
+          "id": "neg-terminal-corrosion",
+          "name": "Corroded negative terminal",
+          "effect": {
+            "kind": "seriesOhms",
+            "value": 0.06
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The rubber boot is greasy, and at its edge there is a faint green-white bloom.",
+              "discovers": false
+            },
+            {
+              "action": "measure",
+              "text": "That's far too much voltage lost across one clamp.",
+              "discovers": true
+            },
+            {
+              "action": "clean",
+              "text": "You pull the clamp off and find a ring of green-white crust on the post, eating into the lead.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "clean",
+            "replace"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "negative-cable",
+      "name": "Negative cable",
+      "subsystem": "electrical",
+      "location": "battery-box",
+      "aliases": [
+        "negative cable",
+        "minus cable",
+        "black cable",
+        "ground cable"
+      ],
+      "description": "A black cable of the same gauge as its red twin, a little greener at the lugs.",
+      "condition": 0.65,
+      "wearYears": 15,
+      "seriesOhms": 0.0015,
+      "cleanable": true,
+      "replaceCostNok": 400,
+      "replaceMinutes": 90
+    },
+    {
+      "id": "engine-ground-stud",
+      "name": "Engine ground stud",
+      "subsystem": "electrical",
+      "location": "engine-side",
+      "aliases": [
+        "ground stud",
+        "ground",
+        "earth stud",
+        "engine ground"
+      ],
+      "description": "A brass stud on the engine foot with a ring lug and a nut. Dull, but it holds.",
+      "condition": 0.7,
+      "wearYears": 12,
+      "seriesOhms": 0.0005,
+      "cleanable": true,
+      "replaceCostNok": 80,
+      "replaceMinutes": 30
+    },
+    {
+      "id": "starter-solenoid",
+      "name": "Starter solenoid",
+      "subsystem": "electrical",
+      "location": "engine-side",
+      "aliases": [
+        "solenoid",
+        "starter solenoid"
+      ],
+      "description": "A small silver can bolted on top of the starter. Paint blistered; it clicks when called.",
+      "condition": 0.6,
+      "wearYears": 10,
+      "seriesOhms": 0.001,
+      "cleanable": true,
+      "replaceCostNok": 900,
+      "replaceMinutes": 90
+    },
+    {
+      "id": "starter-motor",
+      "name": "Starter motor",
+      "subsystem": "electrical",
+      "location": "engine-side",
+      "aliases": [
+        "starter",
+        "starter motor"
+      ],
+      "description": "A heavy cylinder on the flywheel housing, caked with old oil and a fine grey dust. Smells of warm copper.",
+      "condition": 0.6,
+      "wearYears": 12,
+      "seriesOhms": 0.045,
+      "cleanable": false,
+      "replaceCostNok": 3800,
+      "replaceMinutes": 180
+    },
+    {
+      "id": "ignition-panel",
+      "name": "Ignition panel",
+      "subsystem": "electrical",
+      "location": "cockpit",
+      "aliases": [
+        "panel",
+        "ignition",
+        "ignition panel",
+        "key panel",
+        "instrument panel"
+      ],
+      "description": "A cockpit panel with a key, two warning lamps and a tachometer that has read 800 for years. The plastic has clouded.",
+      "condition": 0.6,
+      "wearYears": 12,
+      "seriesOhms": null,
+      "cleanable": true,
+      "replaceCostNok": 1100,
+      "replaceMinutes": 90
+    },
+    {
+      "id": "fuel-tank",
+      "name": "Fuel tank",
+      "subsystem": "fuel",
+      "location": "cockpit-locker",
+      "aliases": [
+        "tank",
+        "fuel tank",
+        "diesel tank"
+      ],
+      "description": "A grey aluminium tank under the cockpit sole, tidy welds, a little white bloom at the bottom seam.",
+      "condition": 0.7,
+      "wearYears": 30,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 5200,
+      "replaceMinutes": 360,
+      "properties": {
+        "litres": 40
+      }
+    },
+    {
+      "id": "fuel-shutoff",
+      "name": "Fuel shutoff valve",
+      "subsystem": "fuel",
+      "location": "cockpit-locker",
+      "aliases": [
+        "shutoff",
+        "fuel valve",
+        "fuel shutoff",
+        "shutoff valve",
+        "tap"
+      ],
+      "description": "A brass lever valve on the tank outlet. The lever is stiff but moves the full quarter turn.",
+      "condition": 0.7,
+      "wearYears": 20,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 350,
+      "replaceMinutes": 45,
+      "properties": {
+        "open": 1
+      }
+    },
+    {
+      "id": "fuel-supply-line",
+      "name": "Fuel supply line",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "supply line",
+        "fuel line",
+        "supply hose"
+      ],
+      "description": "A clear-sleeved fuel hose, slightly yellowed, clamped at both ends. No weeping at the clamps.",
+      "condition": 0.6,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 260,
+      "replaceMinutes": 60
+    },
+    {
+      "id": "primary-filter",
+      "name": "Primary fuel filter / water separator",
+      "subsystem": "fuel",
+      "location": "cockpit-locker",
+      "aliases": [
+        "primary filter",
+        "fuel filter",
+        "water separator",
+        "separator"
+      ],
+      "description": "A spin-on filter with a glass bowl below. The element is dusty; a date is faintly visible on the casing.",
+      "condition": 0.45,
+      "wearYears": 2,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 180,
+      "replaceMinutes": 45,
+      "faults": [
+        {
+          "id": "primary-filter-clogged",
+          "name": "Primary fuel filter half clogged",
+          "effect": {
+            "kind": "fuelRestriction",
+            "value": 0.5
+          },
+          "reveals": [
+            {
+              "action": "checkFilterBowl",
+              "text": "You open the drain and look in the bowl: dark diesel, a finger of water at the bottom and black sludge on the walls.",
+              "discovers": true
+            },
+            {
+              "action": "inspect",
+              "text": "An old date is written on the element in marker, so old that the ink has gone brown.",
+              "discovers": false
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lift-pump",
+      "name": "Lift pump",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "lift pump",
+        "fuel pump",
+        "feed pump"
+      ],
+      "description": "A small pump on the side of the block with a priming lever. Ticks when the engine turns.",
+      "condition": 0.65,
+      "wearYears": 12,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 780,
+      "replaceMinutes": 90
+    },
+    {
+      "id": "secondary-filter",
+      "name": "Secondary fuel filter",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "secondary filter",
+        "fine filter",
+        "second filter"
+      ],
+      "description": "A small blue-grey canister on the engine side, clean on the outside, with a single ring of rust at the base.",
+      "condition": 0.6,
+      "wearYears": 2,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 220,
+      "replaceMinutes": 45
+    },
+    {
+      "id": "injection-pump",
+      "name": "Injection pump",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "injection pump",
+        "pump"
+      ],
+      "description": "A compact pump with a stamped plate, bolted tight. The tamper seals are intact.",
+      "condition": 0.7,
+      "wearYears": 25,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 6400,
+      "replaceMinutes": 300
+    },
+    {
+      "id": "injectors",
+      "name": "Injectors",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "injectors",
+        "injector",
+        "nozzles"
+      ],
+      "description": "Two stubby injectors under their return pipes, a little carbon around the clamps.",
+      "condition": 0.6,
+      "wearYears": 10,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 2400,
+      "replaceMinutes": 180
+    },
+    {
+      "id": "fuel-return-line",
+      "name": "Fuel return line",
+      "subsystem": "fuel",
+      "location": "engine-side",
+      "aliases": [
+        "return line",
+        "fuel return",
+        "return hose"
+      ],
+      "description": "A thin hose back to the tank, clamped with a worm-drive that has started to rust.",
+      "condition": 0.6,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 160,
+      "replaceMinutes": 45
+    },
+    {
+      "id": "raw-water-seacock",
+      "name": "Raw-water seacock",
+      "subsystem": "cooling",
+      "location": "bilge",
+      "aliases": [
+        "seacock",
+        "raw water seacock",
+        "sea cock",
+        "intake"
+      ],
+      "description": "A bronze ball valve on a through-hull, green with age, handle moving freely.",
+      "condition": 0.6,
+      "wearYears": 25,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 1200,
+      "replaceMinutes": 180,
+      "properties": {
+        "open": 1
+      }
+    },
+    {
+      "id": "raw-water-strainer",
+      "name": "Raw-water strainer",
+      "subsystem": "cooling",
+      "location": "bilge",
+      "aliases": [
+        "strainer",
+        "raw water strainer",
+        "sea strainer"
+      ],
+      "description": "A clear-lidded strainer, a little weed and grit in the basket and a faint tidemark inside the glass.",
+      "condition": 0.6,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": true,
+      "replaceCostNok": 950,
+      "replaceMinutes": 60
+    },
+    {
+      "id": "raw-water-pump",
+      "name": "Raw-water pump",
+      "subsystem": "cooling",
+      "location": "engine-front",
+      "aliases": [
+        "raw water pump",
+        "water pump",
+        "sea water pump"
+      ],
+      "description": "A bronze-bodied pump on the front of the engine, a faint salt trail beneath the shaft seal.",
+      "condition": 0.55,
+      "wearYears": 10,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 1400,
+      "replaceMinutes": 120
+    },
+    {
+      "id": "impeller",
+      "name": "Raw-water impeller",
+      "subsystem": "cooling",
+      "location": "engine-front",
+      "aliases": [
+        "impeller",
+        "raw water impeller"
+      ],
+      "description": "A rubber impeller, inside the pump behind a six-screw cover.",
+      "condition": 0.35,
+      "wearYears": 2,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 350,
+      "replaceMinutes": 60,
+      "faults": [
+        {
+          "id": "impeller-tired",
+          "name": "Tired impeller",
+          "effect": {
+            "kind": "rawWaterFlowFactor",
+            "value": 0.4
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "With the cover off, the vanes have taken a set in a curve and two of them are cracked at the root.",
+              "discovers": true
+            },
+            {
+              "action": "checkRawWaterFlow",
+              "text": "The water at the exhaust comes in weaker spurts than you would like.",
+              "discovers": false
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heat-exchanger",
+      "name": "Heat exchanger",
+      "subsystem": "cooling",
+      "location": "engine-side",
+      "aliases": [
+        "heat exchanger",
+        "exchanger",
+        "cooler"
+      ],
+      "description": "A cylindrical exchanger with end caps, a thin white crust along one seam, no drips.",
+      "condition": 0.55,
+      "wearYears": 20,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 3200,
+      "replaceMinutes": 240
+    },
+    {
+      "id": "thermostat",
+      "name": "Thermostat",
+      "subsystem": "cooling",
+      "location": "engine-front",
+      "aliases": [
+        "thermostat",
+        "stat"
+      ],
+      "description": "Hidden in its housing, as it should be. The housing gasket is dry and a little brittle.",
+      "condition": 0.6,
+      "wearYears": 8,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 260,
+      "replaceMinutes": 60
+    },
+    {
+      "id": "coolant",
+      "name": "Coolant",
+      "subsystem": "cooling",
+      "location": "engine-front",
+      "aliases": [
+        "coolant",
+        "antifreeze",
+        "anti-freeze"
+      ],
+      "description": "Green-pink coolant in the header tank, a shade murkier than it was. Level at the line.",
+      "condition": 0.6,
+      "wearYears": 4,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 450,
+      "replaceMinutes": 60
+    },
+    {
+      "id": "exhaust-elbow",
+      "name": "Exhaust elbow",
+      "subsystem": "cooling",
+      "location": "engine-side",
+      "aliases": [
+        "exhaust elbow",
+        "elbow",
+        "mixing elbow"
+      ],
+      "description": "A cast elbow where the water meets the exhaust, a rust-brown stain at the lower flange.",
+      "condition": 0.5,
+      "wearYears": 8,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 1800,
+      "replaceMinutes": 120
+    },
+    {
+      "id": "exhaust-hose",
+      "name": "Exhaust hose",
+      "subsystem": "cooling",
+      "location": "cockpit-locker",
+      "aliases": [
+        "exhaust hose",
+        "exhaust",
+        "wet exhaust"
+      ],
+      "description": "A black wet-exhaust hose looping up under the cockpit, stiff, not cracked, clamps doubled.",
+      "condition": 0.6,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 1500,
+      "replaceMinutes": 180
+    },
+    {
+      "id": "anti-siphon-loop",
+      "name": "Anti-siphon loop",
+      "subsystem": "cooling",
+      "location": "cockpit-locker",
+      "aliases": [
+        "anti-siphon",
+        "siphon loop",
+        "siphon break",
+        "vented loop"
+      ],
+      "description": "A vented loop high in the cockpit locker, with a little white salt around the vent.",
+      "condition": 0.55,
+      "wearYears": 10,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 300,
+      "replaceMinutes": 60
+    },
+    {
+      "id": "engine-block",
+      "name": "Engine block",
+      "subsystem": "engine",
+      "location": "engine-front",
+      "aliases": [
+        "engine",
+        "block",
+        "engine block",
+        "motor"
+      ],
+      "description": "A grey Nordvik twin-cylinder, paint worn at the corners, a faint sheen of oil beneath the sump.",
+      "condition": 0.6,
+      "wearYears": 40,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 24000,
+      "replaceMinutes": 1200
+    },
+    {
+      "id": "engine-oil",
+      "name": "Engine oil",
+      "subsystem": "engine",
+      "location": "engine-front",
+      "aliases": [
+        "oil",
+        "engine oil",
+        "dipstick"
+      ],
+      "description": "The dipstick shows oil the colour of tea, within the marks.",
+      "condition": 0.5,
+      "wearYears": 1,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 320,
+      "replaceMinutes": 45
+    },
+    {
+      "id": "oil-filter",
+      "name": "Oil filter",
+      "subsystem": "engine",
+      "location": "engine-front",
+      "aliases": [
+        "oil filter"
+      ],
+      "description": "A blue spin-on canister, rust around the base, a last service sticker curling at the edge.",
+      "condition": 0.55,
+      "wearYears": 1,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 120,
+      "replaceMinutes": 30
+    },
+    {
+      "id": "alternator",
+      "name": "Alternator",
+      "subsystem": "engine",
+      "location": "engine-front",
+      "aliases": [
+        "alternator",
+        "dynamo"
+      ],
+      "description": "A small 60 A alternator on the front bracket, grimy but turning freely by hand.",
+      "condition": 0.6,
+      "wearYears": 12,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 2200,
+      "replaceMinutes": 120
+    },
+    {
+      "id": "alternator-belt",
+      "name": "Alternator belt",
+      "subsystem": "engine",
+      "location": "engine-front",
+      "aliases": [
+        "belt",
+        "alternator belt",
+        "fan belt"
+      ],
+      "description": "A narrow V-belt with a glazed shine on the flanks and a small dusting of black on the pulley.",
+      "condition": 0.55,
+      "wearYears": 2,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 90,
+      "replaceMinutes": 20
+    },
+    {
+      "id": "glow-plugs",
+      "name": "Glow plugs",
+      "subsystem": "engine",
+      "location": "engine-side",
+      "aliases": [
+        "glow plugs",
+        "glow plug",
+        "glowplugs"
+      ],
+      "description": "Two glow plugs sunk into the head, thin wires on their caps, a fleck of carbon at each.",
+      "condition": 0.6,
+      "wearYears": 8,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 640,
+      "replaceMinutes": 90,
+      "properties": {
+        "healthyOhms": 0.8
+      }
+    },
+    {
+      "id": "hull",
+      "name": "Hull",
+      "subsystem": "hull",
+      "location": "hull-outside",
+      "aliases": [
+        "hull",
+        "fibreglass",
+        "gelcoat"
+      ],
+      "description": "Cream gelcoat gone chalky, a few spider cracks at the toerail and a faded waterline stripe.",
+      "condition": 0.6,
+      "wearYears": 40,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    },
+    {
+      "id": "keel",
+      "name": "Keel",
+      "subsystem": "hull",
+      "location": "hull-outside",
+      "aliases": [
+        "keel",
+        "fin keel"
+      ],
+      "description": "A cast-iron keel, rust bleeding from the bolts at the joint, a thin line of filler along the seam.",
+      "condition": 0.65,
+      "wearYears": 50,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    },
+    {
+      "id": "rudder",
+      "name": "Rudder",
+      "subsystem": "hull",
+      "location": "hull-outside",
+      "aliases": [
+        "rudder",
+        "blade"
+      ],
+      "description": "A spade rudder with a small bit of play at the bottom, the blade fair and sound.",
+      "condition": 0.6,
+      "wearYears": 30,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    },
+    {
+      "id": "standing-rig",
+      "name": "Standing rig",
+      "subsystem": "hull",
+      "location": "deck",
+      "aliases": [
+        "rig",
+        "mast",
+        "standing rig",
+        "shrouds"
+      ],
+      "description": "A tall alloy mast, shrouds a little dull, turnbuckles safety-wired in tape that has seen better summers.",
+      "condition": 0.55,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    },
+    {
+      "id": "antifouling",
+      "name": "Antifouling",
+      "subsystem": "hull",
+      "location": "hull-outside",
+      "aliases": [
+        "antifouling",
+        "bottom paint",
+        "anti-fouling"
+      ],
+      "description": "Red-brown bottom paint, chalky and thin at the waterline, with a few patches of old blue beneath.",
+      "condition": 0.45,
+      "wearYears": 2,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    }
+  ]
+}
