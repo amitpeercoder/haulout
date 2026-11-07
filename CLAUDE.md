@@ -12,7 +12,8 @@ A sailboat-ownership sim. Buy a tired boat, keep it alive through the seasons, s
 2. **Depth must be diagnosable.** Every simulated detail has a path: cause → symptom → investigation → fix. If the player cannot reason about it with in-game tools, cut it.
 3. **Consequences are delayed, never hidden.** Deferred work compounds visibly. Randomness is allowed; unexplained randomness is not.
 4. **Text first.** Every mechanic is playable in `Haulout.Console` before it gets a view. If it is not fun as text, no art will save it.
-5. **Fictional world.** Fictional archipelago, fictional brands. Real standards (wire sizing, service intervals) are fine; real names are not.
+5. **Adapters, not interfaces.** Every player action is a command, every observation is a query, through one facade in `Haulout.Sim`. The console, the future Godot view and the MCP server for AI agents are all thin adapters over that facade. No adapter gets state the player could not observe in-game. See `docs/design/002-agents-as-players.md`.
+6. **Fictional world.** Fictional archipelago, fictional brands. Real standards (wire sizing, service intervals) are fine; real names are not.
 
 ## Build order
 
@@ -27,7 +28,8 @@ CONCEPT.md            vision, pillars, scope
 CLAUDE.md             this file
 docs/design/          design notes: component graph, degradation, economy
 src/Haulout.Sim/      the sim core (library)
-src/Haulout.Console/  text interface
+src/Haulout.Console/  text interface (adapter)
+src/Haulout.Mcp/      MCP server for AI agents (adapter, planned)
 tests/Haulout.Sim.Tests/
 ```
 
