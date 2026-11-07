@@ -47,12 +47,12 @@ public static class CutawayGeometry
 
     public const string Title = "HAULOUT  /  28 FT SLOOP  /  SECTION, LOOKING TO PORT";
     public const double TitleX = 24;
-    public const double TitleY = 584;
+    public const double TitleY = 586;
 
     // ---- yard: she is on the hard -----------------------------------------------------------------------------------
-    public const double GroundY = 562;
+    public const double GroundY = 572;
     /// <summary>Yard concrete below the ground line (x, y, width, height).</summary>
-    public static readonly (double X, double Y, double W, double H) GroundTone = (8, 562, 984, 30);
+    public static readonly (double X, double Y, double W, double H) GroundTone = (8, 572, 984, 20);
 
     /// <summary>Design waterline, a thin dashed reference only.</summary>
     public const double WaterlineY = 395;
@@ -61,9 +61,117 @@ public static class CutawayGeometry
     public const string WaterlineLabel = "DWL";
 
     // ---- hull and rig ------------------------------------------------------------------------------------------------
-    /// <summary>Outer hull outline, closed; filled with paper so the water tone stays outside the boat.</summary>
-    public const string HullOutline =
-        "M60,240 L74,370 Q104,468 240,476 L780,476 Q880,460 915,390 Q955,300 940,224 Z";
+    // Hull bottom: three cubic Beziers from the stern, along a gently cambered skin, round the forefoot to the stem.
+    private readonly record struct Cubic(double X0, double Y0, double X1, double Y1, double X2, double Y2, double X3, double Y3)
+    {
+        public (double X, double Y) At(double t)
+        {
+            var u = 1 - t;
+            return (u * u * u * X0 + 3 * u * u * t * X1 + 3 * u * t * t * X2 + t * t * t * X3,
+                    u * u * u * Y0 + 3 * u * u * t * Y1 + 3 * u * t * t * Y2 + t * t * t * Y3);
+        }
+
+        /// <summary>The part of the curve between parameters t0 and t1 (de Casteljau).</summary>
+        public Cubic Sub(double t0, double t1)
+        {
+            var a = Split(this, t1).Left;
+            return t0 <= 0 ? a : Split(a, t0 / t1).Right;
+        }
+
+        public Cubic Reverse() => new(X3, Y3, X2, Y2, X1, Y1, X0, Y0);
+
+        public Cubic Shift(double dy) => new(X0, Y0 + dy, X1, Y1 + dy, X2, Y2 + dy, X3, Y3 + dy);
+
+        public string C() => FormattableString.Invariant($" C{N(X1)},{N(Y1)} {N(X2)},{N(Y2)} {N(X3)},{N(Y3)}");
+
+        private static (Cubic Left, Cubic Right) Split(Cubic c, double t)
+        {
+            static (double, double) L(double ax, double ay, double bx, double by, double t) => (ax + (bx - ax) * t, ay + (by - ay) * t);
+            var p01 = L(c.X0, c.Y0, c.X1, c.Y1, t); var p12 = L(c.X1, c.Y1, c.X2, c.Y2, t); var p23 = L(c.X2, c.Y2, c.X3, c.Y3, t);
+            var a = L(p01.Item1, p01.Item2, p12.Item1, p12.Item2, t); var b = L(p12.Item1, p12.Item2, p23.Item1, p23.Item2, t);
+            var m = L(a.Item1, a.Item2, b.Item1, b.Item2, t);
+            return (new Cubic(c.X0, c.Y0, p01.Item1, p01.Item2, a.Item1, a.Item2, m.Item1, m.Item2),
+                    new Cubic(m.Item1, m.Item2, b.Item1, b.Item2, p23.Item1, p23.Item2, c.X3, c.Y3));
+        }
+    }
+
+    private static string N(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static readonly Cubic[] Skin =
+    {
+        new(74, 370, 88, 436, 150, 472, 262, 473),    // stern quarter
+        new(262, 473, 400, 476, 620, 476, 748, 473),  // flat run
+        new(748, 473, 835, 470, 897, 440, 915, 390),  // forefoot to stem
+    };
+
+    private static (int Seg, double T) FindX(double x)
+    {
+        for (var i = 0; i < Skin.Length; i++)
+        {
+            var s = Skin[i];
+            if (x < s.X0 - 1e-9 || x > s.X3 + 1e-9) continue;
+            double lo = 0, hi = 1;
+            for (var k = 0; k < 50; k++)
+            {
+                var mid = (lo + hi) / 2;
+                if (s.At(mid).X < x) lo = mid; else hi = mid;
+            }
+            return (i, (lo + hi) / 2);
+        }
+        throw new ArgumentOutOfRangeException(nameof(x));
+    }
+
+    /// <summary>Hull skin y at a given x (stern quarter to stem).</summary>
+    public static double HullY(double x) { var (i, t) = FindX(x); return Skin[i].At(t).Y; }
+
+    private static Cubic SkinBetween(double xa, double xb)
+    {
+        var (i, ta) = FindX(xa); var (j, tb) = FindX(xb);
+        if (i != j) throw new InvalidOperationException("range spans segments");
+        return Skin[i].Sub(ta, tb);
+    }
+
+    /// <summary>Skin curve from xa to xb as path data continuing from the current point (may cross segments).</summary>
+    private static string SkinPath(double xa, double xb)
+    {
+        var sb = new System.Text.StringBuilder();
+        var (i, ta) = FindX(xa); var (j, tb) = FindX(xb);
+        if (i == j) return Skin[i].Sub(ta, tb).C();
+        sb.Append(Skin[i].Sub(ta, 1).C());
+        for (var k = i + 1; k < j; k++) sb.Append(Skin[k].C());
+        sb.Append(Skin[j].Sub(0, tb).C());
+        return sb.ToString();
+    }
+
+    private static string SkinPathReversed(double xa, double xb)
+    {
+        var sb = new System.Text.StringBuilder();
+        var (i, ta) = FindX(xa); var (j, tb) = FindX(xb);
+        if (i == j) return Skin[i].Sub(ta, tb).Reverse().C();
+        sb.Append(Skin[j].Sub(0, tb).Reverse().C());
+        for (var k = j - 1; k > i; k--) sb.Append(Skin[k].Reverse().C());
+        sb.Append(Skin[i].Sub(ta, 1).Reverse().C());
+        return sb.ToString();
+    }
+
+    // Fin keel (tapered, leading edge raked aft going down) and a separate spade rudder aft of it.
+    public const double KeelTopAft = 480, KeelTopFwd = 740, KeelTipAft = 515, KeelTipFwd = 700, KeelBottomY = 558;
+    public const double RudderTopAft = 102, RudderTopFwd = 150, RudderTipAft = 108, RudderTipFwd = 142, RudderBottomY = 538;
+
+    private static string KeelPoly() => FormattableString.Invariant(
+        $"M{KeelTopAft},{N(HullY(KeelTopAft))} L{KeelTipAft},{KeelBottomY} L{KeelTipFwd},{KeelBottomY} L{KeelTopFwd},{N(HullY(KeelTopFwd))} Z");
+
+    private static string RudderPoly() => FormattableString.Invariant(
+        $"M{RudderTopAft},{N(HullY(RudderTopAft))} L{RudderTipAft},{RudderBottomY} L{RudderTipFwd},{RudderBottomY} L{RudderTopFwd},{N(HullY(RudderTopFwd))} Z");
+
+    /// <summary>Outer hull outline incl. keel and rudder, closed; filled with paper so the water tone stays outside the boat.</summary>
+    public static readonly string HullOutline =
+        "M60,240 L74,370" + SkinPath(74, RudderTopAft)
+        + FormattableString.Invariant($" L{RudderTipAft},{RudderBottomY} L{RudderTipFwd},{RudderBottomY} L{RudderTopFwd},{N(HullY(RudderTopFwd))}")
+        + SkinPath(RudderTopFwd, KeelTopAft)
+        + FormattableString.Invariant($" L{KeelTipAft},{KeelBottomY} L{KeelTipFwd},{KeelBottomY} L{KeelTopFwd},{N(HullY(KeelTopFwd))}")
+        + SkinPath(KeelTopFwd, 915)
+        + " Q955,300 940,224 Z";
 
     /// <summary>Cabin-top outline (also part of the deck region).</summary>
     public const string CabinTop = "M276,236 L296,196 L520,196 L548,231";
@@ -86,32 +194,52 @@ public static class CutawayGeometry
     public const double QuarterBerthX = 272;
     public const double QuarterBerthY = 290;
 
-    private static string Pad(double x1, double y1, double x2, double y2, double t) =>
-        FormattableString.Invariant($"M{x1},{y1} L{x2},{y2} L{x2},{y2 + t} L{x1},{y1 + t} Z");
+    /// <summary>Cradle pad whose top edge is the hull curve between x1 and x2, t thick.</summary>
+    private static string Pad(double x1, double x2, double t)
+    {
+        var top = SkinBetween(x1, x2);
+        return FormattableString.Invariant($"M{N(top.X0)},{N(top.Y0)}") + top.C()
+            + FormattableString.Invariant($" L{N(top.X3)},{N(top.Y3 + t)}") + top.Shift(t).Reverse().C() + " Z";
+    }
+
+    /// <summary>Cradle stand: pad under the hull, two splayed legs to the ground, a crossbar and a brace.</summary>
+    private static string Stand(double x1, double x2, double splay)
+    {
+        const double t = 8;
+        var xa = x1 + 8; var xb = x2 - 8;
+        var ya = HullY(xa) + t; var yb = HullY(xb) + t;
+        var fa = xa - splay; var fb = xb + splay;
+        double LegX(double top, double foot, double ytop, double y) => top + (foot - top) * (y - ytop) / (GroundY - ytop);
+        var yc = GroundY - 42; var yd = GroundY - 17;
+        return Pad(x1, x2, t)
+            + FormattableString.Invariant($" M{N(xa)},{N(ya)} L{N(fa)},{GroundY} M{N(xb)},{N(yb)} L{N(fb)},{GroundY}")
+            + FormattableString.Invariant($" M{N(LegX(xa, fa, ya, yc))},{N(yc)} L{N(LegX(xb, fb, yb, yc))},{N(yc)}")
+            + FormattableString.Invariant($" M{N(LegX(xa, fa, ya, yc))},{N(yc)} L{N(LegX(xb, fb, yb, yd))},{N(yd)}");
+    }
 
     private static string Ladder()
     {
-        var sb = new System.Text.StringBuilder("M916,562 L892,430 M934,562 L910,430");
-        for (var y = 544.0; y > 440; y -= 18)
+        var sb = new System.Text.StringBuilder(FormattableString.Invariant($"M916,{GroundY} L892,430 M934,{GroundY} L910,430"));
+        for (var y = GroundY - 18; y > 440; y -= 18)
         {
-            var k = (562 - y) / 132.0;
+            var k = (GroundY - y) / (GroundY - 430.0);
             sb.Append(FormattableString.Invariant($" M{916 - 24 * k:0.#},{y} L{934 - 24 * k:0.#},{y}"));
         }
         return sb.ToString();
     }
 
+    private const double BlockTop = KeelBottomY, BlockX1 = 490, BlockX2 = 730;
+
     /// <summary>Drawn behind the hull: ground line, joints, keel block, cradle stands, yard ladder.</summary>
     public static readonly ImmutableArray<DecorPath> Backdrop = ImmutableArray.Create(
-        new DecorPath("detail", "M150,562 L136,592 M430,562 L420,592 M760,562 L772,592"),
-        new DecorPath("ground", "M16,562 L984,562"),
+        new DecorPath("detail", FormattableString.Invariant($"M150,{GroundY} L136,592 M430,{GroundY} L420,592 M780,{GroundY} L792,592")),
+        new DecorPath("ground", FormattableString.Invariant($"M16,{GroundY} L984,{GroundY}")),
         // timber block under the keel, with end grain and wedges
-        new DecorPath("yard", "M524,548 L716,548 L716,562 L524,562 Z M524,555 L716,555 M560,548 L560,562 M680,548 L680,562 M524,562 L514,562 M716,562 L728,562"),
-        // aft stand
-        new DecorPath("yard", Pad(178, 466, 224, 474, 8) + " M188,474 L172,562 M214,479 L232,562 M181,520 L222,520 M181,520 L222,545"),
-        // mid stand
-        new DecorPath("yard", Pad(338, 476, 386, 476, 8) + " M346,484 L330,562 M378,484 L394,562 M338,524 L384,524 M338,524 L384,548"),
-        // bow stand, pad following the hull
-        new DecorPath("yard", Pad(820, 466, 868, 444, 8) + " M830,469 L806,562 M860,456 L888,562 M817,520 L877,520 M817,520 L877,545"),
+        new DecorPath("yard", FormattableString.Invariant(
+            $"M{BlockX1},{BlockTop} L{BlockX2},{BlockTop} L{BlockX2},{GroundY} L{BlockX1},{GroundY} Z M{BlockX1},{BlockTop + 7} L{BlockX2},{BlockTop + 7} M530,{BlockTop} L530,{GroundY} M690,{BlockTop} L690,{GroundY} M{BlockX1},{GroundY} L{BlockX1 - 10},{GroundY} M{BlockX2},{GroundY} L{BlockX2 + 10},{GroundY}")),
+        new DecorPath("yard", Stand(178, 224, 16)),   // aft stand
+        new DecorPath("yard", Stand(338, 386, 16)),   // mid stand
+        new DecorPath("yard", Stand(826, 866, 22)),   // bow stand, pad following the hull
         new DecorPath("yard", Ladder()));
 
     /// <summary>Drawn over the hull and regions, never clickable: steps, sprayhood, boom, mast.</summary>
@@ -120,7 +248,7 @@ public static class CutawayGeometry
         new DecorPath("detail", "M796,226 L840,282 M812,226 L856,282"
             + " M805.4,238 L821.4,238 M814.9,250 L830.9,250 M824.3,262 L840.3,262 M833.7,274 L849.7,274"),
         // Sprayhood outline over the companionway.
-        new DecorPath("rig-line", "M762,227 L774,198 L836,198 L854,225 M793,198 L797,226 M815,198 L819,226"),
+        new DecorPath("sprayhood", "M762,227 L774,198 L836,198 L854,225 M793,198 L797,226 M815,198 L819,226"),
         // Boom, outline only.
         new DecorPath("rig-line", "M118,166 L637,166 M118,174 L637,174 M118,166 L118,174 M628,170 L637,170"));
 
@@ -194,11 +322,11 @@ public static class CutawayGeometry
         // Hull skin below the waterline (inner chamfer to outer curve), keel and rudder, one region. 4 + 2 spare (+2).
         // Slots 0-3 on the skin, 4-5 on the keel, 6-7 on the rudder.
         new CompartmentShape("hull-outside", "Hull, outside",
-            "M84,378 Q112,432 170,450 L862,450 L880,428 L898,416 Q880,460 780,476 L240,476 Q104,468 74,370 Z"
-            + " M520,476 L720,476 L700,548 L545,548 Z"
-            + " M98,416 L136,449 L128,530 L100,530 Z",
-            548, 500,
-            Slots((300, 463), (420, 463), (540, 463), (660, 463), (600, 515), (600, 535), (111, 490), (111, 510))));
+            FormattableString.Invariant($"M84,378 Q112,432 170,450 L862,450 L880,428 L905,{N(HullY(905))}")
+            + SkinPathReversed(74, 905)
+            + " Z " + KeelPoly() + " " + RudderPoly(),
+            560, 500,
+            Slots((300, 463), (420, 463), (540, 463), (660, 463), (610, 520), (610, 540), (124, 495), (124, 515))));
 
     // ---- marker map: component id -> position and short label --------------------------------------------------------
     private static KeyValuePair<string, MarkerSpot> R(string id, double x, double y, string label) =>
@@ -216,9 +344,9 @@ public static class CutawayGeometry
     {
         // battery box
         R("start-battery", 290, 433, "Start battery"),
-        At("negative-terminal", 284, 408, "Neg. terminal", 286, 393),
+        At("negative-terminal", 284, 408, "Neg. term.", 286, 386),
         R("positive-terminal", 314, 408, "Pos. terminal"),
-        At("main-positive-cable", 384, 392, "Main + cable", 398, 376, "end", 384, 380),
+        At("main-positive-cable", 384, 392, "+ cable", 398, 372, "end", 384, 376),
         R("negative-cable", 272, 356, "Neg. cable"),
         R("battery-switch", 272, 340, "Battery switch"),
 
@@ -244,7 +372,7 @@ public static class CutawayGeometry
         R("oil-filter", 670, 378, "Oil filter"),
         R("alternator", 796, 300, "Alternator"),
         R("alternator-belt", 796, 322, "Alt. belt"),
-        R("raw-water-pump", 796, 344, "Raw-water pump"),
+        R("raw-water-pump", 796, 344, "RW pump"),
         R("impeller", 796, 366, "Impeller"),
 
         // cockpit locker
@@ -261,8 +389,8 @@ public static class CutawayGeometry
         // hull outside
         R("hull", 300, 463, "Hull"),
         R("antifouling", 440, 463, "Antifouling"),
-        R("keel", 612, 522, "Keel"),
-        R("rudder", 114, 495, "Rudder"),
+        R("keel", 610, 520, "Keel"),
+        R("rudder", 124, 495, "Rudder"),
 
         // deck and cockpit
         R("standing-rig", 641, 247, "Standing rig"),
