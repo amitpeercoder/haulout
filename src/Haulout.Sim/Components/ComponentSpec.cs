@@ -2,7 +2,8 @@ namespace Haulout.Sim.Components;
 
 public sealed record ComponentSpec(
     Subsystem Subsystem,
-    string Location,
+    string PositionId,
+    IReadOnlyList<ReachEntry> Reach,
     IReadOnlyList<string> Aliases,
     string Description,
     double? SeriesOhms,
@@ -12,5 +13,5 @@ public sealed record ComponentSpec(
     IReadOnlyDictionary<string, double> Properties)
 {
     public static ComponentSpec Default { get; } = new(
-        Subsystem.Engine, "", [], "", null, false, 0, 0, new Dictionary<string, double>());
+        Subsystem.Engine, "", [], [], "", null, false, 0, 0, new Dictionary<string, double>());
 }

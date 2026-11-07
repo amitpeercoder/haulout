@@ -4,9 +4,8 @@ namespace Haulout.Sim.Play;
 
 public sealed record KnownFault(string Id, string Name, string ComponentName);
 
-public sealed record CompartmentSummary(string Id, string Name);
-
-public sealed record SeenComponent(string Id, string Name);
+/// <summary>A cover as the player sees it at a place. Removed: it is off.</summary>
+public sealed record CoverState(string Name, bool Removed);
 
 public sealed record CommandResult(
     bool Accepted,
@@ -20,8 +19,8 @@ public sealed record CommandResult(
     bool Finished);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
-[JsonDerivedType(typeof(CompartmentList), "compartment-list")]
-[JsonDerivedType(typeof(CompartmentView), "compartment-view")]
+[JsonDerivedType(typeof(PlaceView), "place-view")]
+[JsonDerivedType(typeof(CoverView), "cover-view")]
 [JsonDerivedType(typeof(InspectionView), "inspection-view")]
 [JsonDerivedType(typeof(MeterReading), "meter-reading")]
 [JsonDerivedType(typeof(StartAttemptView), "start-attempt-view")]
@@ -30,9 +29,16 @@ public sealed record CommandResult(
 [JsonDerivedType(typeof(RepairView), "repair-view")]
 public abstract record Observation;
 
-public sealed record CompartmentList(IReadOnlyList<CompartmentSummary> Compartments) : Observation;
+/// <summary>
+/// What the player perceives at a place (Look and GoTo). Visible and Reachable are component names, given the covers.
+/// Exits are the names of adjacent places that can be gone to now.
+/// </summary>
+public sealed record PlaceView(
+    string Place, string Description, IReadOnlyList<CoverState> Covers,
+    IReadOnlyList<string> Visible, IReadOnlyList<string> Reachable, IReadOnlyList<string> Exits) : Observation;
 
-public sealed record CompartmentView(string Id, string Name, string Description, IReadOnlyList<SeenComponent> Components) : Observation;
+/// <summary>Remove or Refit. NowVisible: component names that came into view by removing it (empty on refit).</summary>
+public sealed record CoverView(string Cover, string Place, bool Removed, IReadOnlyList<string> NowVisible) : Observation;
 
 public sealed record InspectionView(string ComponentName, string Text) : Observation;
 
@@ -54,7 +60,6 @@ public sealed record RepairView(string ComponentName, string Text) : Observation
 [JsonDerivedType(typeof(BriefingView), "briefing-view")]
 [JsonDerivedType(typeof(StatusView), "status-view")]
 [JsonDerivedType(typeof(LogView), "log-view")]
-[JsonDerivedType(typeof(CompartmentsView), "compartments-view")]
 [JsonDerivedType(typeof(CommandList), "command-list")]
 [JsonDerivedType(typeof(AboardView), "aboard-view")]
 [JsonDerivedType(typeof(ComponentActionsView), "component-actions-view")]
@@ -71,27 +76,36 @@ public sealed record StatusView(
     bool EngineRunning,
     bool Finished,
     IReadOnlyList<KnownFault> DiscoveredFaults,
-    IReadOnlyList<string> Tools) : QueryResult;
+    IReadOnlyList<string> Tools,
+    string Place) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 public sealed record LogEntry(int Day, string TimeOfDay, string Text, int CostNok = 0);
 
 public sealed record LogView(IReadOnlyList<LogEntry> Entries) : QueryResult;
 
-/// <summary>The Compartments query answer (the CompartmentList observation is a separate type).</summary>
-public sealed record CompartmentsView(IReadOnlyList<CompartmentSummary> Compartments) : QueryResult;
-
 public sealed record CommandInfo(string Verb, string? Argument, string Description);
 
 public sealed record CommandList(IReadOnlyList<CommandInfo> Commands) : QueryResult;
 
-/// <summary>A component the player has found. HasKnownFault: a discovered fault is still present on it.</summary>
-public sealed record FoundComponent(string Id, string Name, bool HasKnownFault);
+/// <summary>
+/// A place aboard. Here: the player is in it. Visited: the player has been there (the start place counts once looked at).
+/// Available: it can be gone to at all (beside the hull only while she is on the hard). Adjacent: names of neighbouring places.
+/// </summary>
+public sealed record AboardPlace(string Name, bool Here, bool Visited, bool Available, IReadOnlyList<string> Adjacent);
 
-/// <summary>Opened: the player has opened it, or it is in plain view and they have looked around.</summary>
-public sealed record AboardCompartment(string Id, string Name, bool Opened, IReadOnlyList<FoundComponent> Components);
+/// <summary>A cover, the name of the place it is removed from, and whether it is off.</summary>
+public sealed record AboardCover(string Name, string Place, bool Removed);
 
-public sealed record AboardView(IReadOnlyList<AboardCompartment> Compartments) : QueryResult;
+/// <summary>
+/// A component the player has found. Position: its true spot, as a label ("Under the quarter berth").
+/// KnownProblem: a discovered problem is still present on it. VisibleHere / ReachableHere: from the current place, given the covers.
+/// </summary>
+public sealed record FoundComponent(string Name, string Position, bool KnownProblem, bool VisibleHere, bool ReachableHere);
+
+/// <summary>Place: the name of the place the player is in. No ids anywhere.</summary>
+public sealed record AboardView(
+    string Place, IReadOnlyList<AboardPlace> Places, IReadOnlyList<AboardCover> Covers, IReadOnlyList<FoundComponent> Components) : QueryResult;
 
 /// <summary>
 /// One verb on a component. Verb is the Command it maps to: "inspect" | "measure" | "clean" | "replace" | "charge"

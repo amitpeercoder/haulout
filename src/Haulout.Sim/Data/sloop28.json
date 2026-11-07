@@ -1,16 +1,6 @@
 {
   "name": "Sloop 28",
-  "compartments": [
-    {
-      "id": "battery-box",
-      "name": "Battery box",
-      "aliases": [
-        "battery",
-        "battery box",
-        "box"
-      ],
-      "description": "A plastic box under the quarter berth, smelling of acid and old rope. The lid hinges on one pin."
-    },
+  "places": [
     {
       "id": "cockpit",
       "name": "Cockpit",
@@ -18,70 +8,226 @@
         "cockpit",
         "helm"
       ],
-      "description": "Teak-slatted seats worn pale, a tiller and the key panel on the bulkhead."
+      "description": "You're in the cockpit, teak-slatted seats worn pale, the tiller beside you and the key panel on the bulkhead.",
+      "way": "into the cockpit",
+      "adjacent": [
+        "companionway",
+        "on-deck"
+      ],
+      "onlyOnTheHard": false
     },
     {
-      "id": "cockpit-locker",
-      "name": "Cockpit locker",
+      "id": "companionway",
+      "name": "Companionway",
       "aliases": [
+        "hatch",
+        "companionway"
+      ],
+      "description": "You're in the companionway hatch, a hand on the cold grab rail, the saloon below and the quarter berth at your knee.",
+      "way": "into the companionway",
+      "adjacent": [
+        "cockpit",
+        "saloon",
+        "quarter-berth"
+      ],
+      "onlyOnTheHard": false
+    },
+    {
+      "id": "quarter-berth",
+      "name": "Quarter berth",
+      "aliases": [
+        "quarter berth",
+        "berth",
+        "quarter-berth"
+      ],
+      "description": "You're in the quarter berth, knees on the cushion, the engine panel by your shoulder.",
+      "way": "into the quarter berth",
+      "adjacent": [
+        "companionway"
+      ],
+      "onlyOnTheHard": false
+    },
+    {
+      "id": "saloon",
+      "name": "Saloon",
+      "aliases": [
+        "saloon",
+        "cabin",
+        "main cabin"
+      ],
+      "description": "You're in the saloon, the table folded, the air cool and a little damp.",
+      "way": "down into the saloon",
+      "adjacent": [
+        "companionway",
+        "forepeak"
+      ],
+      "onlyOnTheHard": false
+    },
+    {
+      "id": "forepeak",
+      "name": "Forepeak",
+      "aliases": [
+        "forepeak",
+        "bow",
+        "v-berth",
+        "vberth"
+      ],
+      "description": "You're in the forepeak, bent under the deck hatch, sail bags and a coil of old anchor warp around your feet.",
+      "way": "forward into the forepeak",
+      "adjacent": [
+        "saloon"
+      ],
+      "onlyOnTheHard": false
+    },
+    {
+      "id": "on-deck",
+      "name": "On deck",
+      "aliases": [
+        "deck",
+        "on deck",
+        "topsides"
+      ],
+      "description": "You're up on deck, the mast stepped in the middle, dew on the cabin top and the whole yard laid out below.",
+      "way": "up on deck",
+      "adjacent": [
+        "cockpit",
+        "beside-the-hull"
+      ],
+      "onlyOnTheHard": false
+    },
+    {
+      "id": "beside-the-hull",
+      "name": "Beside the hull",
+      "aliases": [
+        "ground",
+        "yard",
+        "outside",
+        "ladder",
+        "beside the hull",
+        "hull outside",
+        "cradle"
+      ],
+      "description": "You're on the gravel beside the hull, her keel at head height and the cradle pads around you.",
+      "way": "down the ladder to the ground beside the hull",
+      "adjacent": [
+        "on-deck"
+      ],
+      "onlyOnTheHard": true
+    }
+  ],
+  "covers": [
+    {
+      "id": "companionway-steps",
+      "name": "Companionway steps",
+      "aliases": [
+        "steps",
+        "companionway steps",
+        "stairs"
+      ],
+      "place": "companionway",
+      "plural": true,
+      "removeMinutes": 3,
+      "refitMinutes": 3,
+      "removeText": "You lift the steps out and stand them against the bulkhead; the front of the engine looks up at you.",
+      "refitText": "You slot the steps back into their runners and they sit square."
+    },
+    {
+      "id": "quarter-berth-panel",
+      "name": "Quarter-berth panel",
+      "aliases": [
+        "panel",
+        "berth panel",
+        "engine panel",
+        "side panel"
+      ],
+      "place": "quarter-berth",
+      "plural": false,
+      "removeMinutes": 5,
+      "refitMinutes": 5,
+      "removeText": "Two screws, a tug on the plywood, and the side of the engine is open to you.",
+      "refitText": "You hold the panel up to its frame and run the two screws home."
+    },
+    {
+      "id": "battery-box-lid",
+      "name": "Battery-box lid",
+      "aliases": [
+        "battery lid",
+        "battery box lid",
+        "battery box",
+        "battery"
+      ],
+      "place": "quarter-berth",
+      "plural": false,
+      "removeMinutes": 2,
+      "refitMinutes": 2,
+      "removeText": "You unhook the lid and fold it back on its pin; the smell of acid comes up with the cold.",
+      "refitText": "You fold the lid down and hook it shut."
+    },
+    {
+      "id": "cockpit-locker-lid",
+      "name": "Cockpit-locker lid",
+      "aliases": [
+        "locker lid",
         "locker",
         "cockpit locker",
         "lazarette"
       ],
-      "description": "A deep locker under the cockpit seat, tank at the bottom, fenders and a rusted tin of rags on top."
+      "place": "cockpit",
+      "plural": false,
+      "removeMinutes": 2,
+      "refitMinutes": 2,
+      "removeText": "You lift the seat lid and prop it open; fenders, a tin of rags, and the tank down below.",
+      "refitText": "You lower the seat lid and sit on it to be sure."
     },
     {
-      "id": "engine-front",
-      "name": "Engine front (steps off)",
+      "id": "saloon-floorboards",
+      "name": "Saloon floorboards",
       "aliases": [
-        "engine front",
-        "front of engine",
-        "front",
-        "steps",
-        "companionway"
+        "floorboards",
+        "boards",
+        "floor",
+        "sole"
       ],
-      "description": "With the steps lifted away you face the front of the engine, belts and pump pulleys at hand."
+      "place": "saloon",
+      "plural": true,
+      "removeMinutes": 4,
+      "refitMinutes": 4,
+      "removeText": "You lift the floorboards one by one and stack them on the settee; the bilge smells of brine.",
+      "refitText": "You lay the floorboards back in their order, shoulder to shoulder."
+    }
+  ],
+  "positions": [
+    {
+      "id": "engine-bay-front",
+      "label": "Engine bay, front (under the steps)"
     },
     {
-      "id": "engine-side",
-      "name": "Engine side (quarter-berth panel)",
-      "aliases": [
-        "engine side",
-        "side panel",
-        "quarter berth",
-        "engine"
-      ],
-      "description": "A plywood panel in the quarter berth, held by two screws, opens on the engine's side."
+      "id": "engine-bay-side",
+      "label": "Engine bay, quarter-berth side"
     },
     {
-      "id": "bilge",
-      "name": "Bilge under the steps",
-      "aliases": [
-        "bilge",
-        "under steps"
-      ],
-      "description": "A dark space under the companionway with a faint tidemark and a smell of brine."
+      "id": "under-quarter-berth",
+      "label": "Under the quarter berth"
     },
     {
-      "id": "hull-outside",
-      "name": "Hull outside",
-      "aliases": [
-        "hull outside",
-        "outside",
-        "underwater",
-        "cradle"
-      ],
-      "description": "She stands on the hard in her cradle, keel at head height, bottom paint like a bruise."
+      "id": "under-cockpit-locker",
+      "label": "Under the cockpit locker"
+    },
+    {
+      "id": "bilge-under-saloon",
+      "label": "Bilge under the saloon"
+    },
+    {
+      "id": "cockpit",
+      "label": "Cockpit"
     },
     {
       "id": "deck",
-      "name": "Deck",
-      "aliases": [
-        "deck",
-        "topsides",
-        "on deck"
-      ],
-      "description": "A scuffed non-slip deck, a mast stepped in the middle, dew on the cabin top."
+      "label": "Deck"
+    },
+    {
+      "id": "hull-exterior",
+      "label": "Hull, outside"
     }
   ],
   "components": [
@@ -89,7 +235,15 @@
       "id": "start-battery",
       "name": "Start battery",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "battery-box-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "battery",
         "start battery",
@@ -132,7 +286,15 @@
       "id": "battery-switch",
       "name": "Battery switch",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "switch",
         "battery switch",
@@ -153,7 +315,15 @@
       "id": "positive-terminal",
       "name": "Positive terminal",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "battery-box-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "positive terminal",
         "plus terminal",
@@ -172,7 +342,15 @@
       "id": "main-positive-cable",
       "name": "Main positive cable",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "battery-box-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "positive cable",
         "plus cable",
@@ -191,7 +369,15 @@
       "id": "negative-terminal",
       "name": "Negative terminal",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "battery-box-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "negative terminal",
         "minus terminal",
@@ -241,7 +427,15 @@
       "id": "negative-cable",
       "name": "Negative cable",
       "subsystem": "electrical",
-      "location": "battery-box",
+      "position": "under-quarter-berth",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "battery-box-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "negative cable",
         "minus cable",
@@ -260,7 +454,15 @@
       "id": "engine-ground-stud",
       "name": "Engine ground stud",
       "subsystem": "electrical",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "ground stud",
         "ground",
@@ -279,7 +481,21 @@
       "id": "starter-solenoid",
       "name": "Starter solenoid",
       "subsystem": "electrical",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": false
+        }
+      ],
       "aliases": [
         "solenoid",
         "starter solenoid"
@@ -296,7 +512,15 @@
       "id": "starter-motor",
       "name": "Starter motor",
       "subsystem": "electrical",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "starter",
         "starter motor"
@@ -314,7 +538,15 @@
       "id": "ignition-panel",
       "name": "Ignition panel",
       "subsystem": "electrical",
-      "location": "cockpit",
+      "position": "cockpit",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "panel",
         "ignition",
@@ -334,7 +566,15 @@
       "id": "fuel-tank",
       "name": "Fuel tank",
       "subsystem": "fuel",
-      "location": "cockpit-locker",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "tank",
         "fuel tank",
@@ -355,7 +595,15 @@
       "id": "fuel-shutoff",
       "name": "Fuel shutoff valve",
       "subsystem": "fuel",
-      "location": "cockpit-locker",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "shutoff",
         "fuel valve",
@@ -378,7 +626,21 @@
       "id": "fuel-supply-line",
       "name": "Fuel supply line",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "supply line",
         "fuel line",
@@ -396,7 +658,15 @@
       "id": "primary-filter",
       "name": "Primary fuel filter / water separator",
       "subsystem": "fuel",
-      "location": "cockpit-locker",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "primary filter",
         "fuel filter",
@@ -440,7 +710,15 @@
       "id": "lift-pump",
       "name": "Lift pump",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "lift pump",
         "fuel pump",
@@ -458,7 +736,15 @@
       "id": "secondary-filter",
       "name": "Secondary fuel filter",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "secondary filter",
         "fine filter",
@@ -476,7 +762,15 @@
       "id": "injection-pump",
       "name": "Injection pump",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "injection pump",
         "pump"
@@ -493,7 +787,21 @@
       "id": "injectors",
       "name": "Injectors",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": false
+        }
+      ],
       "aliases": [
         "injectors",
         "injector",
@@ -511,7 +819,15 @@
       "id": "fuel-return-line",
       "name": "Fuel return line",
       "subsystem": "fuel",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "return line",
         "fuel return",
@@ -529,7 +845,15 @@
       "id": "raw-water-seacock",
       "name": "Raw-water seacock",
       "subsystem": "cooling",
-      "location": "bilge",
+      "position": "bilge-under-saloon",
+      "reach": [
+        {
+          "place": "saloon",
+          "cover": "saloon-floorboards",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "seacock",
         "raw water seacock",
@@ -551,7 +875,15 @@
       "id": "raw-water-strainer",
       "name": "Raw-water strainer",
       "subsystem": "cooling",
-      "location": "bilge",
+      "position": "bilge-under-saloon",
+      "reach": [
+        {
+          "place": "saloon",
+          "cover": "saloon-floorboards",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "strainer",
         "raw water strainer",
@@ -569,7 +901,15 @@
       "id": "raw-water-pump",
       "name": "Raw-water pump",
       "subsystem": "cooling",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "raw water pump",
         "water pump",
@@ -587,7 +927,15 @@
       "id": "impeller",
       "name": "Raw-water impeller",
       "subsystem": "cooling",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "impeller",
         "raw water impeller"
@@ -629,7 +977,15 @@
       "id": "heat-exchanger",
       "name": "Heat exchanger",
       "subsystem": "cooling",
-      "location": "engine-side",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "heat exchanger",
         "exchanger",
@@ -647,7 +1003,15 @@
       "id": "thermostat",
       "name": "Thermostat",
       "subsystem": "cooling",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "thermostat",
         "stat"
@@ -664,7 +1028,15 @@
       "id": "coolant",
       "name": "Coolant",
       "subsystem": "cooling",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "coolant",
         "antifreeze",
@@ -682,7 +1054,15 @@
       "id": "exhaust-elbow",
       "name": "Exhaust elbow",
       "subsystem": "cooling",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "exhaust elbow",
         "elbow",
@@ -700,7 +1080,21 @@
       "id": "exhaust-hose",
       "name": "Exhaust hose",
       "subsystem": "cooling",
-      "location": "cockpit-locker",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": false
+        }
+      ],
       "aliases": [
         "exhaust hose",
         "exhaust",
@@ -718,7 +1112,15 @@
       "id": "anti-siphon-loop",
       "name": "Anti-siphon loop",
       "subsystem": "cooling",
-      "location": "cockpit-locker",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "anti-siphon",
         "siphon loop",
@@ -737,7 +1139,21 @@
       "id": "engine-block",
       "name": "Engine block",
       "subsystem": "engine",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "engine",
         "block",
@@ -756,7 +1172,15 @@
       "id": "engine-oil",
       "name": "Engine oil",
       "subsystem": "engine",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "oil",
         "engine oil",
@@ -774,7 +1198,15 @@
       "id": "oil-filter",
       "name": "Oil filter",
       "subsystem": "engine",
-      "location": "engine-front",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "oil filter"
       ],
@@ -790,7 +1222,15 @@
       "id": "alternator",
       "name": "Alternator",
       "subsystem": "engine",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "alternator",
         "dynamo"
@@ -807,7 +1247,15 @@
       "id": "alternator-belt",
       "name": "Alternator belt",
       "subsystem": "engine",
-      "location": "engine-front",
+      "position": "engine-bay-front",
+      "reach": [
+        {
+          "place": "companionway",
+          "cover": "companionway-steps",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "belt",
         "alternator belt",
@@ -825,7 +1273,15 @@
       "id": "glow-plugs",
       "name": "Glow plugs",
       "subsystem": "engine",
-      "location": "engine-side",
+      "position": "engine-bay-side",
+      "reach": [
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "glow plugs",
         "glow plug",
@@ -847,7 +1303,15 @@
       "id": "hull",
       "name": "Hull",
       "subsystem": "hull",
-      "location": "hull-outside",
+      "position": "hull-exterior",
+      "reach": [
+        {
+          "place": "beside-the-hull",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "hull",
         "fibreglass",
@@ -865,7 +1329,15 @@
       "id": "keel",
       "name": "Keel",
       "subsystem": "hull",
-      "location": "hull-outside",
+      "position": "hull-exterior",
+      "reach": [
+        {
+          "place": "beside-the-hull",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "keel",
         "fin keel"
@@ -882,7 +1354,15 @@
       "id": "rudder",
       "name": "Rudder",
       "subsystem": "hull",
-      "location": "hull-outside",
+      "position": "hull-exterior",
+      "reach": [
+        {
+          "place": "beside-the-hull",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "rudder",
         "blade"
@@ -899,7 +1379,27 @@
       "id": "standing-rig",
       "name": "Standing rig",
       "subsystem": "hull",
-      "location": "deck",
+      "position": "deck",
+      "reach": [
+        {
+          "place": "on-deck",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "cockpit",
+          "cover": null,
+          "visible": true,
+          "reachable": false
+        },
+        {
+          "place": "beside-the-hull",
+          "cover": null,
+          "visible": true,
+          "reachable": false
+        }
+      ],
       "aliases": [
         "rig",
         "mast",
@@ -918,7 +1418,15 @@
       "id": "antifouling",
       "name": "Antifouling",
       "subsystem": "hull",
-      "location": "hull-outside",
+      "position": "hull-exterior",
+      "reach": [
+        {
+          "place": "beside-the-hull",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
       "aliases": [
         "antifouling",
         "bottom paint",

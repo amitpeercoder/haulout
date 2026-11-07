@@ -11,16 +11,7 @@ public class GameScenarioTests
 
     private static StatusView Status(Game g) => Assert.IsType<StatusView>(g.Ask(new Status()));
 
-    /// <summary>Look around and open every compartment, so every component is nameable.</summary>
-    private static Game Explored(Game g)
-    {
-        Assert.True(g.Execute(new Look()).Accepted);
-        foreach (var c in Assert.IsType<CompartmentsView>(g.Ask(new Compartments())).Compartments)
-            Assert.True(g.Execute(new Open(c.Id)).Accepted);
-        return g;
-    }
-
-    private static Game ExploredGame() => Explored(Game.NewFirstFault());
+    private static Game NewGame() => Game.NewFirstFault();
 
     private static Game WithButton(Game g)
     {
@@ -28,14 +19,33 @@ public class GameScenarioTests
         return g;
     }
 
+    private static CommandResult Do(Game g, string name, Func<string, Command> make) => Walk.Do(g, name, make);
+
+    private static CommandResult Start(Game g) => Walk.Start(g);
+
+    private static int LogCount(Game g) => ((LogView)g.Ask(new Logbook())).Entries.Count;
+
+    /// <summary>The command is refused, says why, and costs nothing: no time, no money, no log line.</summary>
+    private static string AssertRefusedForFree(Game g, Command c)
+    {
+        int minutes = Status(g).MinutesSpent, log = LogCount(g);
+        var r = g.Execute(c);
+        Assert.False(r.Accepted);
+        Assert.Equal(0, r.MinutesTaken);
+        Assert.Equal(0, r.CostNok);
+        Assert.Equal(minutes, Status(g).MinutesSpent);
+        Assert.Equal(log, LogCount(g));
+        return string.Join(" ", r.Narrative);
+    }
+
     [Fact]
     public void Decoys_alone_do_not_fix_the_click()
     {
-        var g = ExploredGame();
-        Assert.True(g.Execute(new Charge("battery")).Accepted);
-        Assert.True(g.Execute(new Replace("primary filter")).Accepted);
-        Assert.True(g.Execute(new Replace("impeller")).Accepted);
-        var r = g.Execute(new StartEngine());
+        var g = NewGame();
+        Assert.True(Do(g, "battery", n => new Charge(n)).Accepted);
+        Assert.True(Do(g, "primary filter", n => new Replace(n)).Accepted);
+        Assert.True(Do(g, "impeller", n => new Replace(n)).Accepted);
+        var r = Start(g);
         Assert.Equal("Click", Outcome(r));
         Assert.False(r.Finished);
     }
@@ -43,9 +53,9 @@ public class GameScenarioTests
     [Fact]
     public void Cleaning_the_negative_terminal_alone_fixes_it()
     {
-        var g = ExploredGame();
-        Assert.True(g.Execute(new Clean("negative terminal")).Accepted);
-        var r = g.Execute(new StartEngine());
+        var g = NewGame();
+        Assert.True(Do(g, "negative terminal", n => new Clean(n)).Accepted);
+        var r = Start(g);
         Assert.Equal("Runs", Outcome(r));
         Assert.True(r.Finished);
         Assert.True(r.EngineRunning);
@@ -55,14 +65,14 @@ public class GameScenarioTests
     public void Replace_restores()
     {
         var boat = BoatLoader.LoadSloop28();
-        var g = Explored(new Game(boat));
-        Assert.True(g.Execute(new Replace("negative terminal")).Accepted);
-        Assert.Equal("Runs", Outcome(g.Execute(new StartEngine())));
+        var g = new Game(boat);
+        Assert.True(Do(g, "negative terminal", n => new Replace(n)).Accepted);
+        Assert.Equal("Runs", Outcome(Start(g)));
 
-        var stop = g.Execute(new Replace("impeller"));
+        var stop = Do(g, "impeller", n => new Replace(n));
         Assert.False(stop.EngineRunning);
         Assert.Equal(1.0, boat.Get("impeller").Condition);
-        Assert.Equal("Runs", Outcome(g.Execute(new StartEngine())));
+        Assert.Equal("Runs", Outcome(Start(g)));
         var flow = Assert.IsType<RawWaterFlowView>(g.Execute(new CheckRawWaterFlow()).Observation);
         Assert.Contains("strong", flow.Text);
     }
@@ -70,7 +80,7 @@ public class GameScenarioTests
     [Fact]
     public void Multimeter_readings_add_up()
     {
-        var g = WithButton(ExploredGame());
+        var g = WithButton(NewGame());
         string[] loop =
         [
             "positive terminal", "main positive cable", "battery switch", "starter solenoid",
@@ -79,11 +89,11 @@ public class GameScenarioTests
 
         double SumAndCheck()
         {
-            var battery = Assert.IsType<MeterReading>(g.Execute(new Measure("start battery")).Observation);
+            var battery = Assert.IsType<MeterReading>(Do(g, "start battery", n => new Measure(n)).Observation);
             double sum = 0;
             foreach (var name in loop)
             {
-                var m = Assert.IsType<MeterReading>(g.Execute(new Measure(name)).Observation);
+                var m = Assert.IsType<MeterReading>(Do(g, name, n => new Measure(n)).Observation);
                 Assert.NotNull(m.Value);
                 sum += m.Value!.Value;
                 if (name == "starter motor") Assert.Equal("volts-at-starter", m.Kind);
@@ -97,12 +107,12 @@ public class GameScenarioTests
             return sum;
         }
 
-        var dirty = Assert.IsType<MeterReading>(g.Execute(new Measure("negative terminal")).Observation);
+        var dirty = Assert.IsType<MeterReading>(Do(g, "negative terminal", n => new Measure(n)).Observation);
         Assert.True(dirty.Value > 5);
         SumAndCheck();
 
-        g.Execute(new Clean("negative terminal"));
-        var clean = Assert.IsType<MeterReading>(g.Execute(new Measure("negative terminal")).Observation);
+        Do(g, "negative terminal", n => new Clean(n));
+        var clean = Assert.IsType<MeterReading>(Do(g, "negative terminal", n => new Measure(n)).Observation);
         Assert.True(clean.Value < 0.1);
         SumAndCheck();
     }
@@ -110,31 +120,42 @@ public class GameScenarioTests
     [Fact]
     public void Full_play_through_via_the_facade()
     {
-        var g = Game.NewFirstFault();
+        var g = NewGame();
         Assert.Contains("won't start", string.Join(" ", ((BriefingView)g.Ask(new Briefing())).Lines));
+        Assert.Contains("cockpit", string.Join(" ", ((BriefingView)g.Ask(new Briefing())).Lines));
 
         var results = new List<CommandResult>
         {
-            g.Execute(new Look()),
-            g.Execute(new Open("battery")),
-            g.Execute(new Inspect("negative terminal")),
-            g.Execute(new StartEngine()),
-            g.Execute(new Buy("remote start button")),
-            g.Execute(new Measure("start battery")),
-            g.Execute(new Measure("negative terminal")),
-            g.Execute(new Clean("negative terminal")),
-            g.Execute(new StartEngine()),
+            g.Execute(new Look()),                          // 2
+            g.Execute(new GoTo("companionway")),            // 1
+            g.Execute(new GoTo("quarter berth")),           // 1
+            g.Execute(new Remove("battery-box lid")),       // 2
+            g.Execute(new Inspect("negative terminal")),    // 5
+            g.Execute(new GoTo("companionway")),            // 1
+            g.Execute(new GoTo("cockpit")),                 // 1
+            g.Execute(new StartEngine()),                   // 2  click
+            g.Execute(new Buy("remote start button")),      // 30, 400
+            g.Execute(new GoTo("companionway")),            // 1
+            g.Execute(new GoTo("quarter berth")),           // 1
+            g.Execute(new Measure("start battery")),        // 10
+            g.Execute(new Measure("negative terminal")),    // 10
+            g.Execute(new Clean("negative terminal")),      // 30
+            g.Execute(new GoTo("companionway")),            // 1
+            g.Execute(new GoTo("cockpit")),                 // 1
+            g.Execute(new StartEngine()),                   // 2  runs
         };
-        Assert.All(results, r => Assert.True(r.Accepted));
-        Assert.Equal("Click", Outcome(results[3]));
-        Assert.Equal("Runs", Outcome(results[8]));
-        Assert.True(results[8].Finished);
-        Assert.Contains(results[8].Narrative, l => l.StartsWith("Time spent: 1 h 33 min. Money spent: 400"));
+        Assert.All(results, r => Assert.True(r.Accepted, string.Join(" ", r.Narrative)));
+        Assert.Equal("Click", Outcome(results[7]));
+        var last = results[^1];
+        Assert.Equal("Runs", Outcome(last));
+        Assert.True(last.Finished);
+        Assert.Contains(last.Narrative, l => l.StartsWith("Time spent: 1 h 41 min. Money spent: 400"));
 
         var s = Status(g);
-        Assert.Equal(93, s.MinutesSpent);
+        Assert.Equal(101, s.MinutesSpent);
         Assert.Equal(400, s.MoneySpentNok);
-        Assert.Equal("09:33", s.TimeOfDay);
+        Assert.Equal("09:41", s.TimeOfDay);
+        Assert.Equal("Cockpit", s.Place);
         Assert.Equal(["remote start button"], s.Tools);
         Assert.Equal(75, s.Day);
         Assert.Equal("Runs", s.LastStartOutcome);
@@ -144,12 +165,15 @@ public class GameScenarioTests
         var log = Assert.IsType<LogView>(g.Ask(new Logbook()));
         Assert.Equal(results.Count + results.Sum(r => r.NewlyDiscovered.Count), log.Entries.Count);
         Assert.Contains(log.Entries, e => e.Text == "Found: Corroded negative terminal.");
+        Assert.Contains(log.Entries, e => e.Text == "Went into the quarter berth.");
+        Assert.Contains(log.Entries, e => e.Text == "Took off the battery-box lid.");
     }
 
     [Fact]
     public void Time_rolls_over_the_day()
     {
-        var g = ExploredGame();
+        var g = NewGame();
+        Walk.Near(g, "battery");
         int before = Status(g).MinutesSpent;
         g.Execute(new Charge("battery"));
         g.Execute(new Charge("battery"));
@@ -166,18 +190,18 @@ public class GameScenarioTests
         foreach (var fault in reference.AllFaults)
         {
             var reveal = fault.Reveals.First(r => r.Discovers);
-            var boat = BoatLoader.LoadSloop28();
-            var g = WithButton(Explored(new Game(boat)));
+            var g = WithButton(new Game(BoatLoader.LoadSloop28()));
             var comp = reference.Get(fault.ComponentId).Name;
 
             if (reveal.Action == PlayerAction.CheckRawWaterFlow)
             {
-                g.Execute(new Clean("negative terminal"));
-                Assert.True(g.Execute(new StartEngine()).EngineRunning);
+                Do(g, "negative terminal", n => new Clean(n));
+                Assert.True(Start(g).EngineRunning);
             }
+            Walk.Near(g, comp);
             Command cmd = reveal.Action switch
             {
-                PlayerAction.Look => new Open(boat.Compartments.First(c => c.Id == reference.Get(fault.ComponentId).Location).Id),
+                PlayerAction.Look => new Look(),
                 PlayerAction.Inspect => new Inspect(comp),
                 PlayerAction.Measure => new Measure(comp),
                 PlayerAction.Clean => new Clean(comp),
@@ -188,6 +212,7 @@ public class GameScenarioTests
                 PlayerAction.Start => new StartEngine(),
                 _ => throw new InvalidOperationException(),
             };
+            if (cmd is CheckRawWaterFlow or StartEngine) Walk.ToPlace(g, "cockpit");
             var res = g.Execute(cmd);
             Assert.True(res.Accepted, $"{fault.Id}: {string.Join(" ", res.Narrative)}");
             Assert.Contains(Status(g).DiscoveredFaults, k => k.Id == fault.Id && k.Name == fault.Name);
@@ -201,11 +226,17 @@ public class GameScenarioTests
         void Cmd(Command c) { var r = g.Execute(c); json.Add(JsonSerializer.Serialize(r, opts)); }
         void Ask(Query q) { var r = g.Ask(q); json.Add(JsonSerializer.Serialize(r, typeof(QueryResult), opts)); }
 
-        Ask(new Briefing()); Ask(new Commands()); Ask(new Compartments());
-        Cmd(new Look()); Cmd(new Open("battery")); Cmd(new Inspect("negative terminal"));
-        Cmd(new StartEngine()); Ask(new Status()); Cmd(new Measure("start battery"));
+        Ask(new Briefing()); Ask(new Commands()); Ask(new Aboard());
+        Cmd(new Look()); Cmd(new GoTo("companionway")); Cmd(new GoTo("quarter berth"));
+        Cmd(new Remove("battery-box lid")); Cmd(new Inspect("negative terminal"));
+        Cmd(new GoTo("forepeak")); // rejected
+        Cmd(new GoTo("companionway")); Cmd(new GoTo("cockpit"));
+        Cmd(new StartEngine()); Ask(new Status());
+        Cmd(new GoTo("companionway")); Cmd(new GoTo("quarter berth"));
+        Cmd(new Measure("start battery"));
         Cmd(new Buy("remote start button")); Cmd(new Measure("start battery"));
         Cmd(new Measure("filter")); // rejected
+        Ask(new Aboard());
         Ask(new Logbook());
         return json;
     }
@@ -213,7 +244,7 @@ public class GameScenarioTests
     [Fact]
     public void Results_hide_internal_state_and_carry_discriminators()
     {
-        var g = Game.NewFirstFault();
+        var g = NewGame();
         var json = PlayThrough(g);
         // Everything above happens before the corroded terminal is discovered.
         foreach (var j in json)
@@ -225,6 +256,8 @@ public class GameScenarioTests
         }
         Assert.Contains(json, j => j.Contains("\"type\":\"start-attempt-view\""));
         Assert.Contains(json, j => j.Contains("\"type\":\"status-view\""));
+        Assert.Contains(json, j => j.Contains("\"type\":\"place-view\""));
+        Assert.Contains(json, j => j.Contains("\"type\":\"cover-view\""));
 
         // After discovery the name appears, and the rest of the rules still hold.
         var m = g.Execute(new Measure("negative terminal"));
@@ -236,34 +269,29 @@ public class GameScenarioTests
     [Fact]
     public void Ambiguous_and_unknown_names_are_rejected_for_free()
     {
-        var g = ExploredGame();
-        var spentBefore = Status(g).MinutesSpent;
-        var logBefore = ((LogView)g.Ask(new Logbook())).Entries.Count;
-        var amb = g.Execute(new Inspect("filter"));
-        Assert.False(amb.Accepted);
-        Assert.Contains("Primary fuel filter", string.Join(" ", amb.Narrative));
-        Assert.Contains("Oil filter", string.Join(" ", amb.Narrative));
+        var g = NewGame();
+        Walk.Near(g, "primary filter");
+        Walk.Near(g, "oil filter");
+        var amb = AssertRefusedForFree(g, new Inspect("filter"));
+        Assert.Contains("Primary fuel filter", amb);
+        Assert.Contains("Oil filter", amb);
 
-        var unk = g.Execute(new Measure("the flux capacitor"));
-        Assert.False(unk.Accepted);
-        Assert.Contains("You haven't found anything called 'the flux capacitor' yet.", unk.Narrative);
+        var unk = AssertRefusedForFree(g, new Measure("the flux capacitor"));
+        Assert.Contains("You haven't found anything called 'the flux capacitor' yet.", unk);
 
-        Assert.False(g.Execute(new Open("nowhere")).Accepted);
-        Assert.False(g.Execute(new Clean("start battery")).Accepted);
-        Assert.False(g.Execute(new Replace("hull")).Accepted);
-        Assert.False(g.Execute(new Charge("negative terminal")).Accepted);
-
-        Assert.All(new[] { amb, unk }, r => { Assert.Equal(0, r.MinutesTaken); Assert.Equal(0, r.CostNok); });
-        var s = Status(g);
-        Assert.Equal(spentBefore, s.MinutesSpent);
-        Assert.Equal(0, s.MoneySpentNok);
-        Assert.Equal(logBefore, ((LogView)g.Ask(new Logbook())).Entries.Count);
+        AssertRefusedForFree(g, new GoTo("nowhere"));
+        Walk.Near(g, "battery");
+        AssertRefusedForFree(g, new Clean("start battery"));
+        AssertRefusedForFree(g, new Charge("negative terminal"));
+        Walk.Near(g, "hull");
+        AssertRefusedForFree(g, new Replace("hull"));
+        Assert.Equal(0, Status(g).MoneySpentNok);
     }
 
     [Fact]
     public void Unseen_components_cannot_be_named_until_found()
     {
-        var g = Game.NewFirstFault();
+        var g = NewGame();
         string[] cases = ["negative terminal", "flux capacitor"];
         var refusals = new List<CommandResult>();
         foreach (var name in cases)
@@ -281,15 +309,19 @@ public class GameScenarioTests
             g.Execute(new Inspect("negative terminal")).Narrative.Single().Replace("negative terminal", "X"),
             g.Execute(new Inspect("flux capacitor")).Narrative.Single().Replace("flux capacitor", "X"));
         Assert.Equal(0, Status(g).MinutesSpent);
+        // Nothing is nameable before the first command, not even what is in plain view.
+        Assert.False(g.Execute(new Inspect("ignition panel")).Accepted);
 
-        // Opening another compartment does not help.
-        Assert.True(g.Execute(new Open("engine side")).Accepted);
+        // Look shows what is in view from here.
+        Assert.True(g.Execute(new Look()).Accepted);
+        Assert.True(g.Execute(new Inspect("ignition panel")).Accepted);
+        Assert.True(g.Execute(new Inspect("standing rig")).Accepted);
         Assert.False(g.Execute(new Inspect("negative terminal")).Accepted);
 
-        // Look shows what is in plain view; Open shows a compartment's contents.
-        Assert.True(g.Execute(new Look()).Accepted);
-        Assert.True(g.Execute(new Inspect("rudder")).Accepted);
-        Assert.True(g.Execute(new Open("battery")).Accepted);
+        // Standing in the quarter berth does not help while the lid is on; taking it off does.
+        Walk.ToPlace(g, "quarter-berth");
+        Assert.False(g.Execute(new Inspect("negative terminal")).Accepted);
+        Assert.True(g.Execute(new Remove("battery lid")).Accepted);
         Assert.True(g.Execute(new Inspect("negative terminal")).Accepted);
         WithButton(g);
         Assert.True(g.Execute(new Measure("negative terminal")).Accepted);
@@ -298,40 +330,36 @@ public class GameScenarioTests
     [Fact]
     public void Name_resolution_ignores_case_whitespace_and_leading_the()
     {
-        var g = ExploredGame();
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        Walk.Near(g, "positive terminal");
         Assert.True(g.Execute(new Inspect("  The NEGATIVE Terminal ")).Accepted);
         Assert.False(g.Execute(new Inspect("terminal")).Accepted); // two terminals
         Assert.True(g.Execute(new Inspect("negative term")).Accepted);
+        Assert.True(g.Execute(new GoTo("  The COMPANIONWAY ")).Accepted);
     }
 
     [Fact]
     public void Same_commands_give_identical_results()
     {
-        var a = PlayThrough(Game.NewFirstFault());
-        var b = PlayThrough(Game.NewFirstFault());
+        var a = PlayThrough(NewGame());
+        var b = PlayThrough(NewGame());
         Assert.Equal(a, b);
     }
 
     [Fact]
     public void Without_the_button_cranking_measurements_are_refused_for_free()
     {
-        var g = ExploredGame();
-        var logBefore = ((LogView)g.Ask(new Logbook())).Entries.Count;
-        int minutesBefore = Status(g).MinutesSpent;
-
+        var g = NewGame();
         foreach (var name in new[] { "negative terminal", "starter motor" })
         {
-            var r = g.Execute(new Measure(name));
-            Assert.False(r.Accepted);
-            Assert.Equal(0, r.MinutesTaken);
-            Assert.Equal(0, r.CostNok);
-            Assert.Contains("You can't crank and hold the probes at once. A remote start button from the chandlery would let you.", r.Narrative);
+            Walk.Near(g, name);
+            var text = AssertRefusedForFree(g, new Measure(name));
+            Assert.Contains("You can't crank and hold the probes at once. A remote start button from the chandlery would let you.", text);
         }
-        Assert.Equal(minutesBefore, Status(g).MinutesSpent);
-        Assert.Equal(logBefore, ((LogView)g.Ask(new Logbook())).Entries.Count);
 
         // The battery gives resting volts only, and still reveals the flat battery.
-        var b = g.Execute(new Measure("start battery"));
+        var b = Do(g, "start battery", n => new Measure(n));
         Assert.True(b.Accepted);
         var m = Assert.IsType<MeterReading>(b.Observation);
         Assert.Equal("volts-resting", m.Kind);
@@ -340,7 +368,7 @@ public class GameScenarioTests
         Assert.NotEmpty(b.NewlyDiscovered);
 
         // Glow plugs need no cranking.
-        Assert.True(g.Execute(new Measure("glow plugs")).Accepted);
+        Assert.True(Do(g, "glow plugs", n => new Measure(n)).Accepted);
 
         int money = Status(g).MoneySpentNok;
         var buy = g.Execute(new Buy("Remote Start"));
@@ -350,16 +378,16 @@ public class GameScenarioTests
         Assert.Equal(money + 400, Status(g).MoneySpentNok);
         Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Bought a remote start button.");
 
-        var n = g.Execute(new Measure("negative terminal"));
+        var n = Do(g, "negative terminal", x => new Measure(x));
         Assert.True(n.Accepted);
         Assert.Equal("volts-drop", Assert.IsType<MeterReading>(n.Observation).Kind);
-        Assert.NotNull(Assert.IsType<MeterReading>(g.Execute(new Measure("start battery")).Observation).CrankingVolts);
+        Assert.NotNull(Assert.IsType<MeterReading>(Do(g, "start battery", x => new Measure(x)).Observation).CrankingVolts);
     }
 
     [Fact]
     public void Buying_twice_or_an_unknown_item_is_rejected_for_free()
     {
-        var g = ExploredGame();
+        var g = NewGame();
         var unk = g.Execute(new Buy("anchor"));
         Assert.False(unk.Accepted);
         Assert.Contains("The chandlery doesn't have 'anchor'.", unk.Narrative);
@@ -375,27 +403,27 @@ public class GameScenarioTests
     [Fact]
     public void Corroded_terminal_is_discoverable_without_the_button()
     {
-        var g = ExploredGame();
-        Assert.True(g.Execute(new Clean("negative terminal")).Accepted);
+        var g = NewGame();
+        Assert.True(Do(g, "negative terminal", n => new Clean(n)).Accepted);
         Assert.Contains(Status(g).DiscoveredFaults, k => k.Name == "Corroded negative terminal");
     }
 
     [Fact]
     public void Low_battery_cranks_laboured_then_runs()
     {
-        var g = ExploredGame();
-        Assert.True(g.Execute(new Clean("negative terminal")).Accepted);
-        var r = g.Execute(new StartEngine());
+        var g = NewGame();
+        Assert.True(Do(g, "negative terminal", n => new Clean(n)).Accepted);
+        var r = Start(g);
         var view = Assert.IsType<StartAttemptView>(r.Observation);
         Assert.Equal("Runs", view.Outcome);
         Assert.True(r.Finished);
         Assert.True(view.LabouredCrank);
         Assert.Contains("laboured", view.Description);
 
-        var g2 = ExploredGame();
-        Assert.True(g2.Execute(new Charge("battery")).Accepted);
-        Assert.True(g2.Execute(new Clean("negative terminal")).Accepted);
-        var r2 = g2.Execute(new StartEngine());
+        var g2 = NewGame();
+        Assert.True(Do(g2, "battery", n => new Charge(n)).Accepted);
+        Assert.True(Do(g2, "negative terminal", n => new Clean(n)).Accepted);
+        var r2 = Start(g2);
         var v2 = Assert.IsType<StartAttemptView>(r2.Observation);
         Assert.Equal("Runs", v2.Outcome);
         Assert.False(v2.LabouredCrank);
@@ -405,8 +433,205 @@ public class GameScenarioTests
     [Fact]
     public void Commands_query_lists_the_verbs()
     {
-        var list = Assert.IsType<CommandList>(Game.NewFirstFault().Ask(new Commands()));
+        var list = Assert.IsType<CommandList>(NewGame().Ask(new Commands()));
         Assert.Contains(list.Commands, c => c.Verb == "inspect" && c.Argument == "component");
         Assert.Contains(list.Commands, c => c.Verb == "buy" && c.Argument == "item");
+        Assert.Contains(list.Commands, c => c.Verb == "go" && c.Argument == "place");
+        Assert.Contains(list.Commands, c => c.Verb == "remove" && c.Argument == "cover");
+        Assert.Contains(list.Commands, c => c.Verb == "refit" && c.Argument == "cover");
+        Assert.DoesNotContain(list.Commands, c => c.Verb == "open");
+    }
+
+    // ------------------------------------------------------------ places and reach
+
+    [Fact]
+    public void Movement_is_limited_to_adjacent_places()
+    {
+        var g = NewGame();
+        Assert.Equal("Cockpit", Status(g).Place);
+
+        var text = AssertRefusedForFree(g, new GoTo("forepeak"));
+        Assert.StartsWith("You can't get to the forepeak from here.", text);
+        Assert.Contains("From here you can go into the companionway or up on deck.", text);
+        Assert.Equal("Cockpit", Status(g).Place);
+
+        Assert.Equal("You're already in the cockpit.", AssertRefusedForFree(g, new GoTo("cockpit")));
+        Assert.Equal("There's no place aboard called 'the moon'.", AssertRefusedForFree(g, new GoTo("the moon")));
+        AssertRefusedForFree(g, new GoTo("beside the hull")); // two moves away
+
+        var r = g.Execute(new GoTo("companionway"));
+        Assert.True(r.Accepted);
+        Assert.Equal(1, r.MinutesTaken);
+        Assert.Equal("Companionway", Status(g).Place);
+        var view = Assert.IsType<PlaceView>(r.Observation);
+        Assert.Equal("Companionway", view.Place);
+        Assert.Equal(["Cockpit", "Saloon", "Quarter berth"], view.Exits);
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Went into the companionway.");
+
+        // Aliases and the ladder.
+        Assert.True(g.Execute(new GoTo("cabin")).Accepted);
+        Assert.True(g.Execute(new GoTo("bow")).Accepted);
+        Walk.ToPlace(g, "beside-the-hull");
+        Assert.Equal("Beside the hull", Status(g).Place);
+    }
+
+    [Fact]
+    public void The_starter_motor_cannot_be_reached_or_seen_from_the_companionway()
+    {
+        var g = NewGame();
+        Assert.True(g.Execute(new GoTo("companionway")).Accepted);
+        Assert.True(g.Execute(new Remove("steps")).Accepted);
+        var aboard = Assert.IsType<AboardView>(g.Ask(new Aboard()));
+        Assert.DoesNotContain(aboard.Components, c => c.Name == "Starter motor");
+        Assert.Contains("You haven't found anything called 'starter motor' yet.",
+            AssertRefusedForFree(g, new Inspect("starter motor")));
+
+        // The solenoid shows down the side of the block, but a hand does not fit.
+        var solenoid = Assert.Single(aboard.Components, c => c.Name == "Starter solenoid");
+        Assert.True(solenoid.VisibleHere);
+        Assert.False(solenoid.ReachableHere);
+        Assert.True(g.Execute(new Inspect("solenoid")).Accepted);
+        const string panelInTheWay =
+            "You can see the starter solenoid from here but can't get at it; the quarter-berth panel is in the way.";
+        Assert.Equal(panelInTheWay, AssertRefusedForFree(g, new Replace("solenoid")));
+        g.Execute(new Buy("remote start button"));
+        Assert.Equal(panelInTheWay, AssertRefusedForFree(g, new Measure("solenoid")));
+
+        // Panel off, still not from the companionway.
+        Walk.Uncover(g, "quarter-berth-panel");
+        Walk.ToPlace(g, "companionway");
+        Assert.Equal(
+            "You can see the starter solenoid from here but can't get at it; you'd have to get at it from the quarter berth.",
+            AssertRefusedForFree(g, new Measure("solenoid")));
+        // And now the motor is in view from the quarter berth only.
+        Walk.ToPlace(g, "quarter-berth");
+        Assert.True(g.Execute(new Measure("starter motor")).Accepted);
+    }
+
+    [Fact]
+    public void The_negative_terminal_needs_the_battery_box_lid_off()
+    {
+        var g = WithButton(NewGame());
+        Walk.ToPlace(g, "quarter-berth");
+        // Not even nameable: she has not seen it.
+        foreach (Command c in new Command[]
+                 { new Inspect("negative terminal"), new Measure("negative terminal"), new Clean("negative terminal"), new Replace("negative terminal") })
+            Assert.Contains("You haven't found anything called 'negative terminal' yet.", AssertRefusedForFree(g, c));
+
+        Assert.True(g.Execute(new Remove("battery-box lid")).Accepted);
+        Assert.True(g.Execute(new Measure("negative terminal")).Accepted);
+
+        // Lid back on: she knows the part but cannot see it.
+        Assert.True(g.Execute(new Refit("battery-box lid")).Accepted);
+        const string blind = "You can't see the negative terminal from here.";
+        Assert.Equal(blind, AssertRefusedForFree(g, new Measure("negative terminal")));
+        Assert.Equal(blind, AssertRefusedForFree(g, new Clean("negative terminal")));
+        Assert.Equal(blind, AssertRefusedForFree(g, new Inspect("negative terminal")));
+    }
+
+    [Fact]
+    public void Covers_come_off_and_go_back_only_where_they_are()
+    {
+        var g = NewGame();
+        Assert.Equal("The battery-box lid is in the quarter berth.", AssertRefusedForFree(g, new Remove("battery-box lid")));
+        Assert.Equal("There's nothing called 'hatch cover' to take off.", AssertRefusedForFree(g, new Remove("hatch cover")));
+        Assert.Contains("could be:", AssertRefusedForFree(g, new Remove("lid")));
+        Assert.Equal("The cockpit-locker lid is already in place.", AssertRefusedForFree(g, new Refit("locker lid")));
+
+        Walk.ToPlace(g, "companionway");
+        int before = Status(g).MinutesSpent;
+        var off = g.Execute(new Remove("steps"));
+        Assert.True(off.Accepted);
+        Assert.Equal(3, off.MinutesTaken); // companionway steps: 3 min in the data
+        Assert.Equal(before + 3, Status(g).MinutesSpent);
+        var view = Assert.IsType<CoverView>(off.Observation);
+        Assert.True(view.Removed);
+        Assert.Equal("Companionway steps", view.Cover);
+        Assert.Equal("Companionway", view.Place);
+        Assert.Contains("Raw-water pump", view.NowVisible, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(off.Narrative, l => l.StartsWith("Behind it:"));
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Took off the companionway steps.");
+
+        Assert.Equal("The companionway steps are already off.", AssertRefusedForFree(g, new Remove("steps")));
+
+        // Look reports them off.
+        Assert.Contains("The companionway steps are off.", g.Execute(new Look()).Narrative);
+
+        Walk.ToPlace(g, "cockpit");
+        Assert.Equal("The companionway steps are in the companionway.", AssertRefusedForFree(g, new Refit("steps")));
+        Walk.ToPlace(g, "companionway");
+        var on = g.Execute(new Refit("steps"));
+        Assert.True(on.Accepted);
+        Assert.Equal(3, on.MinutesTaken);
+        Assert.Empty(Assert.IsType<CoverView>(on.Observation).NowVisible);
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Put back the companionway steps.");
+        Assert.Contains("The companionway steps are in place.", g.Execute(new Look()).Narrative);
+        // What she saw stays known, but is out of sight again.
+        Assert.Equal("You can't see the raw-water pump from here.", AssertRefusedForFree(g, new Inspect("raw-water pump")));
+
+        // Times come from the data.
+        Walk.ToPlace(g, "quarter-berth");
+        Assert.Equal(5, g.Execute(new Remove("panel")).MinutesTaken);
+        Assert.Equal(2, g.Execute(new Remove("battery lid")).MinutesTaken);
+        Assert.Equal(5, g.Execute(new Refit("panel")).MinutesTaken);
+    }
+
+    [Fact]
+    public void The_engine_starts_only_from_the_cockpit()
+    {
+        var g = NewGame();
+        Walk.ToPlace(g, "companionway");
+        Assert.Equal("The key is on the panel in the cockpit.", AssertRefusedForFree(g, new StartEngine()));
+        Walk.ToPlace(g, "on-deck");
+        Assert.Equal("The key is on the panel in the cockpit.", AssertRefusedForFree(g, new StartEngine()));
+        Assert.Null(Status(g).LastStartOutcome);
+        Walk.ToPlace(g, "cockpit");
+        Assert.True(g.Execute(new StartEngine()).Accepted);
+    }
+
+    [Fact]
+    public void The_cooling_water_is_checked_from_outside_only()
+    {
+        var g = NewGame();
+        Do(g, "negative terminal", n => new Clean(n));
+        Assert.True(Start(g).EngineRunning);
+
+        const string nothing = "You can't see the exhaust outlet from down here.";
+        Walk.ToPlace(g, "companionway");
+        Assert.Equal(nothing, AssertRefusedForFree(g, new CheckRawWaterFlow()));
+        Walk.ToPlace(g, "saloon");
+        Assert.Equal(nothing, AssertRefusedForFree(g, new CheckRawWaterFlow()));
+
+        foreach (var place in new[] { "cockpit", "on-deck", "beside-the-hull" })
+        {
+            Walk.ToPlace(g, place);
+            Assert.True(g.Execute(new CheckRawWaterFlow()).Accepted, place);
+        }
+
+        // The same rule when the engine is not running.
+        var idle = NewGame();
+        Walk.ToPlace(idle, "companionway");
+        Assert.Equal(nothing, AssertRefusedForFree(idle, new CheckRawWaterFlow()));
+    }
+
+    [Fact]
+    public void Looking_names_the_place_covers_and_what_is_in_view()
+    {
+        var g = NewGame();
+        var look = g.Execute(new Look());
+        Assert.True(look.Accepted);
+        Assert.Equal(2, look.MinutesTaken);
+        Assert.Contains("The cockpit-locker lid is in place.", look.Narrative);
+        Assert.Contains(look.Narrative, l => l.StartsWith("You can see:") && l.Contains("Ignition panel"));
+        Assert.DoesNotContain(look.Narrative, l => l.Contains("Fuel tank"));
+        Assert.Contains("From here you can go into the companionway or up on deck.", look.Narrative);
+        var view = Assert.IsType<PlaceView>(look.Observation);
+        Assert.Contains("Ignition panel", view.Reachable);
+        Assert.Contains("Standing rig", view.Visible);
+        Assert.DoesNotContain("Standing rig", view.Reachable);
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Looked around the cockpit.");
+
+        g.Execute(new Remove("locker lid"));
+        Assert.Contains("Fuel tank", Assert.IsType<PlaceView>(g.Execute(new Look()).Observation).Reachable);
     }
 }

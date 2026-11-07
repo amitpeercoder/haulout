@@ -69,14 +69,13 @@
                 </div>
             }
         }
-        else if (Session.SelectedCompartmentId is { } cid
-                 && Session.Aboard.Compartments.FirstOrDefault(c => c.Id == cid) is { } comp)
+        else if (Session.SelectedCompartmentId is { } cid)
         {
-            <h2>@comp.Name</h2>
+            <h2>@Session.Aboard.Place</h2>
             <div class="parts">
-                @foreach (var c in comp.Components)
+                @foreach (var c in Session.ComponentsIn(cid))
                 {
-                    <button class="part @(c.HasKnownFault ? "faulty" : "")" data-component="@c.Id" @onclick="() => Session.SelectComponent(c.Id)">@c.Name</button>
+                    <button class="part @(c.KnownProblem ? "faulty" : "")" data-component="@c.Name" @onclick="() => Session.SelectComponent(c.Name)">@c.Name</button>
                 }
             </div>
         }

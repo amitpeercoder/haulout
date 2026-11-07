@@ -8,7 +8,7 @@ public class McpServerTests
 {
     private static readonly string[] ExpectedTools =
     [
-        "look", "open", "inspect", "measure", "clean", "replace", "charge", "buy",
+        "look", "go", "remove", "refit", "inspect", "measure", "clean", "replace", "charge", "buy",
         "check_filter", "check_flow", "start_engine",
         "status", "logbook", "aboard", "help", "briefing",
     ];
@@ -58,25 +58,48 @@ public class McpServerTests
         return Assert.IsType<TextContentBlock>(block).Text;
     }
 
+    private static JsonDocument SloopData() => JsonDocument.Parse(File.ReadAllText(
+        Path.Combine(RepoRoot(), "src", "Haulout.Sim", "Data", "sloop28.json")));
+
+    /// <summary>Ids of places, covers, positions, components and faults. Tolerant of the old (compartments) and new shape.</summary>
     private static IEnumerable<string> HyphenatedIds()
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(
-            Path.Combine(RepoRoot(), "src", "Haulout.Sim", "Data", "sloop28.json")));
+        using var doc = SloopData();
         var ids = new List<string>();
-        foreach (var comp in doc.RootElement.GetProperty("compartments").EnumerateArray())
-            ids.Add(comp.GetProperty("id").GetString()!);
-        foreach (var c in doc.RootElement.GetProperty("components").EnumerateArray())
+        foreach (var section in new[] { "compartments", "places", "covers", "positions", "components" })
         {
-            ids.Add(c.GetProperty("id").GetString()!);
-            if (c.TryGetProperty("faults", out var faults))
-                foreach (var f in faults.EnumerateArray())
-                    if (f.TryGetProperty("id", out var fid)) ids.Add(fid.GetString()!);
+            if (!doc.RootElement.TryGetProperty(section, out var el)) continue;
+            if (el.ValueKind == JsonValueKind.Object)
+                foreach (var p in el.EnumerateObject()) ids.Add(p.Name);
+            else if (el.ValueKind == JsonValueKind.Array)
+                foreach (var item in el.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String) ids.Add(item.GetString()!);
+                    if (item.ValueKind != JsonValueKind.Object) continue;
+                    if (item.TryGetProperty("id", out var id)) ids.Add(id.GetString()!);
+                    if (item.TryGetProperty("faults", out var faults))
+                        foreach (var f in faults.EnumerateArray())
+                            if (f.TryGetProperty("id", out var fid)) ids.Add(fid.GetString()!);
+                }
         }
         return ids.Where(i => i.Contains('-')).Distinct();
     }
 
+    /// <summary>Display names of places, covers and components; some contain an id as a substring ("Quarter-berth panel").</summary>
+    private static IEnumerable<string> DisplayNames()
+    {
+        using var doc = SloopData();
+        var names = new List<string>();
+        foreach (var section in new[] { "compartments", "places", "covers", "components" })
+            if (doc.RootElement.TryGetProperty(section, out var el) && el.ValueKind == JsonValueKind.Array)
+                foreach (var item in el.EnumerateArray())
+                    if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var n) && n.GetString() is { } name)
+                        names.Add(name);
+        return names.OrderByDescending(n => n.Length);
+    }
+
     [Fact]
-    public async Task Lists_all_sixteen_tools()
+    public async Task Lists_all_eighteen_tools()
     {
         await using var client = await Connect();
         var names = (await client.ListToolsAsync()).Select(t => t.Name).ToHashSet();
@@ -89,6 +112,7 @@ public class McpServerTests
     {
         var ids = HyphenatedIds().ToList();
         Assert.NotEmpty(ids);
+        var names = DisplayNames().ToList();
         await using var client = await Connect();
 
         var calls = new (string Tool, Dictionary<string, object?> Args)[]
@@ -96,7 +120,9 @@ public class McpServerTests
             ("briefing", []),
             ("help", []),
             ("start_engine", []),
-            ("open", new() { ["compartment"] = "battery box" }),
+            ("go", new() { ["place"] = "companionway" }),
+            ("go", new() { ["place"] = "quarter berth" }),
+            ("remove", new() { ["cover"] = "battery-box lid" }),
             ("inspect", new() { ["component"] = "negative terminal" }),
             ("aboard", []),
             ("status", []),
@@ -108,7 +134,8 @@ public class McpServerTests
             var text = TextOf(result);
             Assert.False(string.IsNullOrWhiteSpace(text), tool);
             Assert.False(text.TrimStart().StartsWith('{') || text.TrimStart().StartsWith('['), $"{tool}: {text}");
-            foreach (var id in ids) Assert.DoesNotContain(id, text, StringComparison.OrdinalIgnoreCase);
+            var bare = names.Aggregate(text, (t, n) => t.Replace(n, " ", StringComparison.OrdinalIgnoreCase));
+            foreach (var id in ids) Assert.DoesNotContain(id, bare, StringComparison.OrdinalIgnoreCase);
             if (result.StructuredContent is { } sc) AssertNoIdProperties(sc, tool);
         }
     }
@@ -135,7 +162,7 @@ public class McpServerTests
             await using (var client = await Connect(new() { ["HAULOUT_TRACE"] = path }))
             {
                 await Call(client, "look", []);
-                await Call(client, "open", new() { ["compartment"] = "battery box" });
+                await Call(client, "go", new() { ["place"] = "companionway" });
                 await Call(client, "status", []);
                 await Call(client, "inspect", new() { ["component"] = "nothing like this" });
             }
@@ -155,10 +182,13 @@ public class McpServerTests
                 Assert.True(r.GetProperty("engineRunning").ValueKind is JsonValueKind.True or JsonValueKind.False);
                 Assert.True(r.GetProperty("finished").ValueKind is JsonValueKind.True or JsonValueKind.False);
             }
-            var open = JsonDocument.Parse(lines[1]).RootElement;
-            Assert.Equal("open", open.GetProperty("tool").GetString());
-            Assert.Equal("battery box", open.GetProperty("args").GetProperty("compartment").GetString());
-            Assert.Equal(4, open.GetProperty("minutesSpent").GetInt32());
+            var look = JsonDocument.Parse(lines[0]).RootElement;
+            Assert.Equal(2, look.GetProperty("minutesSpent").GetInt32());
+            var go = JsonDocument.Parse(lines[1]).RootElement;
+            Assert.Equal("go", go.GetProperty("tool").GetString());
+            Assert.Equal("companionway", go.GetProperty("args").GetProperty("place").GetString());
+            // minutesSpent is the running total: look 2 + go 1.
+            Assert.Equal(3, go.GetProperty("minutesSpent").GetInt32());
             Assert.False(JsonDocument.Parse(lines[3]).RootElement.GetProperty("accepted").GetBoolean());
             Assert.True(JsonDocument.Parse(lines[2]).RootElement.GetProperty("accepted").GetBoolean());
         }

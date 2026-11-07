@@ -4,7 +4,7 @@ She stands on the hard in her cradle, grey light and a cold wind off the water.
 
 The yard hose is rigged to the raw-water intake, so the engine can run ashore.
 
-You are aboard through the haulout tools (mcp__haulout__*). You may call `help` and `briefing` at any time.
+You are aboard through the haulout tools (mcp__haulout__*). You may call `help` and `briefing` at any time. You move between places aboard and remove covers to get at things.
 
 Your goal: find out why the engine won't start and get it running, spending as little in-game time and money as you can.
 

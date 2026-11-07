@@ -21,8 +21,14 @@ public static class WordParser
 
         return verb switch
         {
-            "look" => arg.Length == 0 ? new RunCommand(new Look()) : new RunCommand(new Open(arg)),
-            "open" => WithArg(arg, "open <compartment>", a => new Open(a)),
+            "look" => ParseLook(arg),
+            "go" or "walk" or "climb" or "enter" => WithArg(StripTo(arg), "go <place>", a => new GoTo(a)),
+            "remove" or "open" or "lift" => WithArg(arg, $"{verb} <cover>", a => new Remove(a)),
+            "take" when arg.StartsWith("off ", StringComparison.OrdinalIgnoreCase) =>
+                WithArg(arg[4..].Trim(), "take off <cover>", a => new Remove(a)),
+            "refit" or "close" => WithArg(arg, $"{verb} <cover>", a => new Refit(a)),
+            "put" when arg.StartsWith("back ", StringComparison.OrdinalIgnoreCase) =>
+                WithArg(arg[5..].Trim(), "put back <cover>", a => new Refit(a)),
             "inspect" or "examine" or "x" => WithArg(arg, "inspect <component>", a => new Inspect(a)),
             "measure" or "meter" => WithArg(arg, "measure <component>", a => new Measure(a)),
             "start" or "crank" => new RunCommand(new StartEngine()),
@@ -38,6 +44,16 @@ public static class WordParser
             _ => new Problem($"I don't know how to '{verb}'. Type 'help'."),
         };
     }
+
+    private static Parsed ParseLook(string arg)
+    {
+        if (arg.Length == 0) return new RunCommand(new Look());
+        if (arg.StartsWith("at ", StringComparison.OrdinalIgnoreCase)) arg = arg[3..].Trim();
+        return arg.Length == 0 ? new Problem("Usage: look | look at <component>") : new RunCommand(new Inspect(arg));
+    }
+
+    private static string StripTo(string arg) =>
+        arg.StartsWith("to ", StringComparison.OrdinalIgnoreCase) ? arg[3..].Trim() : arg;
 
     private static Parsed ParseCheck(string arg) => arg.ToLowerInvariant() switch
     {

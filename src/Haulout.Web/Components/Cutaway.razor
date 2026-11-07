@@ -1,10 +1,6 @@
 @implements IDisposable
 @inject GameSession Session
 
-@{
-    var compartments = Session.Aboard.Compartments.ToDictionary(c => c.Id);
-}
-
 <svg class="cutaway" viewBox="@CutawayGeometry.ViewBox" xmlns="http://www.w3.org/2000/svg"
      role="group" aria-label="Cutaway of the boat">
     <defs>
@@ -27,12 +23,11 @@
 
     @foreach (var shape in CutawayGeometry.Compartments)
     {
-        compartments.TryGetValue(shape.Id, out var comp);
-        var opened = comp?.Opened ?? false;
-        var name = comp?.Name ?? shape.Caption;
+        var opened = Session.IsOpen(shape.Id);
+        var name = shape.Caption;
         var id = shape.Id;
         var regionSelected = Session.SelectedCompartmentId == id;
-        var found = comp?.Components ?? Array.Empty<FoundComponent>();
+        var found = Session.ComponentsIn(id);
 
         <g class="region @(opened ? "open" : "closed") @(regionSelected ? "selected" : "")"
            data-compartment="@id" role="button" tabindex="0" aria-label="@name"
@@ -53,14 +48,14 @@
             @for (var i = 0; i < found.Count; i++)
             {
                 var item = found[i];
-                var itemId = item.Id;
+                var itemId = item.Name;
                 var slot = shape.Slots[Math.Min(i, shape.Slots.Length - 1)];
                 var spot = CutawayGeometry.Spots.TryGetValue(itemId, out var mapped) ? mapped : MarkerSpot.FromSlot(slot, item.Name);
                 var selected = Session.SelectedComponentId == itemId;
 
-                <g class="marker @(item.HasKnownFault ? "fault" : "") @(selected ? "selected" : "")"
+                <g class="marker @(item.KnownProblem ? "fault" : "") @(selected ? "selected" : "")"
                    data-component="@itemId" role="button" tabindex="0"
-                   aria-label="@(item.HasKnownFault ? item.Name + ", known fault" : item.Name)"
+                   aria-label="@(item.KnownProblem ? item.Name + ", known fault" : item.Name)"
                    @onclick="() => Session.SelectComponent(itemId)" @onclick:stopPropagation="true"
                    @onkeydown="e => OnKey(e, () => Session.SelectComponent(itemId))" @onkeydown:stopPropagation="true">
                     @if (spot.LeaderX is { } lx && spot.LeaderY is { } ly)
@@ -69,7 +64,7 @@
                     }
                     <circle class="hit" cx="@spot.X" cy="@spot.Y" r="12" />
                     <circle class="ring" cx="@spot.X" cy="@spot.Y" r="11" />
-                    @if (item.HasKnownFault)
+                    @if (item.KnownProblem)
                     {
                         <circle class="fault-ring" cx="@spot.X" cy="@spot.Y" r="8" />
                     }

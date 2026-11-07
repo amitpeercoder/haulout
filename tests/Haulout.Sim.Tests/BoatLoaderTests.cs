@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
 
@@ -17,11 +18,12 @@ public class BoatLoaderTests
     ];
 
     [Fact]
-    public void Sloop_has_40_components_and_8_compartments()
+    public void Sloop_has_40_components_7_places_and_5_covers()
     {
         var boat = BoatLoader.LoadSloop28();
         Assert.Equal(40, boat.Components.Count);
-        Assert.Equal(8, boat.Compartments.Count);
+        Assert.Equal(7, boat.Places.Count);
+        Assert.Equal(5, boat.Covers.Count);
     }
 
     [Fact]
@@ -33,12 +35,45 @@ public class BoatLoaderTests
     }
 
     [Fact]
-    public void Every_component_is_in_a_known_compartment()
+    public void Every_component_has_a_position_and_is_reachable_from_somewhere()
     {
         var boat = BoatLoader.LoadSloop28();
-        var ids = boat.Compartments.Select(c => c.Id).ToHashSet();
-        Assert.All(boat.Components, c => Assert.Contains(c.Location, ids));
-        Assert.Equal(40, ids.Sum(id => boat.In(id).Count()));
+        var positions = boat.Positions.Select(p => p.Id).ToHashSet();
+        Assert.All(boat.Components, c =>
+        {
+            Assert.Contains(c.PositionId, positions);
+            Assert.Contains(c.Reach, e => e.Reachable);
+            Assert.All(c.Reach, e => Assert.True(e.Visible || !e.Reachable, c.Id));
+        });
+    }
+
+    [Fact]
+    public void Places_are_symmetric_and_every_place_can_be_reached_from_the_cockpit()
+    {
+        var boat = BoatLoader.LoadSloop28();
+        foreach (var p in boat.Places)
+            foreach (var a in p.Adjacent)
+                Assert.Contains(p.Id, boat.GetPlace(a).Adjacent);
+        var seen = new HashSet<string> { "cockpit" };
+        var queue = new Queue<string>(seen);
+        while (queue.Count > 0)
+            foreach (var n in boat.GetPlace(queue.Dequeue()).Adjacent)
+                if (seen.Add(n)) queue.Enqueue(n);
+        Assert.Equal(boat.Places.Count, seen.Count);
+        Assert.True(boat.GetPlace("beside-the-hull").OnlyOnTheHard);
+    }
+
+    [Fact]
+    public void Covers_have_times_and_texts()
+    {
+        var boat = BoatLoader.LoadSloop28();
+        Assert.All(boat.Covers, c =>
+        {
+            Assert.True(c.RemoveMinutes > 0 && c.RefitMinutes > 0, c.Id);
+            Assert.False(string.IsNullOrWhiteSpace(c.RemoveText), c.Id);
+            Assert.False(string.IsNullOrWhiteSpace(c.RefitText), c.Id);
+        });
+        Assert.Equal(["companionway-steps", "saloon-floorboards"], boat.Covers.Where(c => c.Plural).Select(c => c.Id));
     }
 
     [Fact]
@@ -103,10 +138,36 @@ public class BoatLoaderTests
         Assert.Null(f.RevealFor(PlayerAction.Look));
     }
 
+    private static string Mutated(Action<JsonNode> edit)
+    {
+        using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream("Haulout.Sim.Data.sloop28.json")!;
+        var node = JsonNode.Parse(stream)!;
+        edit(node);
+        return node.ToJsonString();
+    }
+
     [Fact]
     public void Boat_rejects_bad_data()
     {
-        const string json = """{"name":"x","compartments":[],"components":[{"id":"a","name":"A","subsystem":"hull","location":"nowhere","condition":1}]}""";
-        Assert.Throws<ArgumentException>(() => BoatLoader.Load(json));
+        // Unknown position.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["components"]![0]!["position"] = "nowhere")));
+        // Unknown place in a reach entry.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["components"]![0]!["reach"]![0]!["place"] = "nowhere")));
+        // Unknown cover in a reach entry.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["components"]![0]!["reach"]![0]!["cover"] = "nothing")));
+        // Reachable but not visible.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["components"]![0]!["reach"]![0]!["visible"] = false)));
+        // Adjacency one way only.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["places"]![0]!["adjacent"]!.AsArray().Add("forepeak"))));
+        // Adjacent to a place that does not exist.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["places"]![0]!["adjacent"]!.AsArray().Add("moon"))));
+        // Duplicate ids.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["places"]![1]!["id"] = "cockpit")));
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["covers"]![1]!["id"] = "companionway-steps")));
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["components"]![1]!["id"] = "start-battery")));
+        // A cover removed at an unknown place.
+        Assert.Throws<ArgumentException>(() => BoatLoader.Load(Mutated(n => n["covers"]![0]!["place"] = "nowhere")));
+        // The unmodified data loads.
+        Assert.NotNull(BoatLoader.Load(Mutated(_ => { })));
     }
 }

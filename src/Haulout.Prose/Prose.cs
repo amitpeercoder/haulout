@@ -61,12 +61,10 @@ public static class Prose
                 break;
             case StatusView s:
                 sb.AppendLine($"Day {s.Day}, {s.TimeOfDay}. Time spent: {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min. Money spent: {s.MoneySpentNok} NOK.");
+                sb.AppendLine($"You're in the {Lower(s.Place)}.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) sb.AppendLine($"  Known: {f.Name} ({f.ComponentName})");
-                break;
-            case CompartmentsView c:
-                sb.AppendLine(string.Join(", ", c.Compartments.Select(x => x.Name)));
                 break;
             case AboardView a:
                 sb.Append(Aboard(a));
@@ -75,23 +73,43 @@ public static class Prose
         return sb.ToString();
     }
 
-    /// <summary>Compartments, whether opened, and the components found in each. Names only.</summary>
+    /// <summary>Where you are, the places and covers aboard, and what you have found. Names only.</summary>
     public static string Aboard(AboardView view)
     {
         var sb = new StringBuilder();
-        foreach (var comp in view.Compartments)
+        sb.AppendLine($"You're in the {Lower(view.Place)}.");
+        sb.AppendLine("Places:");
+        foreach (var p in view.Places)
         {
-            sb.AppendLine($"{comp.Name} ({(comp.Opened ? "opened" : "not opened")})");
-            if (comp.Components.Count == 0)
-            {
-                sb.AppendLine("  nothing found yet");
-                continue;
-            }
-            foreach (var c in comp.Components)
-                sb.AppendLine($"  {c.Name}{(c.HasKnownFault ? " (known problem)" : "")}");
+            var notes = new List<string>();
+            if (p.Here) notes.Add("you are here");
+            else if (p.Visited) notes.Add("been there");
+            if (!p.Available) notes.Add("not available now");
+            var tag = notes.Count > 0 ? $" ({string.Join(", ", notes)})" : "";
+            var next = p.Adjacent.Count > 0 ? $" - next to: {string.Join(", ", p.Adjacent)}" : "";
+            sb.AppendLine($"  {p.Name}{tag}{next}");
+        }
+        if (view.Covers.Count > 0)
+        {
+            sb.AppendLine("Covers:");
+            foreach (var c in view.Covers)
+                sb.AppendLine($"  {c.Name} ({c.Place}): {(c.Removed ? "off" : "in place")}");
+        }
+        if (view.Components.Count == 0)
+        {
+            sb.AppendLine("Found so far: nothing.");
+            return sb.ToString();
+        }
+        sb.AppendLine("Found so far:");
+        foreach (var c in view.Components)
+        {
+            var here = c.ReachableHere ? "; within reach" : c.VisibleHere ? "; in sight" : "";
+            sb.AppendLine($"  {c.Name}{(c.KnownProblem ? " (known problem)" : "")} - {c.Position}{here}");
         }
         return sb.ToString();
     }
+
+    private static string Lower(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     private static string Duration(int minutes) =>
         minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes} min";

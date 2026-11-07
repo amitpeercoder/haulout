@@ -36,3 +36,77 @@ The boat is modelled and drawn the way a sailor moves through it.
 
 - Does moving between places cost time in the slice, or is it free until the economy exists? Default: one minute, visible in the log.
 - Do covers ever need tools (screwdriver for the panel)? Default: not in the slice.
+
+## Implementation notes
+
+**Date:** 2026-11-07. Order of work step 1 (sim, console, MCP) is done. The web view still uses the old cutaway, with a compile fix only.
+
+### Place graph
+
+The player starts in the cockpit. Moving to an adjacent place takes 1 min and is logged. Look takes 2 min.
+
+- cockpit: companionway, on deck
+- companionway (in the hatch / on the steps): cockpit, saloon, quarter berth
+- quarter berth: companionway
+- saloon: companionway, forepeak
+- forepeak: saloon
+- on deck: cockpit, beside the hull (down the ladder)
+- beside the hull: on deck. Only while she is on the hard; this is always true in the slice.
+
+### Covers
+
+| Cover | Removed from | Remove / refit |
+|---|---|---|
+| Companionway steps | companionway | 3 / 3 min |
+| Quarter-berth panel | quarter berth | 5 / 5 min |
+| Battery-box lid | quarter berth | 2 / 2 min |
+| Cockpit-locker lid | cockpit | 2 / 2 min |
+| Saloon floorboards | saloon | 4 / 4 min |
+
+No cover needs tools. There is no engine-front sound panel.
+
+### Positions and reach
+
+Each component has one true position:
+
+- engine bay, front (under the steps)
+- engine bay, quarter-berth side
+- under the quarter berth
+- under the cockpit locker
+- bilge under the saloon
+- cockpit
+- deck
+- hull, outside
+
+Each component also has a reach list in `sloop28.json`. A reach entry names a place, an optional cover that must be off, and whether the component is visible from there and whether it is reachable. Inspect needs the component to be visible from the current place. Measure, clean, replace, charge and check filter need it to be reachable.
+
+Two commands are tied to a place rather than to a component:
+
+- Start works only from the cockpit, where the key is.
+- Check flow works only from outside (the cockpit, on deck or beside the hull), where you can see the exhaust outlet at the transom.
+
+The layout:
+
+- **Quarter berth, panel off.** The engine's fuel side: starter motor, solenoid, ground stud, lift pump, secondary filter, injection pump, return line, glow plugs, oil filter and exhaust elbow.
+- **Companionway, steps off.** The front of the engine: belt, alternator, raw-water pump, impeller, oil filler, coolant cap, thermostat, heat exchanger and the injectors on top. From here the solenoid is visible but cannot be reached, and the starter cannot be seen at all.
+- **Fuel filters.** The primary filter / water separator is on the cockpit-locker bulkhead beside the tank. It sits upstream of the lift pump and close to the tank, where its bowl can be seen and drained without opening up the engine. The lift pump and the secondary filter are on the engine block, on the fuel side.
+
+### Refusals
+
+Refusals are free and not logged. There are three levels:
+
+1. A component the player has never seen: "You haven't found anything called 'x' yet." This is unchanged, and a part that does not exist gets the same answer.
+2. A component the player has seen, but cannot see from here: "You can't see the x from here."
+3. A component that is visible but not reachable: "You can see the x from here but can't get at it", followed by either "; the {cover} is in the way." or "; you'd have to get at it from the {place}."
+
+`Open` and the compartment notion are gone. The console still accepts "open" as a word for remove.
+
+### Open questions for Amit (real layout)
+
+1. Which side is the fuel side on a typical 28-foot sloop's small diesel? Is it the one facing the quarter berth? I assumed that the lift pump, secondary filter, injection pump and oil filter are all there.
+2. Is the battery switch on the face of the berth, reachable without lifting anything? Or is it on the companionway bulkhead?
+3. Is the engine's raw-water seacock really under the saloon floorboards? Or is it in the engine bay or under the steps, which is where it was before?
+4. Is the heat exchanger at the front, reached with the steps off? I moved it there from the side.
+5. Can you see the solenoid from the companionway with the steps off? I said yes, but you cannot reach it from there.
+6. Is the starter visible from the front at all? I said no.
+7. Should moving cost more than 1 min when you climb (on deck to beside the hull, by ladder)?

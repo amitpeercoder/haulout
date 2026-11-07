@@ -30,13 +30,19 @@ public static class BoatLoader
         var dto = JsonSerializer.Deserialize<BoatDto>(json, Options)
             ?? throw new InvalidOperationException("Boat JSON is empty.");
 
-        var compartments = dto.Compartments.Select(c =>
-            new Compartment(c.Id, c.Name, c.Aliases ?? [], c.Description ?? ""));
+        var places = dto.Places.Select(p => new Place(
+            p.Id, p.Name, p.Aliases ?? [], p.Description ?? "", p.Way ?? "", p.Adjacent ?? [], p.OnlyOnTheHard));
+        var covers = dto.Covers.Select(c => new Cover(
+            c.Id, c.Name, c.Aliases ?? [], c.Place, c.Plural, c.RemoveMinutes, c.RefitMinutes,
+            c.RemoveText ?? "", c.RefitText ?? ""));
+        var positions = dto.Positions.Select(p => new Position(p.Id, p.Label));
 
         var components = dto.Components.Select(c =>
         {
             var spec = new ComponentSpec(
-                c.Subsystem, c.Location, c.Aliases ?? [], c.Description ?? "",
+                c.Subsystem, c.Position,
+                (c.Reach ?? []).Select(r => new ReachEntry(r.Place, r.Cover, r.Visible, r.Reachable)).ToList(),
+                c.Aliases ?? [], c.Description ?? "",
                 c.SeriesOhms, c.Cleanable, c.ReplaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()));
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
@@ -46,22 +52,54 @@ public static class BoatLoader
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         });
 
-        return new Boat(dto.Name, compartments, components);
+        return new Boat(dto.Name, places, covers, positions, components);
     }
 
     private sealed class BoatDto
     {
         public string Name { get; set; } = "";
-        public List<CompartmentDto> Compartments { get; set; } = [];
+        public List<PlaceDto> Places { get; set; } = [];
+        public List<CoverDto> Covers { get; set; } = [];
+        public List<PositionDto> Positions { get; set; } = [];
         public List<ComponentDto> Components { get; set; } = [];
     }
 
-    private sealed class CompartmentDto
+    private sealed class PlaceDto
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public List<string>? Aliases { get; set; }
         public string? Description { get; set; }
+        public string? Way { get; set; }
+        public List<string>? Adjacent { get; set; }
+        public bool OnlyOnTheHard { get; set; }
+    }
+
+    private sealed class CoverDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public List<string>? Aliases { get; set; }
+        public string Place { get; set; } = "";
+        public bool Plural { get; set; }
+        public int RemoveMinutes { get; set; }
+        public int RefitMinutes { get; set; }
+        public string? RemoveText { get; set; }
+        public string? RefitText { get; set; }
+    }
+
+    private sealed class PositionDto
+    {
+        public string Id { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+
+    private sealed class ReachDto
+    {
+        public string Place { get; set; } = "";
+        public string? Cover { get; set; }
+        public bool Visible { get; set; }
+        public bool Reachable { get; set; }
     }
 
     private sealed class ComponentDto
@@ -69,7 +107,8 @@ public static class BoatLoader
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public Subsystem Subsystem { get; set; }
-        public string Location { get; set; } = "";
+        public string Position { get; set; } = "";
+        public List<ReachDto>? Reach { get; set; }
         public List<string>? Aliases { get; set; }
         public string? Description { get; set; }
         public double Condition { get; set; }

@@ -34,7 +34,8 @@ public sealed class Component
     public ComponentSpec Spec { get; }
 
     public Subsystem Subsystem => Spec.Subsystem;
-    public string Location => Spec.Location;
+    public string PositionId => Spec.PositionId;
+    public IReadOnlyList<ReachEntry> Reach => Spec.Reach;
     public IReadOnlyList<string> Aliases => Spec.Aliases;
     public string Description => Spec.Description;
     public double? SeriesOhms => Spec.SeriesOhms;

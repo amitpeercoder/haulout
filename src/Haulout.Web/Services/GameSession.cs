@@ -21,7 +21,7 @@ public sealed class GameSession
 
     public CommandResult? LastResult { get; private set; }
 
-    /// <summary>Component id (facade id) of the selected component, if any.</summary>
+    /// <summary>Name of the selected component, if any.</summary>
     public string? SelectedComponentId { get; private set; }
 
     /// <summary>Compartment id last clicked, if any.</summary>
@@ -83,22 +83,52 @@ public sealed class GameSession
         Execute(new Look());
     }
 
-    /// <summary>A click on a compartment: opens it the first time (costs time), only selects it afterwards.</summary>
-    public void ClickCompartment(string compartmentId)
+    /// <summary>Cutaway shape id -> (position label, place to stand in, cover to take off or null). Interim mapping until the Web is redone.</summary>
+    private static readonly Dictionary<string, (string Position, string Place, string? Cover)> Shapes = new()
     {
-        SelectedCompartmentId = compartmentId;
+        ["deck"] = ("Deck", "on deck", null),
+        ["cockpit"] = ("Cockpit", "cockpit", null),
+        ["cockpit-locker"] = ("Under the cockpit locker", "cockpit", "cockpit-locker lid"),
+        ["battery-box"] = ("Under the quarter berth", "quarter berth", "battery-box lid"),
+        ["engine-side"] = ("Engine bay, quarter-berth side", "quarter berth", "quarter-berth panel"),
+        ["engine-front"] = ("Engine bay, front (under the steps)", "companionway", "companionway steps"),
+        ["bilge"] = ("Bilge under the saloon", "saloon", "saloon floorboards"),
+        ["hull-outside"] = ("Hull, outside", "beside the hull", null),
+    };
+
+    /// <summary>Components found so far that sit at this cutaway shape.</summary>
+    public IReadOnlyList<FoundComponent> ComponentsIn(string shapeId) =>
+        Shapes.TryGetValue(shapeId, out var s) ? Aboard.Components.Where(c => c.Position == s.Position).ToList() : [];
+
+    /// <summary>The shape counts as open when its cover is off, or it has no cover and the player has been to its place.</summary>
+    public bool IsOpen(string shapeId)
+    {
+        if (!Shapes.TryGetValue(shapeId, out var s)) return false;
+        var view = Aboard;
+        if (s.Cover is null) return view.Places.Any(p => p.Visited && p.Name.Equals(s.Place, StringComparison.OrdinalIgnoreCase));
+        return view.Covers.Any(c => c.Removed && c.Name.Equals(s.Cover, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>A click on a shape: go to its place and take its cover off, as far as the sim allows.</summary>
+    public void ClickCompartment(string shapeId)
+    {
+        SelectedCompartmentId = shapeId;
         SelectedComponentId = null;
-        var comp = Aboard.Compartments.FirstOrDefault(c => c.Id == compartmentId);
-        if (comp is { Opened: false }) Execute(new Open(compartmentId));
+        if (!Shapes.TryGetValue(shapeId, out var s)) { Changed?.Invoke(); return; }
+        var view = Aboard;
+        if (!view.Place.Equals(s.Place, StringComparison.OrdinalIgnoreCase) && !Execute(new GoTo(s.Place)).Accepted) return;
+        if (s.Cover is not null && !IsOpen(shapeId)) Execute(new Remove(s.Cover));
         else Changed?.Invoke();
     }
 
-    public void SelectComponent(string? componentId)
+    public void SelectComponent(string? componentName)
     {
-        SelectedComponentId = componentId;
-        if (componentId is not null)
-            SelectedCompartmentId = Aboard.Compartments.FirstOrDefault(c => c.Components.Any(x => x.Id == componentId))?.Id
-                                    ?? SelectedCompartmentId;
+        SelectedComponentId = componentName;
+        if (componentName is not null)
+        {
+            var pos = Aboard.Components.FirstOrDefault(c => c.Name == componentName)?.Position;
+            SelectedCompartmentId = Shapes.FirstOrDefault(kv => kv.Value.Position == pos).Key ?? SelectedCompartmentId;
+        }
         Changed?.Invoke();
     }
 
