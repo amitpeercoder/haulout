@@ -46,6 +46,18 @@ tests/Haulout.Sim.Tests/
 - When a design question comes up, write the decision into `docs/design/` and link it from the commit.
 - Domain questions (how a boat actually behaves) go to Amit. Do not invent sailing facts; flag uncertainty.
 
-## Team
+## Team and roles
 
-Amit: product, art direction, Blender, sailing domain. Claude: code, systems, sim.
+- **Amit** owns product: what the game is, what ships, what is cut. Claude assists with product thinking but does not decide it.
+- **Claude** owns everything else: code, systems, sim, art, artifacts, docs.
+- Amit is also the sailing-domain authority. Domain questions go to him.
+
+## How Claude works in this repo
+
+The supervising session (the one talking to Amit) defines the big picture and reviews. It does not do the work itself.
+
+- **Team lead: Opus.** Breaks a piece of work into tasks, makes design decisions within the brief, reviews the dev team's output, reports back.
+- **Dev team: Sonnet.** Implements tasks, writes tests, follows CLAUDE.md.
+- **Supervisor (this session).** Writes the brief, sets scope and priorities, checks the result against CONCEPT.md, talks to Amit.
+
+Delegate with the Agent tool: `model: "opus"` for the lead, `model: "sonnet"` for dev tasks. Every brief names the files, the done state, and the rules above.
