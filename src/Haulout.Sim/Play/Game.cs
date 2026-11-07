@@ -25,6 +25,8 @@ public sealed class Game
     private readonly HashSet<string> _visited = [];
     /// <summary>Cover ids that are currently off.</summary>
     private readonly HashSet<string> _removed = [];
+    /// <summary>Component ids whose removable part (boot, cap) is pulled back.</summary>
+    private readonly HashSet<string> _uncovered = [];
     /// <summary>She is on the hard for the whole slice; the ground beside the hull is only there then.</summary>
     private readonly bool _onTheHard = true;
     private readonly Reach _reach;
@@ -81,6 +83,7 @@ public sealed class Game
         new("remove", "cover", "Take off steps, a panel, a lid or floorboards"),
         new("refit", "cover", "Put a cover back"),
         new("inspect", "component", "Take a closer look at something"),
+        new("uncover", "component", "Pull back a boot or cap to see underneath"),
         new("measure", "component", "Put the multimeter on something (cranking needs a remote start button)"),
         new("start", null, "Try to start the engine"),
         new("clean", "component", "Clean and tighten a part"),
@@ -124,6 +127,10 @@ public sealed class Game
 
         Add("inspect", "Inspect", sight, 5, 0);
 
+        if (c.RemovablePart is { } part)
+            Add("uncover", $"Pull back the {part.Name}",
+                touch ?? (_uncovered.Contains(c.Id) ? AlreadyUncovered(part) : null), 2, 0);
+
         if (c.Id == "start-battery" || c.Id == "glow-plugs")
             Add("measure", "Measure", touch, 10, 0);
         else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
@@ -161,6 +168,7 @@ public sealed class Game
             Measure c => DoMeasure(turn, c.Component),
             StartEngine => DoStart(turn),
             Clean c => DoClean(turn, c.Component),
+            Uncover c => DoUncover(turn, c.Component),
             Replace c => DoReplace(turn, c.Component),
             Charge c => DoCharge(turn, c.Component),
             Buy c => DoBuy(turn, c.Item),
@@ -278,10 +286,12 @@ public sealed class Game
     {
         if (!ResolveComponent("inspect", name, needTouch: false, out var c, out var rejected)) return rejected!;
 
+        bool off = _uncovered.Contains(c.Id);
         t.Narrative.Add(c.Description + " " + WearPhrase(c.Condition));
+        if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
         foreach (var f in c.ActiveFaults.ToList())
         {
-            Reveal(t, f, PlayerAction.Inspect);
+            Reveal(t, f, PlayerAction.Inspect, uncovered: off);
             if (f.Discovered) t.Narrative.Add($"You know what this is: {f.Name}.");
         }
         var view = new InspectionView(c.Name, string.Join(" ", t.Narrative));
@@ -388,12 +398,26 @@ public sealed class Game
             $"Tried to start the engine. Result: {result.Outcome}.");
     }
 
+    private static string AlreadyUncovered(RemovablePart part) => $"The {part.Name} is already pulled back.";
+
+    private CommandResult DoUncover(Turn t, string name)
+    {
+        if (!ResolveComponent("uncover", name, needTouch: true, out var c, out var rejected)) return rejected!;
+        if (c.RemovablePart is not { } part) return Reject("uncover", $"There's nothing to pull back on the {c.Name.ToLowerInvariant()}.");
+        if (!_uncovered.Add(c.Id)) return Reject("uncover", AlreadyUncovered(part));
+
+        t.Narrative.Add($"You peel the {part.Name} back off the clamp.");
+        if (part.UncoveredText.Length > 0) t.Narrative.Add(part.UncoveredText);
+        return Accept(t, "uncover", 2, 0, null, $"Pulled back the {part.Name} on the {c.Name.ToLowerInvariant()}.");
+    }
+
     private CommandResult DoClean(Turn t, string name)
     {
         if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected)) return rejected!;
         if (!c.Cleanable) return Reject("clean", "Nothing to clean there.");
 
         StopEngine(t);
+        bool bootWasOff = _uncovered.Remove(c.Id);
         var fixedFaults = c.ActiveFaults.Where(f => f.FixedBy.Contains(PlayerAction.Clean)).ToList();
         string text;
         if (fixedFaults.Count == 0)
@@ -411,6 +435,12 @@ public sealed class Game
             t.Narrative.Add("Cleaned and tightened. It looks right now.");
             text = string.Join(" ", t.Narrative);
         }
+        if (bootWasOff && c.RemovablePart is { } part)
+        {
+            var refit = $"You push the {part.Name} back over the clamp.";
+            t.Narrative.Add(refit);
+            text += " " + refit;
+        }
         return Accept(t, "clean", 30, 0, new RepairView(c.Name, text), $"Cleaned the {c.Name.ToLowerInvariant()}.");
     }
 
@@ -421,6 +451,7 @@ public sealed class Game
 
         StopEngine(t);
         c.Replace();
+        _uncovered.Remove(c.Id);
         var text = $"You fit a new {c.Name.ToLowerInvariant()}.";
         t.Narrative.Add(text);
         return Accept(t, "replace", c.ReplaceMinutes, c.ReplaceCostNok, new RepairView(c.Name, text),
@@ -507,9 +538,9 @@ public sealed class Game
     }
 
     /// <summary>Shows the fault's reveal text for the action and records a discovery if it has one.</summary>
-    private void Reveal(Turn t, Fault f, PlayerAction action, bool forceDiscover = false)
+    private void Reveal(Turn t, Fault f, PlayerAction action, bool forceDiscover = false, bool uncovered = false)
     {
-        var reveal = f.RevealFor(action);
+        var reveal = f.RevealFor(action, uncovered);
         if (reveal is not null) t.Narrative.Add(reveal.Text);
         if ((reveal?.Discovers ?? false) || forceDiscover) Discover(t, f);
     }

@@ -7,7 +7,7 @@ public sealed record FaultEffect(FaultEffectKind Kind, double Value);
 public enum PlayerAction { Look, Inspect, Measure, Start, Clean, Replace, Charge, CheckFilterBowl, CheckRawWaterFlow }
 
 /// <summary>What the player learns from an action. Discovers=false is a hint only.</summary>
-public sealed record FaultReveal(PlayerAction Action, string Text, bool Discovers);
+public sealed record FaultReveal(PlayerAction Action, string Text, bool Discovers, bool NeedsUncovered = false);
 
 public sealed class Fault
 {
@@ -44,5 +44,6 @@ public sealed class Fault
     /// <summary>The fault is gone. Discovered stays as is: the player still knows it happened.</summary>
     public void Clear() => Present = false;
 
-    public FaultReveal? RevealFor(PlayerAction a) => Reveals.FirstOrDefault(r => r.Action == a);
+    public FaultReveal? RevealFor(PlayerAction a, bool uncovered = false) =>
+        Reveals.FirstOrDefault(r => r.Action == a && (!r.NeedsUncovered || uncovered));
 }

@@ -199,6 +199,7 @@ public class GameScenarioTests
                 Assert.True(Start(g).EngineRunning);
             }
             Walk.Near(g, comp);
+            if (reveal.NeedsUncovered) Assert.True(g.Execute(new Uncover(comp)).Accepted);
             Command cmd = reveal.Action switch
             {
                 PlayerAction.Look => new Look(),
@@ -219,6 +220,95 @@ public class GameScenarioTests
         }
     }
 
+    private static string Text(CommandResult r) => string.Join(" ", r.Narrative);
+
+    [Fact]
+    public void A_plain_inspect_of_the_negative_terminal_gives_no_hint_until_the_boot_is_pulled_back()
+    {
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        var plain = g.Execute(new Inspect("negative terminal"));
+        Assert.True(plain.Accepted);
+        Assert.Empty(plain.NewlyDiscovered);
+        Assert.Empty(Status(g).DiscoveredFaults);
+        var text = Text(plain);
+        Assert.Equal("A lead clamp under a black rubber boot, greasy from some earlier owner's smear of vaseline. Worn but serviceable.", text);
+        foreach (var w in new[] { "green", "bloom", "crust" }) Assert.DoesNotContain(w, text, StringComparison.OrdinalIgnoreCase);
+
+        var pull = g.Execute(new Uncover("negative terminal"));
+        Assert.True(pull.Accepted);
+        Assert.Equal(2, pull.MinutesTaken);
+        Assert.Empty(pull.NewlyDiscovered);
+        Assert.StartsWith("You peel the rubber boot back off the clamp.", Text(pull));
+
+        var look = g.Execute(new Inspect("negative terminal"));
+        Assert.Contains("crusted green-white", Text(look));
+        Assert.Contains(look.NewlyDiscovered, k => k.Name == "Corroded negative terminal");
+        Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Pulled back the rubber boot on the negative terminal.");
+    }
+
+    [Fact]
+    public void Measure_still_discovers_the_fault_with_the_boot_on()
+    {
+        var g = WithButton(NewGame());
+        var m = Do(g, "negative terminal", n => new Measure(n));
+        Assert.Contains(m.NewlyDiscovered, k => k.Name == "Corroded negative terminal");
+    }
+
+    [Fact]
+    public void The_positive_terminal_uncovers_to_clean_metal_and_nothing_is_found()
+    {
+        var g = NewGame();
+        Walk.Near(g, "positive terminal");
+        Assert.DoesNotContain("bright", Text(g.Execute(new Inspect("positive terminal"))));
+        var pull = g.Execute(new Uncover("positive terminal"));
+        Assert.True(pull.Accepted);
+        Assert.Contains("clean and bright", Text(pull));
+        var look = g.Execute(new Inspect("positive terminal"));
+        Assert.Contains("clean and bright", Text(look));
+        Assert.Empty(look.NewlyDiscovered);
+        Assert.Empty(Status(g).DiscoveredFaults);
+    }
+
+    [Fact]
+    public void Uncover_refusals_are_free()
+    {
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        Assert.Equal("There's nothing to pull back on the start battery.", AssertRefusedForFree(g, new Uncover("start battery")));
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
+        Assert.Equal("The rubber boot is already pulled back.", AssertRefusedForFree(g, new Uncover("negative terminal")));
+        Walk.ToPlace(g, "companionway");
+        Assert.Equal(AssertRefusedForFree(g, new Clean("negative terminal")), AssertRefusedForFree(g, new Uncover("negative terminal")));
+        Assert.Contains("haven't found", AssertRefusedForFree(g, new Uncover("flux capacitor")));
+    }
+
+    [Fact]
+    public void Cleaning_or_replacing_refits_the_boot()
+    {
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        g.Execute(new Uncover("negative terminal"));
+        var clean = g.Execute(new Clean("negative terminal"));
+        Assert.EndsWith("You push the rubber boot back over the clamp.", Text(clean));
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
+
+        g.Execute(new Replace("negative terminal"));
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted); // boot was on again
+    }
+
+    [Fact]
+    public void Uncover_is_offered_for_the_terminals_only()
+    {
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        g.Execute(new Look());
+        var withPart = new List<string>();
+        foreach (var f in ((AboardView)g.Ask(new Aboard())).Components)
+            if (((ComponentActionsView)g.Ask(new ComponentActions(f.Name))).Options.Any(o => o.Verb == "uncover")) withPart.Add(f.Name);
+        Assert.Equal(["Negative terminal", "Positive terminal"], withPart.Order().ToList());
+    }
+
     private static List<string> PlayThrough(Game g)
     {
         var json = new List<string>();
@@ -229,6 +319,7 @@ public class GameScenarioTests
         Ask(new Briefing()); Ask(new Commands()); Ask(new Aboard());
         Cmd(new Look()); Cmd(new GoTo("companionway")); Cmd(new GoTo("quarter berth"));
         Cmd(new Remove("battery-box lid")); Cmd(new Inspect("negative terminal"));
+        Cmd(new Uncover("positive terminal"));
         Cmd(new GoTo("forepeak")); // rejected
         Cmd(new GoTo("companionway")); Cmd(new GoTo("cockpit"));
         Cmd(new StartEngine()); Ask(new Status());

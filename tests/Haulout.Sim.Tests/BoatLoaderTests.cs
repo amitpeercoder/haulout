@@ -133,7 +133,10 @@ public class BoatLoaderTests
         var f = BoatLoader.LoadSloop28().Get("negative-terminal").Faults.Single();
         Assert.Equal(FaultEffectKind.SeriesOhms, f.Effect.Kind);
         Assert.Equal(0.060, f.Effect.Value);
-        Assert.False(f.RevealFor(PlayerAction.Inspect)!.Discovers);
+        Assert.Null(f.RevealFor(PlayerAction.Inspect));
+        var crust = f.RevealFor(PlayerAction.Inspect, uncovered: true)!;
+        Assert.True(crust.Discovers);
+        Assert.True(crust.NeedsUncovered);
         Assert.True(f.RevealFor(PlayerAction.Measure)!.Discovers);
         Assert.Null(f.RevealFor(PlayerAction.Look));
     }

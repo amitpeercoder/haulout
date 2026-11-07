@@ -19,8 +19,12 @@ public static class WordParser
         if (verb == "try" && arg.StartsWith("start", StringComparison.OrdinalIgnoreCase))
             (verb, arg) = ("start", "");
 
+        if (verb == "lift" || verb == "pull")
+            if (ParseBoot(arg) is { } boot) return boot;
+
         return verb switch
         {
+            "uncover" => WithArg(arg, "uncover <component>", a => new Uncover(a)),
             "look" => ParseLook(arg),
             "go" or "walk" or "climb" or "enter" => WithArg(StripTo(arg), "go <place>", a => new GoTo(a)),
             "remove" or "open" or "lift" => WithArg(arg, $"{verb} <cover>", a => new Remove(a)),
@@ -43,6 +47,19 @@ public static class WordParser
             "quit" or "exit" => new Quit(),
             _ => new Problem($"I don't know how to '{verb}'. Type 'help'."),
         };
+    }
+
+    /// <summary>"lift (the) boot on|of X", "pull back (the) boot on|of X"; null when it is not about a boot.</summary>
+    private static Parsed? ParseBoot(string arg)
+    {
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0].Equals("back", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        if (words.Count > 0 && words[0].Equals("the", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        if (words.Count == 0 || !words[0].Equals("boot", StringComparison.OrdinalIgnoreCase)) return null;
+        words.RemoveAt(0);
+        if (words.Count > 0 && (words[0].Equals("on", StringComparison.OrdinalIgnoreCase) || words[0].Equals("of", StringComparison.OrdinalIgnoreCase)))
+            words.RemoveAt(0);
+        return words.Count == 0 ? new Problem("Usage: uncover <component>") : new RunCommand(new Uncover(string.Join(' ', words)));
     }
 
     private static Parsed ParseLook(string arg)

@@ -12,6 +12,7 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(Measure), "measure")]
 [JsonDerivedType(typeof(StartEngine), "start")]
 [JsonDerivedType(typeof(Clean), "clean")]
+[JsonDerivedType(typeof(Uncover), "uncover")]
 [JsonDerivedType(typeof(Replace), "replace")]
 [JsonDerivedType(typeof(Charge), "charge")]
 [JsonDerivedType(typeof(Buy), "buy")]
@@ -30,6 +31,8 @@ public sealed record Inspect(string Component) : Command;
 public sealed record Measure(string Component) : Command;
 public sealed record StartEngine() : Command;
 public sealed record Clean(string Component) : Command;
+/// <summary>Pull back a small removable part (a boot, a cap) to see what is under it. Needs reach.</summary>
+public sealed record Uncover(string Component) : Command;
 public sealed record Replace(string Component) : Command;
 public sealed record Charge(string Component) : Command;
 public sealed record Buy(string Item) : Command;

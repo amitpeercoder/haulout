@@ -150,6 +150,7 @@ public sealed class GameSession
     {
         "inspect" => new Inspect(componentName),
         "measure" => new Measure(componentName),
+        "uncover" => new Uncover(componentName),
         "clean" => new Clean(componentName),
         "replace" => new Replace(componentName),
         "charge" => new Charge(componentName),

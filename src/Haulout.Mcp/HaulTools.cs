@@ -32,6 +32,11 @@ public sealed class HaulTools(GameSession session)
     public string Inspect([Description("Name of a part you have found.")] string component) =>
         session.Do("inspect", new Inspect(component), ("component", component));
 
+    [McpServerTool(Name = "uncover"), Description(
+        "Pull back a small removable part (a boot or cap) on something you can reach, to see what is underneath. Takes 2 minutes, free.")]
+    public string Uncover([Description("Name of a part you have found.")] string component) =>
+        session.Do("uncover", new Uncover(component), ("component", component));
+
     [McpServerTool(Name = "measure"), Description(
         "Put the multimeter on a part you have found and can get a hand to from where you are. Takes 10 minutes, free (2 minutes if there is nothing a meter can read there). " +
         "Readings of the electrical system while the starter is cranking need a remote start button from the chandlery (see buy); without one only the battery's resting voltage can be read.")]

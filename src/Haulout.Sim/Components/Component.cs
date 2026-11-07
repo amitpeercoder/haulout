@@ -43,6 +43,7 @@ public sealed class Component
     public int ReplaceCostNok => Spec.ReplaceCostNok;
     public int ReplaceMinutes => Spec.ReplaceMinutes;
     public IReadOnlyDictionary<string, double> Properties => Spec.Properties;
+    public RemovablePart? RemovablePart => Spec.RemovablePart;
 
     public IReadOnlyList<Fault> Faults => _faults;
     public IEnumerable<Fault> ActiveFaults => _faults.Where(f => f.Present);

@@ -340,7 +340,12 @@
         "positive",
         "+ terminal"
       ],
-      "description": "A lead clamp with a red boot, bolt snug, metal bright where the boot has slipped back.",
+      "description": "A lead clamp under a red rubber boot, bolt snug.",
+      "removablePart": {
+        "name": "rubber boot",
+        "aliases": ["boot"],
+        "uncoveredText": "Under the boot the lead is clean and bright."
+      },
       "condition": 0.7,
       "wearYears": 8,
       "seriesOhms": 0.0003,
@@ -394,7 +399,12 @@
         "negative",
         "- terminal"
       ],
-      "description": "A lead clamp under a black rubber boot, the boot greasy from some earlier owner's smear of vaseline.",
+      "description": "A lead clamp under a black rubber boot, greasy from some earlier owner's smear of vaseline.",
+      "removablePart": {
+        "name": "rubber boot",
+        "aliases": ["boot"],
+        "uncoveredText": ""
+      },
       "condition": 0.5,
       "wearYears": 8,
       "seriesOhms": 0.0003,
@@ -412,8 +422,9 @@
           "reveals": [
             {
               "action": "inspect",
-              "text": "The rubber boot is greasy, and at its edge there is a faint green-white bloom.",
-              "discovers": false
+              "text": "The lead under the boot is crusted green-white, the crust eating into the clamp.",
+              "discovers": true,
+              "needsUncovered": true
             },
             {
               "action": "measure",

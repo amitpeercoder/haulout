@@ -87,9 +87,14 @@ public class AdapterQueryTests
         Assert.Contains(options.Options, o => o.Verb == "clean" && o.Available);
         Assert.Contains(options.Options, o => o.Verb == "replace" && o.CostNok == 60);
 
-        // Inspect only hints; the marker stays neutral.
+        // A plain inspect shows nothing; the boot has to come off first.
         g.Execute(new Inspect("negative terminal"));
         Assert.False(Found(g, "Negative terminal").KnownProblem);
+        Assert.Contains(options.Options, o => o.Verb == "uncover" && o.Available && o.Label == "Pull back the rubber boot" && o.Minutes == 2);
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
+        Assert.False(Option(g, "negative terminal", "uncover").Available);
+        g.Execute(new Inspect("negative terminal"));
+        Assert.True(Found(g, "Negative terminal").KnownProblem);
 
         Assert.True(g.Execute(new Buy("remote start button")).Accepted);
         Assert.True(Option(g, "negative terminal", "measure").Available);
@@ -109,7 +114,7 @@ public class AdapterQueryTests
         var g = Game.NewFirstFault();
         Walk.Near(g, "battery");
         var verbs = Actions(g, "start-battery").Options.Select(o => o.Verb).ToList();
-        Assert.Equal(["inspect", "measure", "replace", "charge"], verbs);
+        Assert.Equal(["inspect", "measure", "replace", "charge"], verbs); // no removable part
         Assert.Equal(1900, Option(g, "start-battery", "replace").CostNok);
     }
 

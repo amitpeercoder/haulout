@@ -44,7 +44,8 @@ public static class BoatLoader
                 (c.Reach ?? []).Select(r => new ReachEntry(r.Place, r.Cover, r.Visible, r.Reachable)).ToList(),
                 c.Aliases ?? [], c.Description ?? "",
                 c.SeriesOhms, c.Cleanable, c.ReplaceCostNok, c.ReplaceMinutes,
-                new Dictionary<string, double>(c.Properties ?? new()));
+                new Dictionary<string, double>(c.Properties ?? new()),
+                c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "") : null);
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
             var faults = (c.Faults ?? []).Select(f => new Fault(
                 f.Id, f.Name, c.Id, f.Effect,
@@ -122,6 +123,14 @@ public static class BoatLoader
         public int ReplaceMinutes { get; set; }
         public Dictionary<string, double>? Properties { get; set; }
         public List<FaultDto>? Faults { get; set; }
+        public RemovablePartDto? RemovablePart { get; set; }
+    }
+
+    private sealed class RemovablePartDto
+    {
+        public string Name { get; set; } = "";
+        public List<string>? Aliases { get; set; }
+        public string? UncoveredText { get; set; }
     }
 
     private sealed class FaultDto

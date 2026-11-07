@@ -8,7 +8,7 @@ public class McpServerTests
 {
     private static readonly string[] ExpectedTools =
     [
-        "look", "go", "remove", "refit", "inspect", "measure", "clean", "replace", "charge", "buy",
+        "look", "go", "remove", "refit", "inspect", "uncover", "measure", "clean", "replace", "charge", "buy",
         "check_filter", "check_flow", "start_engine",
         "status", "logbook", "aboard", "help", "briefing",
     ];
@@ -99,7 +99,7 @@ public class McpServerTests
     }
 
     [Fact]
-    public async Task Lists_all_eighteen_tools()
+    public async Task Lists_all_nineteen_tools()
     {
         await using var client = await Connect();
         var names = (await client.ListToolsAsync()).Select(t => t.Name).ToHashSet();
@@ -123,6 +123,8 @@ public class McpServerTests
             ("go", new() { ["place"] = "companionway" }),
             ("go", new() { ["place"] = "quarter berth" }),
             ("remove", new() { ["cover"] = "battery-box lid" }),
+            ("inspect", new() { ["component"] = "negative terminal" }),
+            ("uncover", new() { ["component"] = "negative terminal" }),
             ("inspect", new() { ["component"] = "negative terminal" }),
             ("aboard", []),
             ("status", []),

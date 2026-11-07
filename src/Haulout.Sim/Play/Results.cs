@@ -108,7 +108,7 @@ public sealed record AboardView(
     string Place, IReadOnlyList<AboardPlace> Places, IReadOnlyList<AboardCover> Covers, IReadOnlyList<FoundComponent> Components) : QueryResult;
 
 /// <summary>
-/// One verb on a component. Verb is the Command it maps to: "inspect" | "measure" | "clean" | "replace" | "charge"
+/// One verb on a component. Verb is the Command it maps to: "inspect" | "uncover" | "measure" | "clean" | "replace" | "charge"
 /// | "check-filter-bowl" | "check-raw-water-flow". UnavailableReason is set when Available is false.
 /// </summary>
 public sealed record ActionOption(string Verb, string Label, bool Available, string? UnavailableReason, int Minutes, int CostNok);
