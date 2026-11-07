@@ -7,7 +7,7 @@ namespace Haulout.Web.Art.CloseUps;
 /// <summary>
 /// Close-up: Quarter berth. Kneeling on the berth. Upper right: the plywood engine-side panel at your shoulder; off, it
 /// shows the engine's fuel side. Lower left: the berth top with the hinged battery-box lid (flat, or folded back to show
-/// two batteries with terminals and cables) and the battery switch on the face of the berth.
+/// two batteries with terminals and cables).
 /// The two covers' clickable regions do not overlap.
 /// </summary>
 public static class QuarterBerthCloseUp
@@ -213,7 +213,6 @@ public static class QuarterBerthCloseUp
 
         var spots = ImmutableDictionary.CreateRange(StringComparer.OrdinalIgnoreCase, new Dictionary<string, MarkerSpot>
         {
-            ["Battery switch"] = new MarkerSpot(325, 552, "Battery switch", 372, 556, "start", 368, 552),
             // battery box
             ["Start battery"] = MarkerSpot.Right(150, 494, "Start battery"),
             ["Positive terminal"] = Sp(120, 480, "Positive terminal", 120, 447, "middle"),
@@ -225,12 +224,10 @@ public static class QuarterBerthCloseUp
             ["Injectors"] = Sp(560, 130, "Injectors", 396, 134, "end"),
             ["Glow plugs"] = Sp(580, 178, "Glow plugs", 396, 174, "end"),
             ["Injection pump"] = Sp(560, 242, "Injection pump", 396, 214, "end"),
-            ["Lift pump"] = Sp(571, 311, "Lift pump", 396, 290, "end"),
             ["Fuel supply line"] = Sp(480, 318, "Fuel supply line", 396, 326, "end"),
             // engine, in the block
-            ["Secondary fuel filter"] = MarkerSpot.Right(737, 262, "Secondary filter"),
+            ["Heat exchanger"] = MarkerSpot.Right(737, 262, "Heat exchanger"), // on top, seen past the block; label only
             ["Engine block"] = MarkerSpot.Right(640, 330, "Engine block"),
-            ["Oil filter"] = Sp(789, 330, "Oil filter", 789, 384, "middle"),
             // engine, right
             ["Exhaust elbow"] = MarkerSpot.Right(850, 172, "Exhaust elbow"),
             ["Exhaust hose"] = new MarkerSpot(925, 119, "Exhaust hose", 925, 97, "middle", 925, 101),

@@ -131,27 +131,27 @@ public class AdapterQueryTests
         Assert.False(terminal.VisibleHere);
         Assert.False(terminal.ReachableHere);
 
-        // The solenoid from the companionway: seen, not touched. The reason is the one the command would give.
-        Walk.Near(g, "starter solenoid");
-        g.Execute(new Refit("quarter-berth panel"));
-        Walk.ToPlace(g, "companionway");
-        Walk.Uncover(g, "companionway-steps");
-        var inspect = Option(g, "starter solenoid", "inspect");
+        // The heat exchanger from the quarter berth: seen, not touched. The reason is the one the command would give.
+        Walk.ToPlace(g, "quarter-berth");
+        Walk.Uncover(g, "quarter-berth-panel");
+        var inspect = Option(g, "heat exchanger", "inspect");
         Assert.True(inspect.Available);
-        var replace = Option(g, "starter solenoid", "replace");
+        var replace = Option(g, "heat exchanger", "replace");
         Assert.False(replace.Available);
         Assert.Equal(
-            "You can see the starter solenoid from here but can't get at it; the quarter-berth panel is in the way.",
+            "You can see the heat exchanger from here but can't get at it; the companionway steps are in the way.",
             replace.UnavailableReason);
-        var refusal = g.Execute(new Replace("starter solenoid"));
+        var refusal = g.Execute(new Replace("heat exchanger"));
         Assert.False(refusal.Accepted);
         Assert.Equal(replace.UnavailableReason, refusal.Narrative.Single());
-        // Reach reasons come before the button reason.
-        Assert.Equal(replace.UnavailableReason, Option(g, "starter solenoid", "measure").UnavailableReason);
 
-        // Walking to the quarter berth opens it up.
-        Walk.Near(g, "starter solenoid");
-        Assert.True(Option(g, "starter solenoid", "replace").Available);
+        // Reach reasons come before the button reason.
+        Walk.ToPlace(g, "companionway");
+        Assert.Equal("You can't see the starter solenoid from here.", Option(g, "starter solenoid", "measure").UnavailableReason);
+
+        // From the companionway with the steps off it is within reach.
+        Walk.Near(g, "heat exchanger");
+        Assert.True(Option(g, "heat exchanger", "replace").Available);
     }
 
     [Fact]

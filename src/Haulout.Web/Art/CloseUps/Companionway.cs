@@ -7,7 +7,7 @@ namespace Haulout.Web.Art.CloseUps;
 /// <summary>
 /// Close-up: Companionway. Standing in the hatch looking down at the front of the engine. With the step unit in, a
 /// stack of treads and risers hides the engine; with it out it leans aside and the engine front is revealed: belt,
-/// alternator, raw-water pump, heat exchanger, thermostat, injectors, with the starter solenoid behind the block.
+/// alternator, raw-water pump, heat exchanger, thermostat, injectors, lift pump, secondary filter, oil filter, and the battery switch on the bulkhead above the engine.
 /// </summary>
 public static class CompanionwayCloseUp
 {
@@ -175,7 +175,11 @@ public static class CompanionwayCloseUp
             ["Raw-water impeller"] = Sp(715, 425, "Impeller", 893, 395),
             ["Alternator"] = Sp(310, 207, "Alternator", 205, 232, "end"),
             ["Alternator belt"] = Sp(beltSpot.Item1, beltSpot.Item2, "Alternator belt", 205, 300, "end"),
-            ["Starter solenoid"] = Sp(412, 397, "Starter solenoid", 205, 345, "end"),
+            // labels only, placed for Amit's layout (2026-11-07); the drawing is redone with the web round
+            ["Lift pump"] = Sp(412, 397, "Lift pump", 205, 345, "end"),
+            ["Secondary fuel filter"] = Sp(460, 300, "Secondary filter", 205, 380, "end"),
+            ["Oil filter"] = Sp(470, 450, "Oil filter", 205, 415, "end"),
+            ["Battery switch"] = Sp(540, 95, "Battery switch", 205, 110, "end"),
         });
 
         return new CloseUpScene(

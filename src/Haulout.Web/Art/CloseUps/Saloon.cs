@@ -237,7 +237,8 @@ public static class SaloonCloseUp
 
         var spots = ImmutableDictionary<string, MarkerSpot>.Empty
             .Add("Raw-water seacock", new MarkerSpot(684, 498, "Seacock", 774, 505, "start", 764, 503))
-            .Add("Raw-water strainer", new MarkerSpot(623, 438, "Strainer", 662, 420, "start", 656, 418));
+            .Add("Raw-water strainer", new MarkerSpot(623, 438, "Strainer", 662, 420, "start", 656, 418))
+            .Add("Battery switch", new MarkerSpot(60, 120, "Battery switch (aft, below the hatch)", 80, 124, "start", 76, 120)); // label only
 
         var fallback = ImmutableArray.Create<(double X, double Y)>(
             (120, 330), (120, 470), (880, 330), (880, 470), (300, 290), (700, 290), (300, 520), (720, 330));

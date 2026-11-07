@@ -228,6 +228,10 @@
     {
       "id": "hull-exterior",
       "label": "Hull, outside"
+    },
+    {
+      "id": "below-companionway",
+      "label": "Below the companionway, above the engine"
     }
   ],
   "components": [
@@ -286,13 +290,19 @@
       "id": "battery-switch",
       "name": "Battery switch",
       "subsystem": "electrical",
-      "position": "under-quarter-berth",
+      "position": "below-companionway",
       "reach": [
         {
-          "place": "quarter-berth",
+          "place": "companionway",
           "cover": null,
           "visible": true,
           "reachable": true
+        },
+        {
+          "place": "saloon",
+          "cover": null,
+          "visible": true,
+          "reachable": false
         }
       ],
       "aliases": [
@@ -300,7 +310,7 @@
         "battery switch",
         "master switch"
       ],
-      "description": "A red-knobbed rotary switch, knob faded pink on the sun side. It turns with a gritty click.",
+      "description": "A red-knobbed rotary switch, knob faded pink where the light from the hatch falls on it. It turns with a gritty click.",
       "condition": 0.6,
       "wearYears": 10,
       "seriesOhms": 0.0005,
@@ -488,12 +498,6 @@
           "cover": "quarter-berth-panel",
           "visible": true,
           "reachable": true
-        },
-        {
-          "place": "companionway",
-          "cover": "companionway-steps",
-          "visible": true,
-          "reachable": false
         }
       ],
       "aliases": [
@@ -710,11 +714,11 @@
       "id": "lift-pump",
       "name": "Lift pump",
       "subsystem": "fuel",
-      "position": "engine-bay-side",
+      "position": "engine-bay-front",
       "reach": [
         {
-          "place": "quarter-berth",
-          "cover": "quarter-berth-panel",
+          "place": "companionway",
+          "cover": "companionway-steps",
           "visible": true,
           "reachable": true
         }
@@ -724,7 +728,7 @@
         "fuel pump",
         "feed pump"
       ],
-      "description": "A small pump on the side of the block with a priming lever. Ticks when the engine turns.",
+      "description": "A small pump on the front of the block with a priming lever. Ticks when the engine turns.",
       "condition": 0.65,
       "wearYears": 12,
       "seriesOhms": null,
@@ -736,11 +740,11 @@
       "id": "secondary-filter",
       "name": "Secondary fuel filter",
       "subsystem": "fuel",
-      "position": "engine-bay-side",
+      "position": "engine-bay-front",
       "reach": [
         {
-          "place": "quarter-berth",
-          "cover": "quarter-berth-panel",
+          "place": "companionway",
+          "cover": "companionway-steps",
           "visible": true,
           "reachable": true
         }
@@ -750,7 +754,7 @@
         "fine filter",
         "second filter"
       ],
-      "description": "A small blue-grey canister on the engine side, clean on the outside, with a single ring of rust at the base.",
+      "description": "A small blue-grey canister on the front of the engine, clean on the outside, with a single ring of rust at the base.",
       "condition": 0.6,
       "wearYears": 2,
       "seriesOhms": null,
@@ -984,6 +988,12 @@
           "cover": "companionway-steps",
           "visible": true,
           "reachable": true
+        },
+        {
+          "place": "quarter-berth",
+          "cover": "quarter-berth-panel",
+          "visible": true,
+          "reachable": false
         }
       ],
       "aliases": [
@@ -1198,11 +1208,11 @@
       "id": "oil-filter",
       "name": "Oil filter",
       "subsystem": "engine",
-      "position": "engine-bay-side",
+      "position": "engine-bay-front",
       "reach": [
         {
-          "place": "quarter-berth",
-          "cover": "quarter-berth-panel",
+          "place": "companionway",
+          "cover": "companionway-steps",
           "visible": true,
           "reachable": true
         }

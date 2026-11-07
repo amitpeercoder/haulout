@@ -476,36 +476,48 @@ public class GameScenarioTests
     }
 
     [Fact]
-    public void The_starter_motor_cannot_be_reached_or_seen_from_the_companionway()
+    public void The_starter_and_solenoid_cannot_be_seen_from_the_companionway()
     {
         var g = NewGame();
         Assert.True(g.Execute(new GoTo("companionway")).Accepted);
         Assert.True(g.Execute(new Remove("steps")).Accepted);
         var aboard = Assert.IsType<AboardView>(g.Ask(new Aboard()));
-        Assert.DoesNotContain(aboard.Components, c => c.Name == "Starter motor");
+        // Both sit on the flywheel housing at the aft end: out of sight from the front (Amit, 2026-11-07).
+        Assert.DoesNotContain(aboard.Components, c => c.Name is "Starter motor" or "Starter solenoid");
         Assert.Contains("You haven't found anything called 'starter motor' yet.",
             AssertRefusedForFree(g, new Inspect("starter motor")));
 
-        // The solenoid shows down the side of the block, but a hand does not fit.
-        var solenoid = Assert.Single(aboard.Components, c => c.Name == "Starter solenoid");
-        Assert.True(solenoid.VisibleHere);
-        Assert.False(solenoid.ReachableHere);
-        Assert.True(g.Execute(new Inspect("solenoid")).Accepted);
-        const string panelInTheWay =
-            "You can see the starter solenoid from here but can't get at it; the quarter-berth panel is in the way.";
-        Assert.Equal(panelInTheWay, AssertRefusedForFree(g, new Replace("solenoid")));
-        g.Execute(new Buy("remote start button"));
-        Assert.Equal(panelInTheWay, AssertRefusedForFree(g, new Measure("solenoid")));
-
-        // Panel off, still not from the companionway.
+        // Once found from the quarter berth, they are still out of sight from the companionway.
         Walk.Uncover(g, "quarter-berth-panel");
         Walk.ToPlace(g, "companionway");
-        Assert.Equal(
-            "You can see the starter solenoid from here but can't get at it; you'd have to get at it from the quarter berth.",
-            AssertRefusedForFree(g, new Measure("solenoid")));
-        // And now the motor is in view from the quarter berth only.
+        Assert.Equal("You can't see the starter solenoid from here.", AssertRefusedForFree(g, new Inspect("solenoid")));
+        Assert.Equal("You can't see the starter motor from here.", AssertRefusedForFree(g, new Replace("starter motor")));
         Walk.ToPlace(g, "quarter-berth");
+        g.Execute(new Buy("remote start button"));
         Assert.True(g.Execute(new Measure("starter motor")).Accepted);
+        Assert.True(g.Execute(new Measure("solenoid")).Accepted);
+    }
+
+    [Fact]
+    public void The_heat_exchanger_shows_from_the_quarter_berth_but_is_reached_from_the_front()
+    {
+        var g = NewGame();
+        Walk.ToPlace(g, "quarter-berth");
+        Walk.Uncover(g, "quarter-berth-panel");
+        var hx = Assert.Single(Assert.IsType<AboardView>(g.Ask(new Aboard())).Components, c => c.Name == "Heat exchanger");
+        Assert.True(hx.VisibleHere);
+        Assert.False(hx.ReachableHere);
+        Assert.True(g.Execute(new Inspect("heat exchanger")).Accepted);
+        Assert.Equal(
+            "You can see the heat exchanger from here but can't get at it; the companionway steps are in the way.",
+            AssertRefusedForFree(g, new Replace("heat exchanger")));
+
+        Walk.ToPlace(g, "companionway");
+        Walk.Uncover(g, "companionway-steps");
+        Walk.ToPlace(g, "quarter-berth");
+        Assert.Equal(
+            "You can see the heat exchanger from here but can't get at it; you'd have to get at it from the companionway.",
+            AssertRefusedForFree(g, new Replace("heat exchanger")));
     }
 
     [Fact]
