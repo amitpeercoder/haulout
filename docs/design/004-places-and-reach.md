@@ -140,3 +140,12 @@ A component's map position is `CutawayGeometry.SpotFor(name, positionLabel, inde
 
 - The place graph is the sim's: from the quarter berth the cockpit is two moves (via the companionway); clicking it directly shows the refusal.
 - Space on a focused place or cover may also scroll; Blazor cannot prevent default conditionally.
+
+## Decisions on the layout (Amit, 2026-11-07, from his own boat)
+
+1. Lift pump, oil filter and secondary fuel filter are on the engine front (reachable from the companionway, steps off). Engine-dependent; this is our fictional engine's layout.
+2. Battery switch is just below the companionway, above the engine: no cover, reachable from the companionway.
+3. Raw-water seacock is under the saloon floorboards. Confirmed.
+4. Heat exchanger is on top of the engine, starboard side: reachable from the front with the steps off, visible from the quarter berth with the panel off.
+5. Starter and solenoid: not visible from the front. The starter bolts to the flywheel housing at the aft end of the engine, away from the belt end that faces the steps. Both are seen and reached only from the quarter berth with the panel off. (Brief check: generic starter-location guides agree on rear/flywheel-housing mounting; no model-specific source found.)
+6. Ladder to the ground stays at one minute.
