@@ -4,7 +4,7 @@
 
 <section class="logbook">
     @{ var status = Session.Status; var entries = Session.Log.Entries; }
-    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK · money left @status.BalanceNok NOK@if (status.Weather is not null) { <span class="weather"> · @status.Weather</span> }</header>
+    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK · money left @status.BalanceNok NOK @if (status.Weather is not null) { <span class="weather"> · @status.Weather</span> }</header>
     <div class="scroll">
         <ol>
             @if (entries.Count == 0)

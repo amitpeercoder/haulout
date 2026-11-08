@@ -30,7 +30,7 @@
     @{ var unseen = Session.UnseenAlerts; }
     <nav class="tabs">
         <button class="@(Session.ReadinessTab ? "" : "on")" data-tab="here" @onclick="() => Session.ShowTab(false)">Here</button>
-        <button class="@(Session.ReadinessTab ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(true)">Readiness@if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
+        <button class="@(Session.ReadinessTab ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(true)">Readiness @if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
     </nav>
 
     @if (Session.ReadinessTab)
