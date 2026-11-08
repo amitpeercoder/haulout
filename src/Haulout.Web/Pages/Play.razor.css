@@ -33,3 +33,18 @@
 .layer { grid-area: 1 / 1; transition: opacity var(--zoom) var(--ease); }
 .log { flex: 1 1 0; min-height: 0; display: flex; }
 .right { min-height: 0; min-width: 0; display: flex; }
+
+.viewtoggle { display: flex; gap: 0; flex: 0 0 auto; }
+.viewtoggle button { border-radius: 0; padding: 0.3rem 1rem; }
+.viewtoggle button + button { margin-left: -1px; }
+.viewtoggle button.on { background: var(--slate-soft); border-color: var(--paper); }
+.chartstage { display: block; }
+
+/* Phone: one column, the page scrolls, 16px gutters. */
+@media (max-width: 760px) {
+    .intro { padding: 16px; height: auto; min-height: 100vh; }
+    .play { height: auto; grid-template-columns: minmax(0, 1fr); padding: 16px; }
+    .stage { width: 100%; }
+    .log { flex: none; min-height: 14rem; max-height: 22rem; }
+    .right { min-height: 24rem; }
+}

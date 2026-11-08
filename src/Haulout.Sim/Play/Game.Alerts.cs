@@ -38,6 +38,7 @@ public sealed partial class Game
         _alerts.Items.Add((alert, false));
         _log.Add(new LogEntry(day, alert.TimeOfDay, text, Alert: true));
         _passage?.Failures.Add(text);
+        MarkTrack(text);
     }
 
     /// <summary>All unread alerts, now marked read.</summary>

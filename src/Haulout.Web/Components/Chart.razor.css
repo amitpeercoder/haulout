@@ -1,0 +1,73 @@
+/* The paper chart. Colours are the logbook's tokens; shared drawing classes live in wwwroot/css/drawing.css. */
+.chartfig { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chart { display: block; width: 100%; height: auto; font-family: var(--face-ui); }
+.chart-here { font-family: var(--face-hand); font-style: italic; color: var(--water-pale); font-size: 0.95rem; padding: 0 2px; }
+
+.c-sheet { fill: var(--water-pale); stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.c-shoal { fill: var(--paper-shade); fill-opacity: 0.45; stroke: var(--water); stroke-width: var(--line-thin); stroke-dasharray: 2 3; pointer-events: none; }
+.c-land, .c-mainland { fill: var(--paper); stroke: var(--ink); stroke-width: var(--line); stroke-linejoin: round; pointer-events: none; }
+.c-skerry { fill: var(--paper-shade); stroke: var(--ink); stroke-width: var(--line-thin); stroke-linejoin: round; pointer-events: none; }
+
+.c-sounding { fill: var(--ink-faint); font-size: 11px; font-style: italic; text-anchor: middle; pointer-events: none; }
+.c-island { font-size: 14px; font-style: italic; letter-spacing: 0.06em; text-anchor: middle; pointer-events: none; }
+.c-island.on-land { fill: var(--ink-faint); }
+.c-island.on-water { fill: var(--slate-soft); }
+.c-note { fill: var(--ink); font-family: var(--face-type); font-size: 13px; pointer-events: none; }
+.c-mid { text-anchor: middle; }
+
+.c-rose-ring { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.c-rose-star { fill: var(--paper); stroke: var(--ink); stroke-width: var(--line-thin); stroke-linejoin: round; }
+.c-rose-star-minor { fill: none; stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.c-rose-north { fill: var(--ink); stroke: none; }
+.c-scale-line { fill: none; stroke: var(--ink); stroke-width: var(--line); }
+.c-scale-block { fill: var(--ink); stroke: none; }
+.c-scale-tick { fill: none; stroke: var(--ink); stroke-width: var(--line-thin); }
+
+.c-route { stroke: var(--ink-faint); stroke-width: 1.4; stroke-dasharray: 3 6; stroke-linecap: round; }
+.c-plan { stroke: var(--ink); stroke-width: 2.4; stroke-dasharray: 11 5; stroke-linecap: round; }
+.c-plan-label { fill: var(--ink); font-family: var(--face-type); font-size: 14px; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+
+.c-shelter-mark { fill: var(--paper); stroke: var(--ink-faint); stroke-width: var(--line); }
+.c-shelter-name { fill: var(--ink); font-size: 13px; font-style: italic; paint-order: stroke; stroke: var(--water-pale); stroke-width: 3px; stroke-linejoin: round; }
+
+.c-track { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.c-track.current { stroke: var(--ink); stroke-width: 2.2; }
+.c-track.earlier { stroke: var(--wood); stroke-width: 2.4; opacity: 0.45; } /* solid and warm, so it does not vanish into the dashed route under it */
+.c-fix-dot { fill: var(--ink); }
+.c-fix-ring { fill: none; stroke: var(--fault); stroke-width: 2; }
+.c-hit { fill: transparent; stroke: none; }
+
+.c-port { outline: none; }
+.c-port-ring { fill: var(--paper); stroke: var(--ink); stroke-width: var(--line); }
+.c-port-dot { fill: var(--ink); }
+.c-port-name { fill: var(--ink); font-size: 15px; paint-order: stroke; stroke: var(--paper); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+.c-glyph { fill: none; stroke: var(--ink); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; paint-order: stroke; pointer-events: none; }
+.c-port.reachable { cursor: pointer; }
+.c-port.reachable .c-port-ring { stroke-width: 2; }
+.c-port.reachable:hover .c-port-ring, .c-port.reachable:focus-visible .c-port-ring { fill: var(--amber); }
+.c-port.reachable:hover .c-port-name, .c-port.reachable:focus-visible .c-port-name { text-decoration: underline; }
+.c-port.here .c-port-ring { fill: var(--amber); stroke-width: 2.4; }
+.c-port.here .c-port-name { font-weight: 700; }
+
+.c-boat { pointer-events: none; }
+.c-hull { fill: var(--paper); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+.c-mast { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.c-wreck-hull { fill: var(--paper-shade); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+.c-wreck-x { fill: none; stroke: var(--fault); stroke-width: 2.6; stroke-linecap: round; }
+
+.c-rain { fill: #4a5762; fill-opacity: 0.28; pointer-events: none; }
+.c-rain-hatch { pointer-events: none; opacity: 0.5; }
+.c-rain-line { stroke: var(--slate-soft); stroke-width: 0.9; }
+.c-wind { pointer-events: none; }
+.c-wind-plate { fill: var(--paper); fill-opacity: 0.88; stroke: var(--ink-faint); stroke-width: var(--line-thin); }
+.c-wind-arrow { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.c-wind-force { fill: var(--ink); font-family: var(--face-type); font-size: 16px; font-weight: 700; }
+.c-wind-from { fill: var(--ink); font-size: 13px; }
+
+/* Phone: the 1000-unit chart is drawn about a third of its size, so the names that matter grow and the flavour goes. */
+@media (max-width: 760px) {
+    .c-port-name { font-size: 30px; stroke-width: 5px; }
+    .c-shelter-name { font-size: 24px; }
+    .c-plan-label { font-size: 24px; }
+    .c-sounding, .c-island { display: none; }
+}

@@ -12,7 +12,7 @@ public class McpServerTests
         "check_filter", "check_flow", "start_engine", "stop_engine",
         "order_survey", "survey", "readiness", "defer", "undefer", "yard_fix", "wait", "launch", "emergency_lift", "pump_bilge",
         "status", "logbook", "aboard", "weather", "notices", "help", "briefing",
-        "plan_trip", "inventory", "trip", "depart", "continue", "motor", "sail", "heave_to", "anchor", "turn_back", "call_tow",
+        "plan_trip", "inventory", "trip", "chart", "depart", "continue", "motor", "sail", "heave_to", "anchor", "turn_back", "call_tow",
         "season", "book_haulout", "haul_out", "scrub", "yard_wash",
         "winterise_engine", "fill_tank", "battery_ashore", "battery_aboard", "winter_charger", "fit_winter_cover", "wait_until_spring",
         "list_for_sale", "accept_offer", "keep", "sale",
@@ -116,7 +116,7 @@ public class McpServerTests
     public async Task Emergency_lift_tool_description_quotes_the_data_numbers()
     {
         var eco = Haulout.Sim.Data.BoatLoader.LoadSloop28().Economy;
-        Assert.Equal(59, ExpectedTools.Length);
+        Assert.Equal(60, ExpectedTools.Length);
         await using var client = await Connect();
         var tool = (await client.ListToolsAsync()).Single(t => t.Name == "emergency_lift");
         Assert.Contains($"{eco.EmergencyLiftNok} NOK", tool.Description);
@@ -149,6 +149,8 @@ public class McpServerTests
             ("plan_trip", new() { ["destination"] = "Hestholmen", ["depart_day"] = 150 }),
             ("inventory", []),
             ("buy", new() { ["item"] = "impeller" }),
+            ("chart", []),
+            ("chart", new() { ["destination"] = "Hestholmen" }),
             ("trip", []),
             ("depart", []),
             ("continue", []),

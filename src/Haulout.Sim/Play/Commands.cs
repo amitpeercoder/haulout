@@ -156,6 +156,7 @@ public sealed record Keep() : Command;
 [JsonDerivedType(typeof(Trip), "trip")]
 [JsonDerivedType(typeof(Season), "season")]
 [JsonDerivedType(typeof(Sale), "sale")]
+[JsonDerivedType(typeof(Chart), "chart")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -189,3 +190,9 @@ public sealed record Trip() : Query;
 public sealed record Season() : Query;
 
 public sealed record Sale() : Query;
+
+/// <summary>
+/// The chart (design note 009): the ports and routes, where she is, the passage under way as hourly fixes, the earlier passages of the season,
+/// today's wind. Planned: the destination the adapter has planned (the game does not remember a plan); null: none. Costs no time.
+/// </summary>
+public sealed record Chart(string? Planned = null) : Query;

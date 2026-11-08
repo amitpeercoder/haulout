@@ -122,12 +122,46 @@ public static class BoatLoader
 
         var trips = dto.Trips is { } tr
             ? new TripRules(
-                tr.Home, tr.Ports ?? [], tr.Routes ?? [], tr.Tow ?? new TowRules())
+                tr.Home, tr.Ports ?? [], DeriveRoutes(tr.Ports ?? [], tr.Routes ?? []), tr.Tow ?? new TowRules())
             : null;
 
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
             chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale);
+    }
+
+    /// <summary>
+    /// Routes as written in the data carry no distance or course: both are derived from the two ports' chart positions (design note 009),
+    /// distance to 0.1 nm and course to the whole degree, 0 to 359. A route whose ports lack a position, a leftover distance or course,
+    /// two ports at one point, or a shelter outside the route are errors.
+    /// </summary>
+    private static List<Route> DeriveRoutes(List<Port> ports, List<RouteDto> routes)
+    {
+        for (int i = 0; i < ports.Count; i++)
+            for (int j = i + 1; j < ports.Count; j++)
+                if (ports[i].Chart is { } a && ports[j].Chart is { } b && a == b)
+                    throw new InvalidOperationException($"Ports '{ports[i].Id}' and '{ports[j].Id}' are at the same point on the chart.");
+
+        var result = new List<Route>();
+        foreach (var r in routes)
+        {
+            if (r.DistanceNm is not null || r.CourseDeg is not null)
+                throw new InvalidOperationException($"Route {r.From} → {r.To} carries distanceNm or courseDeg: they are derived from the ports' chart positions.");
+            var from = ports.FirstOrDefault(p => p.Id == r.From) ?? throw new InvalidOperationException($"Route {r.From} → {r.To}: no port '{r.From}'.");
+            var to = ports.FirstOrDefault(p => p.Id == r.To) ?? throw new InvalidOperationException($"Route {r.From} → {r.To}: no port '{r.To}'.");
+            foreach (var end in new[] { from, to })
+                if (end.Chart is null)
+                    throw new InvalidOperationException($"Route {r.From} → {r.To}: port {end.Id} has no chart position.");
+            double dx = to.Chart!.EastNm - from.Chart!.EastNm, dy = to.Chart.NorthNm - from.Chart.NorthNm;
+            double distance = Math.Round(Math.Sqrt(dx * dx + dy * dy), 1, MidpointRounding.AwayFromZero);
+            int course = (((int)Math.Round(Math.Atan2(dx, dy) * 180 / Math.PI, MidpointRounding.AwayFromZero) % 360) + 360) % 360;
+            var shelter = r.Shelter ?? [];
+            foreach (var s in shelter)
+                if (s.AtNm <= 0 || s.AtNm >= distance)
+                    throw new InvalidOperationException($"Route {r.From} → {r.To}: shelter '{s.Name}' at {s.AtNm} nm is not inside the route (0 to {distance} nm).");
+            result.Add(new Route { From = r.From, To = r.To, DistanceNm = distance, CourseDeg = course, Shelter = shelter });
+        }
+        return result;
     }
 
     /// <summary>
@@ -181,11 +215,21 @@ public static class BoatLoader
         public SaleRules? Sale { get; set; }
     }
 
+    private sealed class RouteDto
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        /// <summary>Present only to be rejected: derived from the ports' positions.</summary>
+        public double? DistanceNm { get; set; }
+        public int? CourseDeg { get; set; }
+        public List<Shelter>? Shelter { get; set; }
+    }
+
     private sealed class TripsDto
     {
         public string Home { get; set; } = "";
         public List<Port>? Ports { get; set; }
-        public List<Route>? Routes { get; set; }
+        public List<RouteDto>? Routes { get; set; }
         public TowRules? Tow { get; set; }
     }
 

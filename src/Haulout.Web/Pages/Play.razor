@@ -20,10 +20,21 @@ else
 {
     <div class="play">
         <div class="left">
-            <div class="stage" data-level-now="@(Session.Level == ViewLevel.Map ? "map" : "closeup")">
+            <div class="viewtoggle" role="group" aria-label="View">
+                <button class="@(Session.View == StageView.Boat ? "on" : "")" data-view="boat" aria-pressed="@(Session.View == StageView.Boat)" @onclick="() => Session.ShowView(StageView.Boat)">Boat</button>
+                <button class="@(Session.View == StageView.Chart ? "on" : "")" data-view="chart" aria-pressed="@(Session.View == StageView.Chart)" @onclick="() => Session.ShowView(StageView.Chart)">Chart</button>
+            </div>
+            @if (Session.View == StageView.Chart)
+            {
+                <div class="stage chartstage" data-view-now="chart"><Chart /></div>
+            }
+            else
+            {
+            <div class="stage" data-view-now="boat" data-level-now="@(Session.Level == ViewLevel.Map ? "map" : "closeup")">
                 <div class="layer" data-level="map" aria-hidden="@(Map ? null : "true")" inert="@(!Map)" style="opacity:@(Map ? 1 : 0);pointer-events:@(Map ? "auto" : "none")"><Cutaway /></div>
                 <div class="layer" data-level="closeup" aria-hidden="@(Map ? "true" : null)" inert="@(Map)" style="opacity:@(Map ? 0 : 1);pointer-events:@(Map ? "none" : "auto")"><CloseUp /></div>
             </div>
+            }
             <div class="log"><Logbook /></div>
         </div>
         <div class="right"><ContextPanel /></div>

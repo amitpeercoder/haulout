@@ -8,6 +8,9 @@ public enum ViewLevel { Map, CloseUp }
 /// <summary>The tabs of the context panel: the part and place, the launch picture, the passage.</summary>
 public enum PanelTab { Here, Readiness, Trip, Season }
 
+/// <summary>Above the stage: the boat (cutaway, with its Map and Close-up) or the chart (docs/design/009).</summary>
+public enum StageView { Boat, Chart }
+
 /// <summary>
 /// The web adapter's one door into the sim. Holds the Game, forwards commands and queries,
 /// and remembers what the UI needs between clicks (selection, last result, what the player read).
@@ -35,6 +38,26 @@ public sealed class GameSession
 
     /// <summary>Which tab of the context panel is showing.</summary>
     public PanelTab Tab { get; private set; } = PanelTab.Here;
+
+    /// <summary>Boat (the cutaway) or Chart (the paper chart).</summary>
+    public StageView View { get; private set; } = StageView.Boat;
+
+    /// <summary>The port the player has chosen on the chart to plan a trip to; null: the sim's default route.</summary>
+    public string? PlannedTo { get; private set; }
+
+    public void ShowView(StageView view)
+    {
+        View = view;
+        Changed?.Invoke();
+    }
+
+    /// <summary>A click on a reachable port on the chart: plan the trip there and open the Trip tab.</summary>
+    public void PlanTo(string portName)
+    {
+        PlannedTo = portName;
+        Tab = PanelTab.Trip;
+        Changed?.Invoke();
+    }
 
     /// <summary>The survey letter is open in the Readiness tab.</summary>
     public bool SurveyOpen { get; private set; }
@@ -104,7 +127,8 @@ public sealed class GameSession
     public ComponentActionsView ActionsFor(string componentName) =>
         Ask<ComponentActionsView>(new ComponentActions(componentName));
 
-    public TripPlanView PlanTrip() => Ask<TripPlanView>(new PlanTrip());
+    public TripPlanView PlanTrip() => Ask<TripPlanView>(new PlanTrip(PlannedTo));
+    public ChartView Chart => Ask<ChartView>(new Chart(PlannedTo));
     public InventoryView Inventory => Ask<InventoryView>(new Inventory());
     public TripView Trip => Ask<TripView>(new Trip());
     public SeasonView Season => Ask<SeasonView>(new Season());
@@ -138,6 +162,8 @@ public sealed class GameSession
         var result = _game.Execute(command);
         LastResult = result;
         TripResult = result.Accepted ? result.Observation as TripResultView : null;
+        // The plan is spent once she leaves; and cleared again when a passage ends.
+        if (result.Accepted && (command is Depart || result.Observation is TripResultView)) PlannedTo = null;
         if (result.Finished && ClosingNarrative is null && command is StartEngine) ClosingNarrative = result.Narrative;
         if (result.Accepted)
         {
@@ -259,7 +285,7 @@ public sealed class GameSession
 
     public CommandResult Depart()
     {
-        var result = Execute(new Depart());
+        var result = Execute(new Depart(PlannedTo));
         if (result.Accepted) { Tab = PanelTab.Trip; Changed?.Invoke(); }
         return result;
     }

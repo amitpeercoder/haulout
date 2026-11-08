@@ -129,6 +129,9 @@ public static class Prose
             case SaleView sale:
                 sb.Append(Sale(sale));
                 break;
+            case ChartView chart:
+                sb.Append(Chart(chart));
+                break;
         }
         return sb.ToString();
     }
@@ -272,6 +275,83 @@ public static class Prose
             foreach (var l in v.ForSale) sb.AppendLine($"  {l.Name}: {l.PriceNok} NOK, {Duration(l.Minutes)}");
         }
         return sb.ToString();
+    }
+
+    private static string Position(double east, double north) =>
+        $"{Math.Abs(east):0.0} {(east < 0 ? "W" : "E")} {Math.Abs(north):0.0} {(north < 0 ? "S" : "N")}";
+
+    /// <summary>The shelters of the route between two ports, nearest the first port first, whichever way the data writes it.</summary>
+    private static IEnumerable<(string Name, double AtNm)> ShelterAlong(ChartView v, string from, string to)
+    {
+        var direct = v.Routes.FirstOrDefault(r => r.From == from && r.To == to);
+        if (direct is not null) return direct.Shelters.Select(s => (s.Name, s.AtNm));
+        var back = v.Routes.FirstOrDefault(r => r.From == to && r.To == from);
+        return back is null ? [] : back.Shelters.Select(s => (s.Name, back.DistanceNm - s.AtNm)).OrderBy(s => s.Item2);
+    }
+
+    /// <summary>
+    /// The chart as text (design note 009): where she is, the wind, a line per port with the distance and bearing from where she is, the
+    /// shelters on the way, the plan, the track of the passage under way as fixes, and this season's earlier passages. Positions are
+    /// nautical miles east and north of the home port.
+    /// </summary>
+    public static string Chart(ChartView v)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(v.Here);
+        sb.AppendLine($"She is at {Position(v.Boat.EastNm, v.Boat.NorthNm)}.");
+        sb.AppendLine($"Wind: {v.Wind.Text}");
+        sb.AppendLine("Ports (distance and bearing from where she is):");
+        foreach (var p in v.Ports)
+        {
+            var marks = new List<string>();
+            if (p.Yard) marks.Add("yard");
+            if (p.Shop) marks.Add("shop");
+            if (p.Fuel) marks.Add("fuel");
+            if (p.Anchorage) marks.Add("anchorage");
+            string where = p.IsHere ? "you are here" : $"{p.DistanceNm:0.0} nm on {p.BearingDeg:000}";
+            string note = p.IsHere || v.Boat.AtSea || p.Reachable ? "" : " (no route from here)";
+            sb.AppendLine($"  {p.Name}, {where}, at {Position(p.EastNm, p.NorthNm)}: {(marks.Count == 0 ? "nothing" : string.Join(", ", marks))}.{note}");
+        }
+        if (v.Boat.AtSea && v.Boat.From is not null && v.Boat.To is not null)
+        {
+            foreach (var s in ShelterAlong(v, v.Boat.From, v.Boat.To))
+                sb.AppendLine($"On the way to {v.Boat.To}: {s.Name} at {s.AtNm:0.#} nm.");
+        }
+        else if (v.Boat.Port is not null)
+            foreach (var r in v.Routes.Where(r => r.From == v.Boat.Port || r.To == v.Boat.Port))
+            {
+                string to = r.From == v.Boat.Port ? r.To : r.From;
+                foreach (var s in ShelterAlong(v, v.Boat.Port, to))
+                    sb.AppendLine($"On the way to {to}: {s.Name} at {s.AtNm:0.#} nm.");
+            }
+        if (v.Plan is { } plan)
+        {
+            sb.AppendLine($"Planned: {plan.From} to {plan.To}, {plan.DistanceNm:0.0} nm on {plan.CourseDeg:000}. {plan.Estimate}");
+            foreach (var s in plan.Shelters) sb.AppendLine($"  Shelter: {s.Name}, {s.AtNm:0.#} nm out, at {Position(s.EastNm, s.NorthNm)}.");
+            foreach (var b in plan.Blockers) sb.AppendLine($"  Can't go yet: {b}");
+        }
+        if (v.Track is { } track)
+        {
+            sb.AppendLine($"Under way, {track.From} to {track.To}:");
+            AppendFixes(sb, track);
+        }
+        foreach (var t in v.EarlierTracks)
+        {
+            int hours = t.Fixes.Count == 0 ? 0 : t.Fixes[^1].Hour;
+            sb.AppendLine($"Earlier this season: day {t.Day}, {t.From} to {t.To}, {t.Outcome}, {hours} h.");
+        }
+        return sb.ToString();
+    }
+
+    private static void AppendFixes(StringBuilder sb, ChartTrack track)
+    {
+        var start = track.Fixes.Count > 0 ? track.Fixes[0] : null;
+        foreach (var f in track.Fixes)
+        {
+            double out_ = start is null ? 0 : Math.Sqrt(Math.Pow(f.EastNm - start.EastNm, 2) + Math.Pow(f.NorthNm - start.NorthNm, 2));
+            string events = f.Events.Count == 0 ? "" : " " + string.Join(" ", f.Events);
+            sb.AppendLine($"  Hour {f.Hour}: {out_:0.0} nm out, {f.Mode}, at {Position(f.EastNm, f.NorthNm)}.{events}");
+        }
     }
 
     /// <summary>Where she is on the passage: the view's own text, plus the numbers when at sea.</summary>

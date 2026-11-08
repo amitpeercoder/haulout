@@ -120,6 +120,7 @@ public sealed partial class Game
             Trip => TripSnapshot(),
             Season => SeasonSnapshot(),
             Sale => SaleSnapshot(),
+            Chart q => ChartSnapshot(q.Planned),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -149,6 +150,7 @@ public sealed partial class Game
         new("turn back", null, "At sea: give up the passage and head for the port you left"),
         new("call tow", null, "At sea: call the towboat (costs money and the best part of a day)"),
         new("trip", null, "Where you are on the passage"),
+        new("chart", "destination", "The chart: the ports with distance and bearing from here, the shelters, and the track of the passage under way"),
         new("season", null, "The yard calendar: your slot, the first free slot and what lifting costs"),
         new("book haulout", "day", "Ring the yard and book a slot to be lifted out (free; changing the booking costs a fee)"),
         new("haul out", null, "At the yard, afloat, on your booked day, engine running: be lifted out for the winter (costs the lift and the storage)"),
@@ -807,6 +809,10 @@ public sealed partial class Game
     {
         var stamp = TimeOfDay;
         int day = Day;
+        // What goes on the track once the time has passed: the hour she is in then is the hour it happened in (design note 009).
+        string? trackEvent = _passage is not null && logText is not null && action is "clean" or "replace" or "heave-to" or "anchor" or "turn-back"
+            ? logText : null;
+        var seaPassage = _passage;
         if (CountsAsMaintenance(action)) _maintenanceEntries++;
         if (logText is not null)
         {
@@ -818,6 +824,7 @@ public sealed partial class Game
         int before = ClockMinutes;
         Tick(t, minutes, work);
         if (afterTick is not null) obs = afterTick();
+        if (trackEvent is not null && !_sunk && _passage is not null && ReferenceEquals(_passage, seaPassage)) MarkTrack(trackEvent);
         if (_sunk)
         {
             // She went down while the time passed: the card is the result, and the rest of the time does not pass.

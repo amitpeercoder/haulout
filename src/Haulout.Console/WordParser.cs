@@ -60,6 +60,7 @@ public static class WordParser
             "call" => new Problem("Usage: call tow"),
             "inventory" or "inv" or "spares" => new RunQuery(new Inventory()),
             "trip" => new RunQuery(new Trip()),
+            "chart" => new RunQuery(new Chart(OrNull(StripTo(arg)))),
             "season" => new RunQuery(new Season()),
             "sale" => new RunQuery(new Sale()),
             "list" or "sell" => ParseList(arg),

@@ -82,3 +82,8 @@ button.primary:hover:not(:disabled) { background: var(--amber); color: var(--ink
     display: inline-block; min-width: 1.1em; margin-left: 0.35em; padding: 0 0.3em; border-radius: 0.6em;
     background: var(--fault); color: var(--paper); font-size: 0.75em; font-weight: bold; line-height: 1.4; text-align: center;
 }
+
+/* Phone: the page scrolls instead of being one fixed screen (the play layout stacks, see Play.razor.css). */
+@media (max-width: 760px) {
+    body { overflow-x: hidden; overflow-y: auto; }
+}

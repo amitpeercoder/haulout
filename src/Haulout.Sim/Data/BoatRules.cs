@@ -110,6 +110,9 @@ public sealed record ChandleryItem
     public string? LogText { get; init; }
 }
 
+/// <summary>A point on the chart: nautical miles east and north of the home port, which is (0, 0). PLACEHOLDER (design note 009).</summary>
+public sealed record ChartPoint(double EastNm, double NorthNm);
+
 /// <summary>A place she can lie. Yard: the yard (repairs, survey, shore power, the crane) is here. ShopName: where Buy happens; Stock and PriceFactor: what it sells and at what markup.</summary>
 public sealed record Port
 {
@@ -127,6 +130,10 @@ public sealed record Port
     public bool Shop { get; init; } = true;
     /// <summary>Diesel is for sale here (design note 008, used by the winter tasks). PLACEHOLDER.</summary>
     public bool Fuel { get; init; }
+    /// <summary>Where the port is on the chart (design note 009). Every port in a route needs one.</summary>
+    public ChartPoint? Chart { get; init; }
+    /// <summary>She lies to her own anchor here: no mooring, no harbour (design note 009). PLACEHOLDER.</summary>
+    public bool Anchorage { get; init; }
 
     public bool Sells(ChandleryItem item) => Shop && (Stock is null || Stock.Contains(item.Id));
     public int PriceOf(ChandleryItem item) => (int)Math.Round(item.PriceNok * PriceFactor, MidpointRounding.AwayFromZero);
@@ -169,6 +176,19 @@ public sealed record TowRules
 public sealed record TripRules(string Home, IReadOnlyList<Port> Ports, IReadOnlyList<Route> Routes, TowRules Tow)
 {
     public Port? FindPort(string id) => Ports.FirstOrDefault(p => p.Id == id);
+
+    /// <summary>
+    /// The point <paramref name="nm"/> along the straight line from the route's From port to its To port (clamped to the route). The only
+    /// geometry in the sim (design note 009). Both ports need a chart position (the loader checks).
+    /// </summary>
+    public ChartPoint PointAlong(Route route, double nm)
+    {
+        var a = FindPort(route.From)?.Chart ?? new ChartPoint(0, 0);
+        var b = FindPort(route.To)?.Chart ?? a;
+        if (route.DistanceNm <= 0) return a;
+        double f = Math.Clamp(nm, 0, route.DistanceNm) / route.DistanceNm; // the rounded distance, so the end is exactly the To port
+        return new ChartPoint(a.EastNm + (b.EastNm - a.EastNm) * f, a.NorthNm + (b.NorthNm - a.NorthNm) * f);
+    }
 
     /// <summary>Routes out of a port: the data routes from it, and each route to it, reversed.</summary>
     public IEnumerable<Route> RoutesFrom(string portId) =>

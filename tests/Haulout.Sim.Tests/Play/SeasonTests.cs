@@ -956,7 +956,7 @@ public class SeasonTests
         var seen = new List<string>();
         void Snap()
         {
-            foreach (Query q in new Query[] { new Status(), new Season(), new Trip(), new PlanTrip(), new Logbook(), new Notices(), new Inventory(), new Aboard() })
+            foreach (Query q in new Query[] { new Status(), new Season(), new Trip(), new PlanTrip(), new Chart(), new Chart("Hestholmen"), new Logbook(), new Notices(), new Inventory(), new Aboard() })
                 seen.Add(JsonSerializer.Serialize<QueryResult>(g.Ask(q)));
         }
         void Keep(CommandResult r) => seen.Add(JsonSerializer.Serialize(r));

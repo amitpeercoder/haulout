@@ -3072,7 +3072,7 @@
     "home": "skjaervik",
     "ports": [
       {
-        "id": "skjaervik", "name": "Skjærvik", "aliases": ["home", "skjaervik", "the yard", "yard"], "yard": true, "shopName": "the yard chandlery", "fuel": true,
+        "id": "skjaervik", "name": "Skjærvik", "aliases": ["home", "skjaervik", "the yard", "yard"], "chart": { "eastNm": 0, "northNm": 0 }, "yard": true, "shopName": "the yard chandlery", "fuel": true,
         "arrivalLines": [
           "The mooring buoy comes up out of the grey, and you hook it on the second try.",
           "She swings to the wind, and the yard sheds stand where you left them.",
@@ -3080,7 +3080,7 @@
         ]
       },
       {
-        "id": "hestholmen", "name": "Hestholmen", "aliases": ["hestholmen", "the regatta", "the party", "regatta"], "yard": false, "shopName": "the harbour shop",
+        "id": "hestholmen", "name": "Hestholmen", "aliases": ["hestholmen", "the regatta", "the party", "regatta"], "chart": { "eastNm": 9.0, "northNm": 10.7 }, "yard": false, "shopName": "the harbour shop",
         "stock": ["primary-filter-element", "secondary-filter-element", "impeller"], "priceFactor": 1.3,
         "arrivalLines": [
           "Hestholmen opens up round the point: masts, bunting, a quay full of people.",
@@ -3090,7 +3090,7 @@
         ]
       },
       {
-        "id": "storholmen", "name": "Storholmen", "aliases": ["storholmen"], "yard": false, "shopName": "the harbour kiosk", "fuel": true,
+        "id": "storholmen", "name": "Storholmen", "aliases": ["storholmen"], "chart": { "eastNm": -22.5, "northNm": 13.0 }, "yard": false, "shopName": "the harbour kiosk", "fuel": true,
         "stock": ["primary-filter-element", "secondary-filter-element", "impeller"], "priceFactor": 1.3,
         "arrivalLines": [
           "Storholmen is a low island with a white light on its point and a harbour no bigger than a yard.",
@@ -3099,7 +3099,7 @@
         ]
       },
       {
-        "id": "kvitnes", "name": "Kvitnes", "aliases": ["kvitnes", "the anchorage"], "yard": false, "shop": false,
+        "id": "kvitnes", "name": "Kvitnes", "aliases": ["kvitnes", "the anchorage"], "chart": { "eastNm": 16.8, "northNm": 6.2 }, "anchorage": true, "yard": false, "shop": false,
         "arrivalLines": [
           "Kvitnes is a bay of white shingle inside a ring of low hills, and nothing built on it but a boathouse with no door.",
           "The anchor finds the sand on the second try, and she swings quietly to it.",
@@ -3108,9 +3108,9 @@
       }
     ],
     "routes": [
-      { "from": "skjaervik", "to": "hestholmen", "distanceNm": 14, "courseDeg": 40, "shelter": [ { "name": "Lyngskjær", "atNm": 7 } ] },
-      { "from": "skjaervik", "to": "storholmen", "distanceNm": 26, "courseDeg": 300, "shelter": [ { "name": "Måkeskjær", "atNm": 12 } ] },
-      { "from": "kvitnes", "to": "hestholmen", "distanceNm": 9, "courseDeg": 300, "shelter": [] }
+      { "from": "skjaervik", "to": "hestholmen", "shelter": [ { "name": "Lyngskjær", "atNm": 7 } ] },
+      { "from": "skjaervik", "to": "storholmen", "shelter": [ { "name": "Måkeskjær", "atNm": 12 } ] },
+      { "from": "kvitnes", "to": "hestholmen", "shelter": [] }
     ],
     "tow": { "nok": 6000, "hours": 6, "lostHours": 18 }
   },
@@ -3199,6 +3199,7 @@
     "PLACEHOLDER (design note 007): sea { depart 10 min, heave-to 5, anchor 15, turn back 2 }; forecast { 3 days of lead, force error chance 0 / 0.3 / 0.5 / 0.7 by lead day, rain flip chance 0 / 0.1 / 0.2 / 0.3 }.",
     "PLACEHOLDER (design note 007): the atSea sentence on each fault names the consequence under way, and the vaneFactor (impeller) and waterMinutes (primary filter) properties start at 1 and 0.",
     "PLACEHOLDER (design note 008): trips { Skjaervik to Storholmen 26 nm on 300 degrees with shelter at Maakeskjaer 12 nm out; Kvitnes 9 nm from Hestholmen on 120 degrees, the way back on 300 }, the arrival lines of both, fuel at Skjaervik and Storholmen, no shop at Kvitnes, and the Storholmen kiosk (stock as Hestholmen's, 1.3 times the chandlery price).",
+    "PLACEHOLDER (design note 009): chart { positions in nautical miles east and north of Skjaervik: Skjaervik (0, 0), Hestholmen (9.0, 10.7), Storholmen (-22.5, 13.0), Kvitnes (16.8, 6.2); route distance and course are derived from them (14.0 nm on 040, 26.0 on 300, 9.0 on 300 for Kvitnes to Hestholmen); Kvitnes is an anchorage }.",
     "PLACEHOLDER (design note 008): yard { window day 255 to 300 of the year, first free slot drifting later by 0 to 7 days for every week after day 240, at least 1 day ahead; lift 7000 NOK, winter storage 9000 NOK, a booking change 500 NOK, the yard's hull wash 1200 NOK and 120 min, the haulout 120 min; a lift on or after day 240 of the year is the autumn lift }.",
     "UNVERIFIED (design note 008): the haulout season (day 255 to 300, mid-September to late October) and the busy-yard drift are not checked against a real Nordic yard.",
     "PLACEHOLDER (design note 008): fouling { growth 0.008 a day at full temperature (water 6 to 15 degrees C, mean of the last 20 days), spread 0.6 to 1.6 drawn at each launch, antifouling condition cuts it by 0.9 x its condition; a fully grown hull loses 1.2 knots and puts 50 % more load on the impeller; clean the hull 240 min, scrub 120 min taking 40 %; antifouling cannot be painted over growth of 0.1 or more; growth shows from 0.05; paint reads as thin under condition 0.5; a look says more or less than the last look when the words are the same and the growth moved by 0.04 }, and the waterline and hull word bands (seven each). Calibrated over 20 seeds (launched day 96, thin paint reaches the top band, 0.8, by day 270 in about half of them; fresh paint stays under 0.45).",

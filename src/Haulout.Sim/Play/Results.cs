@@ -98,6 +98,7 @@ public sealed record LossView(
 [JsonDerivedType(typeof(TripView), "trip-view")]
 [JsonDerivedType(typeof(SeasonView), "season-view")]
 [JsonDerivedType(typeof(SaleView), "sale-view")]
+[JsonDerivedType(typeof(ChartView), "chart-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -305,3 +306,43 @@ public sealed record ListingView(ValuationLetter Letter) : Observation;
 /// <summary>The end of the game: facts only. The lines are also the narrative of the accepting command.</summary>
 public sealed record ClosingView(
     int Day, int PriceNok, int SpentNok, int BalanceNok, int Days, int HoursWorked, int Trips, int Tows, IReadOnlyList<string> Lines) : Observation;
+
+// ------------------------------------------------------------------ the chart (design note 009)
+
+/// <summary>
+/// The chart. Positions are nautical miles east and north of the home port, to 0.1 nm; bearings whole degrees. Here: where she is, in a
+/// sentence. Track: the passage under way (null in port); EarlierTracks: this season's finished passages, oldest first. No ids.
+/// </summary>
+public sealed record ChartView(
+    string Here, IReadOnlyList<ChartPort> Ports, IReadOnlyList<ChartRoute> Routes, ChartBoat Boat,
+    ChartTrack? Track, IReadOnlyList<ChartTrack> EarlierTracks, ChartWind Wind, ChartPlan? Plan) : QueryResult;
+
+/// <summary>A port with its marks. DistanceNm and BearingDeg are from the boat's position now; Reachable: a route out of the port she lies at (false at sea).</summary>
+public sealed record ChartPort(
+    string Name, double EastNm, double NorthNm, bool Yard, bool Shop, bool Fuel, bool Anchorage, bool IsHere,
+    bool Reachable, double DistanceNm, int BearingDeg);
+
+/// <summary>A route as written in the data, once (the way back is the same line). Distance and course are derived from the ports' positions.</summary>
+public sealed record ChartRoute(string From, string To, double DistanceNm, int CourseDeg, IReadOnlyList<ChartShelter> Shelters);
+
+/// <summary>A place to get out of the weather, AtNm along the route from its first port, and where that is on the chart.</summary>
+public sealed record ChartShelter(string Name, double AtNm, double EastNm, double NorthNm);
+
+/// <summary>Where she is. At sea From/To are port names and PositionNm/RemainingNm the distance made good and left; HeadingDeg the route's course (0 in port).</summary>
+public sealed record ChartBoat(
+    bool AtSea, string? Port, double EastNm, double NorthNm, string? From, string? To, double PositionNm,
+    double RemainingNm, string? Mode, int HeadingDeg, bool Sunk);
+
+/// <summary>A passage on the chart. Outcome: "under way", "arrived", "turned back", "towed" or "sank". Day: the day she left.</summary>
+public sealed record ChartTrack(string From, string To, int Day, string Outcome, IReadOnlyList<ChartFix> Fixes);
+
+/// <summary>One hourly fix (hour 0: the departure). Events: what the logbook recorded in that hour.</summary>
+public sealed record ChartFix(int Hour, double EastNm, double NorthNm, string Mode, IReadOnlyList<string> Events);
+
+/// <summary>Today's real weather as the status shows it.</summary>
+public sealed record ChartWind(int Force, string From, bool Rain, string Text);
+
+/// <summary>The trip the adapter asked about, from the plan: the estimate under engine and sail, and what would stop her leaving.</summary>
+public sealed record ChartPlan(
+    string From, string To, double DistanceNm, int CourseDeg, IReadOnlyList<ChartShelter> Shelters,
+    double MotorHours, double? SailHours, string Estimate, IReadOnlyList<string> Blockers);

@@ -2,6 +2,7 @@ using System.Globalization;
 using Haulout.Sim.Data;
 using Haulout.Sim.Engine;
 using Haulout.Sim.Systems;
+using Haulout.Sim.Time;
 using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Play;
@@ -106,6 +107,7 @@ public sealed partial class Game
         else p.OverheatMinutes = 0;
 
         p.EngineNote = EngineNote();
+        UpdateFix(p);
         if (p.Mode != SeaMode.UnderTow && p.PositionNm >= p.Route.DistanceNm + p.DriftNm - 1e-9) Arrive(p);
     }
 
@@ -122,6 +124,8 @@ public sealed partial class Game
     private void Arrive(Passage p)
     {
         p.EndClockMinutes = ClockMinutes;
+        MarkTrack($"Arrived at {PortName(p.DestinationPortId)}.");
+        ArchivePassage(p, p.TurnedBack ? "turned back" : "arrived");
         _running = false;
         _portId = p.DestinationPortId;
         _passage = null;
@@ -184,8 +188,9 @@ public sealed partial class Game
             _passage = new Passage
             {
                 Route = route, OriginPortId = route.From, DestinationPortId = route.To, Mode = SeaMode.Motoring,
-                DepartClockMinutes = ClockMinutes, MoneyAtDeparture = _money, LogStart = logStart,
+                DepartClockMinutes = ClockMinutes, MoneyAtDeparture = _money, LogStart = logStart, Year = new GameClock(Day).Year,
             };
+            StartTrack(_passage);
             return null;
         });
     }
@@ -362,12 +367,15 @@ public sealed partial class Game
         t.Narrative.Add($"{home} is the nearer port, {towNm.ToString("0.0", CultureInfo.InvariantCulture)} nm off; that's where they take her.");
         _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {tow.Nok} NOK to be towed {towed}.", tow.Nok));
         CountTow($"Called the towboat: {tow.Nok} NOK to be towed {towed}.");
+        MarkTrack($"Called the towboat: {tow.Nok} NOK to be towed {towed}.");
         int before = ClockMinutes;
 
         Tick(t, tow.Hours * 60, aboard: true);
         if (_sunk) return TowSunk(t, before, tow.Nok);
 
         _portId = target;
+        p.EndClockMinutes = ClockMinutes;
+        ArchivePassage(p, "towed");
         _passage = null;
         _log.Add(new LogEntry(Day, TimeOfDay, $"The towboat left her on her mooring at {home}."));
         Tick(t, tow.LostHours * 60, aboard: false);

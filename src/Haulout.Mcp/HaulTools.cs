@@ -142,6 +142,13 @@ public sealed class HaulTools(GameSession session)
         "Where she is on the passage: at which port, or at sea with the distance made good, the distance left, how she is being sailed and the nearest place to anchor. Costs no time.")]
     public string Trip() => session.Ask("trip", new Trip());
 
+    [McpServerTool(Name = "chart", ReadOnly = true), Description(
+        "The chart: where she is in nautical miles east and north of Skjærvik, each port with its marks (yard, shop, fuel, anchorage), its position, its distance and bearing from where she is, " +
+        "the shelters on the routes, today's wind, and the track of the passage under way as hourly fixes with what happened in each hour, and this season's earlier passages. " +
+        "Name a destination to see the planned route with its estimate. Costs no time.")]
+    public string Chart([Description("Where to, e.g. Hestholmen. Optional: shows the planned route and estimate.")] string? destination = null) =>
+        session.Ask("chart", new Chart(destination));
+
     [McpServerTool(Name = "depart"), Description(
         "Cast off for another port. Takes 10 minutes, free. Only from the cockpit, afloat at a port, with the engine already running (you motor off the mooring) and not in a gale; " +
         "refused otherwise, and the engine must have run this season. Leave the destination out for the one route out of this port. Then use continue and the other at-sea tools, an hour at a time.")]
@@ -285,7 +292,7 @@ public sealed class HaulTools(GameSession session)
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
         "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer. " +
-        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), inventory, trip, notices (what the boat has told you), briefing.\n";
+        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

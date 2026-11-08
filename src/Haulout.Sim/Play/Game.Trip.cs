@@ -48,6 +48,9 @@ public sealed partial class Game
         public int LogStart { get; init; }
         public List<string> Failures { get; } = [];
         public List<string> Fixes { get; } = [];
+        /// <summary>The clock year she left in, and the hourly fixes of the passage (design note 009).</summary>
+        public int Year { get; init; }
+        public List<TrackFix> Track { get; } = [];
 
         /// <summary>Net distance along the route from its start, drift taken off (never below 0).</summary>
         public double ProgressNm => Math.Max(0, PositionNm - DriftNm);

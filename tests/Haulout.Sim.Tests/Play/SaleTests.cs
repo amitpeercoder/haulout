@@ -857,7 +857,7 @@ public class SaleTests
         Query[] queries =
         [
             new Briefing(), new Status(), new Logbook(), new Commands(), new Aboard(), new SurveyReport(), new Readiness(), new Haulout.Sim.Play.Weather(),
-            new Notices(), new Inventory(), new PlanTrip(), new Trip(), new Season(), new Sale(),
+            new Notices(), new Inventory(), new PlanTrip(), new Trip(), new Season(), new Sale(), new Chart(),
         ];
         foreach (var q in queries) Assert.NotNull(g.Ask(q));
         var sale = Sale(g);

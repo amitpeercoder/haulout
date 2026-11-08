@@ -151,7 +151,13 @@ public sealed partial class Game
                 : $"The insurer's man comes down to the quay with a camera and a folder. They put her at {insurance.ValueNok} NOK and pay {payout} NOK.",
             "The yard has another tired boat for sale.",
         };
-        _log.Add(new LogEntry(day, TimeOfDay, voided ? "She sank. The insurer pays nothing." : $"She sank. The insurer pays {payout} NOK."));
+        string sankText = voided ? "She sank. The insurer pays nothing." : $"She sank. The insurer pays {payout} NOK.";
+        _log.Add(new LogEntry(day, TimeOfDay, sankText));
+        if (_passage is { } wreck)
+        {
+            MarkTrack(sankText);
+            ArchivePassage(wreck, "sank");
+        }
         _loss = new LossView(day, lines, insurance.ValueNok, payout, voided, voidReason);
     }
 
