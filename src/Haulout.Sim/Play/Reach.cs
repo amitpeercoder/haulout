@@ -83,6 +83,10 @@ internal static class Words
 
     public static string CoverName(Cover c) => c.Name.ToLowerInvariant();
 
+    /// <summary>"off" / "in place", or the cover's own words ("open" / "shut").</summary>
+    public static string State(Cover c, bool off) =>
+        c.StateWords is { Count: 2 } w ? (off ? w[0] : w[1]) : off ? "off" : "in place";
+
     public static string JoinOr(IReadOnlyList<string> items) =>
         items.Count <= 1 ? string.Join("", items) : string.Join(", ", items.Take(items.Count - 1)) + " or " + items[^1];
 }

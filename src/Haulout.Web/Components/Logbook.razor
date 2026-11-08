@@ -4,7 +4,7 @@
 
 <section class="logbook">
     @{ var status = Session.Status; var entries = Session.Log.Entries; }
-    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK · money left @status.BalanceNok NOK</header>
+    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK · money left @status.BalanceNok NOK@if (status.Weather is not null) { <span class="weather"> · @status.Weather</span> }</header>
     <div class="scroll">
         <ol>
             @if (entries.Count == 0)
@@ -32,7 +32,8 @@
     public void Dispose() => Session.Changed -= OnChanged;
 
     private static string Kind(Haulout.Sim.Play.LogEntry e) =>
-        e.Document is not null ? "document"
+        e.Alert ? "alert"
+        : e.Document is not null ? "document"
         : e.Text.StartsWith("Found:") ? "found"
         : e.CostNok > 0 || e.Text.StartsWith("Bought") || e.Text.StartsWith("Replaced") ? "receipt"
         : "";

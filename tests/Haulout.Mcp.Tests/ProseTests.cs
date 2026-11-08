@@ -62,6 +62,17 @@ public class ProseTests
     }
 
     [Fact]
+    public void Logbook_header_status_and_weather_view_carry_the_weather()
+    {
+        var game = Game.NewFirstFault();
+        var weather = (WeatherView)game.Ask(new Haulout.Sim.Play.Weather());
+        var log = P.Query(game.Ask(new Logbook())).Replace("\r\n", "\n");
+        Assert.StartsWith($"Day 75 \u00b7 {weather.Text}\n", log);
+        Assert.Contains(weather.Text, P.Query(game.Ask(new Status())));
+        Assert.Equal(weather.Text + Environment.NewLine, P.Query(weather));
+    }
+
+    [Fact]
     public void Briefing_help_hint_is_optional()
     {
         var view = new BriefingView(["One.", "Two."]);
@@ -141,10 +152,40 @@ public class ProseTests
     {
         var status = new StatusView(5, "08:00", 0, 0, null, false, false, [], [], "Cockpit");
         var result = new CommandResult(true, "wait", ["Days pass."], 4 * 1440, 300, null,
-            [new KnownFault("f-1", "Weeping seacock", "Raw-water seacock")], false, true);
+            [new KnownFault("f-1", "Weeping seacock", "Raw-water seacock")], false, true, []);
         var text = P.Result(result, status).Replace("\r\n", "\n");
         Assert.Contains("  Noted in the log: Weeping seacock.", text);
         Assert.Contains("  [+4 days, 300 NOK · 08:00]", text);
         Assert.DoesNotContain("f-1", text);
+    }
+
+    [Fact]
+    public void Result_prints_alerts_after_the_stamp_and_before_the_narrative_for_a_look()
+    {
+        var status = new StatusView(5, "08:00", 0, 0, null, false, false, [], [], "Cockpit");
+        var alerts = new[] { new Alert(5, "07:00", "Water over the saloon sole.") };
+        var wait = new CommandResult(true, "wait", ["Days pass."], 1440, 0, null, [], false, false, alerts);
+        var text = P.Result(wait, status).Replace("\r\n", "\n");
+        Assert.Contains("  ! Water over the saloon sole.\n", text);
+        Assert.True(text.IndexOf("Days pass.", StringComparison.Ordinal) < text.IndexOf("  ! ", StringComparison.Ordinal));
+        Assert.True(text.IndexOf("[+1 day", StringComparison.Ordinal) < text.IndexOf("  ! ", StringComparison.Ordinal));
+
+        var look = new CommandResult(true, "look", ["You look around."], 2, 0, null, [], false, false, alerts);
+        var lookText = P.Result(look, status).Replace("\r\n", "\n");
+        Assert.StartsWith("  ! Water over the saloon sole.\n", lookText);
+
+        var refused = new CommandResult(false, "go", ["No."], 0, 0, null, [], false, false, []);
+        Assert.DoesNotContain("  ! ", P.Result(refused, status));
+    }
+
+    [Fact]
+    public void Status_and_notices_print_alerts_and_the_logbook_marks_them()
+    {
+        var alert = new Alert(5, "07:00", "A damp, sour smell from under the saloon sole.");
+        var status = new StatusView(5, "08:00", 0, 0, null, false, false, [], [], "Cockpit", Notices: [alert]);
+        Assert.StartsWith("  ! A damp, sour smell", P.Query(status).Replace("\r\n", "\n"));
+        Assert.Contains("  ! A damp", P.Query(new NoticesView([alert])));
+        Assert.Contains("Nothing new from the boat.", P.Query(new NoticesView([])));
+        Assert.Contains("Day 5 07:00  ! A damp", P.Query(new LogView([new LogEntry(5, "07:00", alert.Text, Alert: true)])));
     }
 }

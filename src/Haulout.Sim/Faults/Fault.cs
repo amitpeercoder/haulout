@@ -1,8 +1,20 @@
 namespace Haulout.Sim.Faults;
 
-public enum FaultEffectKind { SeriesOhms, StateOfCharge, FuelRestriction, RawWaterFlowFactor, OpenCircuit, NoFuel, None }
+public enum FaultEffectKind { SeriesOhms, StateOfCharge, FuelRestriction, RawWaterFlowFactor, OpenCircuit, NoFuel, None, Property }
 
-public sealed record FaultEffect(FaultEffectKind Kind, double Value);
+/// <summary>How a property effect combines with the value so far: replace it, add to it, scale it, or cap it from above.</summary>
+public enum PropertyOp { Set, Add, Multiply, Min }
+
+/// <summary>
+/// What a fault does to the boat. The older kinds are read where they matter (the engine inputs). Kind <see cref="FaultEffectKind.Property"/>
+/// is the general form (design note 006): Property, Op and Value change a named property of Component (default: the fault's own component);
+/// <see cref="Systems.Properties.Effective"/> applies them.
+/// </summary>
+public sealed record FaultEffect(
+    FaultEffectKind Kind, double Value, string? Property = null, PropertyOp? Op = null, string? Component = null);
+
+/// <summary>A dormant fault wakes, once, when the named system value reaches AtLeast (for example "water.awashHours").</summary>
+public sealed record SpawnRule(string When, double AtLeast);
 
 public enum PlayerAction { Look, Inspect, Measure, Start, Clean, Replace, Charge, CheckFilterBowl, CheckRawWaterFlow }
 
@@ -20,10 +32,10 @@ public sealed record YardRoute(string How, int Nok, int LeadDays);
 
 /// <summary>
 /// What a fault turns into. To: id of a (dormant) fault on the same component.
-/// AfterDays: escalates that many days after the fault became active (whatever its state); null: never on the clock.
+/// It happens when the fault's progression crosses the threshold (see <see cref="ProgressionSpec"/>).
 /// OnLaunch: escalates the moment she is launched. Text: what the player reads when it happens.
 /// </summary>
-public sealed record Escalation(string To, int? AfterDays, bool OnLaunch, string Text);
+public sealed record Escalation(string To, bool OnLaunch, string Text);
 
 public sealed class Fault
 {
@@ -44,12 +56,20 @@ public sealed class Fault
         DiyRoute? diy = null,
         YardRoute? yard = null,
         Escalation? escalation = null,
-        IReadOnlyDictionary<string, double>? properties = null)
+        IReadOnlyDictionary<string, double>? properties = null,
+        ProgressionSpec? progression = null,
+        IEnumerable<FaultEffect>? effects = null,
+        IEnumerable<SpawnRule>? spawn = null,
+        string? arrivalSign = null)
     {
+        ArrivalSign = arrivalSign;
         Id = id;
         Name = name;
         ComponentId = componentId;
-        Effect = effect;
+        var extra = (effects ?? []).ToList();
+        Effect = effect.Kind == FaultEffectKind.None && extra.Count > 0 ? extra[0] : effect;
+        Effects = (effect.Kind == FaultEffectKind.None ? extra : extra.Prepend(effect)).ToList();
+        Spawn = (spawn ?? []).ToList();
         Reveals = (reveals ?? []).ToList();
         FixedBy = (fixedBy ?? []).ToList();
         OnHardOnly = onHardOnly;
@@ -62,13 +82,21 @@ public sealed class Fault
         Yard = yard;
         Escalation = escalation;
         Properties = properties ?? new Dictionary<string, double>();
+        Progression = progression;
     }
 
     public string Id { get; }
     /// <summary>What a mechanic calls it.</summary>
     public string Name { get; }
     public string ComponentId { get; }
+    /// <summary>The legacy single effect, or the first of <see cref="Effects"/> when there is no legacy one.</summary>
     public FaultEffect Effect { get; }
+    /// <summary>Every effect, the legacy one first (when it is not None), then the listed ones in data order.</summary>
+    public IReadOnlyList<FaultEffect> Effects { get; }
+    /// <summary>Wakes the fault (dormant only) when any of these system values has been reached. Empty: it never spawns.</summary>
+    public IReadOnlyList<SpawnRule> Spawn { get; }
+    /// <summary>What the player perceives on coming back aboard after this fault woke while they were away (a hose seen through a gap); null: nothing until they look.</summary>
+    public string? ArrivalSign { get; }
     public IReadOnlyList<FaultReveal> Reveals { get; }
     public IReadOnlyList<PlayerAction> FixedBy { get; }
     public bool OnHardOnly { get; }
@@ -83,10 +111,21 @@ public sealed class Fault
     public YardRoute? Yard { get; }
     public Escalation? Escalation { get; }
     public IReadOnlyDictionary<string, double> Properties { get; }
+    public ProgressionSpec? Progression { get; }
+
+    /// <summary>Accumulated progression toward escalation; escalates at the boat's threshold.</summary>
+    public double Progress { get; internal set; }
+    /// <summary>Drawn once when the fault became active, from the world random; null if it has no progression.</summary>
+    public double? Spread { get; internal set; }
+    public FaultHistory History { get; } = new();
 
     public FaultState State { get; private set; } = FaultState.Latent;
     /// <summary>The day the player deferred it (set while Deferred).</summary>
     public int? DeferredDay { get; private set; }
+    /// <summary>The player has put it off at least once, even if they took it back or it has since escalated.</summary>
+    public bool EverDeferred { get; private set; }
+    /// <summary>A spawn rule woke it. Wakes only once, even if the fault is later fixed.</summary>
+    public bool Spawned { get; private set; }
     /// <summary>The day the fault became active: the game's start day, or the day a successor or a poor job woke. Null while dormant.</summary>
     public int? ActiveSinceDay { get; private set; }
 
@@ -125,6 +164,7 @@ public sealed class Fault
         if (State != FaultState.Discovered) return;
         State = FaultState.Deferred;
         DeferredDay = day;
+        EverDeferred = true;
     }
 
     public void Undefer()
@@ -141,6 +181,13 @@ public sealed class Fault
     {
         Dormant = false;
         ActiveSinceDay = day;
+    }
+
+    /// <summary>A system value crossed the fault's spawn threshold: it is live now, Latent, and never spawns again.</summary>
+    internal void SpawnOn(int day)
+    {
+        Spawned = true;
+        Wake(day);
     }
 
     /// <summary>A fault present from the start, or added during play, starts ageing on this day.</summary>

@@ -4,17 +4,33 @@
 @implements IDisposable
 
 <aside class="contextpanel">
+    @if (Session.Loss is { } loss)
+    {
+        <section class="closing">
+            <h2>She's on the bottom.</h2>
+            @foreach (var line in loss.Lines) { <p>@line</p> }
+        </section>
+    }
     <div class="top">
         <button class="primary" data-action="start" @onclick="() => Session.TryStart()">Try to start</button>
+        @if (Session.Status.EngineRunning)
+        {
+            <button data-action="stop-engine" @onclick="() => Session.StopEngine()">Stop engine</button>
+        }
+        @if (string.Equals(Session.Aboard.Place, "Cockpit", StringComparison.OrdinalIgnoreCase))
+        {
+            <button data-action="pump-bilge" @onclick="() => Session.PumpBilge()">Pump the bilge</button>
+        }
         @if (!Session.HasRemoteStartButton)
         {
             <button data-action="buy-remote" @onclick="() => Session.BuyRemoteStartButton()">Buy remote start button (@Session.RemoteStartButtonCostNok NOK)</button>
         }
     </div>
 
+    @{ var unseen = Session.UnseenAlerts; }
     <nav class="tabs">
         <button class="@(Session.ReadinessTab ? "" : "on")" data-tab="here" @onclick="() => Session.ShowTab(false)">Here</button>
-        <button class="@(Session.ReadinessTab ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(true)">Readiness</button>
+        <button class="@(Session.ReadinessTab ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(true)">Readiness@if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
     </nav>
 
     @if (Session.ReadinessTab)
@@ -193,7 +209,8 @@
     public void Dispose() => Session.Changed -= OnChanged;
 
     private static string? Escalates(ReadinessItem p) =>
-        p.EscalatesInDays is { } n ? $"Escalates in {n} {(n == 1 ? "day" : "days")}."
+        (p.LikelyMinDays, p.LikelyMaxDays) is ({ } lo, { } hi)
+            ? (lo == hi ? $"Likely to get worse in {lo} {(lo == 1 ? "day" : "days")}." : $"Likely to get worse in {lo}\u2013{hi} days.")
         : p.EscalatesOnLaunch ? "Escalates on launch." : null;
 
     private static string DaysToGo(int d) =>

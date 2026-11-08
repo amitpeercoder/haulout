@@ -17,7 +17,8 @@ public sealed record ComponentSpec(
     IReadOnlyDictionary<string, double> Properties,
     RemovablePart? RemovablePart = null,
     bool BelowWaterline = false,
-    string? ReplaceText = null)
+    string? ReplaceText = null,
+    bool NeedsDry = false)
 {
     public static ComponentSpec Default { get; } = new(
         Subsystem.Engine, "", [], [], "", null, false, 0, 0, new Dictionary<string, double>());

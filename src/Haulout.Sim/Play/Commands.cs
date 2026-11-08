@@ -25,6 +25,8 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(WaitDays), "wait")]
 [JsonDerivedType(typeof(Launch), "launch")]
 [JsonDerivedType(typeof(EmergencyLift), "emergency-lift")]
+[JsonDerivedType(typeof(PumpBilge), "pump-bilge")]
+[JsonDerivedType(typeof(StopEngine), "stop-engine")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -37,6 +39,8 @@ public sealed record Refit(string Cover) : Command;
 public sealed record Inspect(string Component) : Command;
 public sealed record Measure(string Component) : Command;
 public sealed record StartEngine() : Command;
+/// <summary>Pull the stop and shut the running engine down (1 min), from anywhere aboard.</summary>
+public sealed record StopEngine() : Command;
 public sealed record Clean(string Component) : Command;
 /// <summary>Pull back a small removable part (a boot, a cap) to see what is under it. Needs reach.</summary>
 public sealed record Uncover(string Component) : Command;
@@ -60,6 +64,9 @@ public sealed record Launch() : Command;
 /// <summary>Afloat only: pay the yard to lift her out again. Costs money and calendar days; she is back on the hard.</summary>
 public sealed record EmergencyLift() : Command;
 
+/// <summary>Work the manual bilge pump from the cockpit: 15 minutes, up to 150 litres out.</summary>
+public sealed record PumpBilge() : Command;
+
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(Briefing), "briefing")]
@@ -70,6 +77,8 @@ public sealed record EmergencyLift() : Command;
 [JsonDerivedType(typeof(ComponentActions), "component-actions")]
 [JsonDerivedType(typeof(SurveyReport), "survey-report")]
 [JsonDerivedType(typeof(Readiness), "readiness")]
+[JsonDerivedType(typeof(Weather), "weather")]
+[JsonDerivedType(typeof(Notices), "notices")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -84,3 +93,7 @@ public sealed record ComponentActions(string Component) : Query;
 public sealed record SurveyReport() : Query;
 /// <summary>The launch picture: every discovered open problem with its price now and later, the deadline, the money. Never anything undiscovered.</summary>
 public sealed record Readiness() : Query;
+/// <summary>Today's sky and wind. Costs no time.</summary>
+public sealed record Weather() : Query;
+/// <summary>What the boat has told you since you last asked: the unread alerts, which it then marks read. Costs no time.</summary>
+public sealed record Notices() : Query;

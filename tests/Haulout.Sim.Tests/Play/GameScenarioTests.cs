@@ -2,6 +2,7 @@ using System.Text.Json;
 using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
 using Haulout.Sim.Play;
+using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Tests.Play;
 
@@ -65,7 +66,7 @@ public class GameScenarioTests
     public void Replace_restores()
     {
         var boat = BoatLoader.LoadSloop28();
-        var g = new Game(boat);
+        var g = new Game(boat, weather: WeatherSeries.Fair());
         Assert.True(Do(g, "negative terminal", n => new Replace(n)).Accepted);
         Assert.Equal("Runs", Outcome(Start(g)));
 
@@ -163,7 +164,7 @@ public class GameScenarioTests
         Assert.Equal(2, s.DiscoveredFaults.Count);
 
         var log = Assert.IsType<LogView>(g.Ask(new Logbook()));
-        Assert.Equal(results.Count + results.Sum(r => r.NewlyDiscovered.Count), log.Entries.Count);
+        Assert.Equal(results.Count + results.Sum(r => r.NewlyDiscovered.Count), log.Entries.Count(e => !e.Alert)); // the boat's own alerts are extra lines
         Assert.Contains(log.Entries, e => e.Text == "Found: Corroded negative terminal.");
         Assert.Contains(log.Entries, e => e.Text == "Went into the quarter berth.");
         Assert.Contains(log.Entries, e => e.Text == "Took off the battery-box lid.");
@@ -191,7 +192,7 @@ public class GameScenarioTests
         foreach (var fault in reference.AllFaults.Where(f => !f.Dormant))
         {
             var reveal = fault.Reveals.First(r => r.Discovers);
-            var g = WithButton(new Game(BoatLoader.LoadSloop28()));
+            var g = WithButton(new Game(BoatLoader.LoadSloop28(), weather: WeatherSeries.Fair()));
             var comp = reference.Get(fault.ComponentId).Name;
 
             if (reveal.Action == PlayerAction.CheckRawWaterFlow)

@@ -3,6 +3,7 @@ using Haulout.Sim.Components;
 using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
 using Haulout.Sim.Play;
+using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Tests.Play;
 
@@ -26,7 +27,7 @@ public class PreLaunchTests
     private static Component DataComponent(string id) => Data.Get(id);
 
     /// <summary>A fresh game whose poor-job roll never comes up, unless a test says otherwise.</summary>
-    private static Game NewGame(IRandom? random = null) => new(BoatLoader.LoadSloop28(), 75, random ?? new FixedRandom(0.99));
+    private static Game NewGame(IRandom? random = null) => new(BoatLoader.LoadSloop28(), 75, random ?? new FixedRandom(0.99), weather: WeatherSeries.Fair());
 
     private static string Text(CommandResult r) => string.Join(" ", r.Narrative);
 
@@ -194,20 +195,21 @@ public class PreLaunchTests
     // ------------------------------------------------------------------ 2. escalation
 
     [Fact]
-    public void Deferred_seacock_seizes_on_the_twentieth_day_and_the_weeping_one_leaves_the_list()
+    public void Deferred_seacock_seizes_within_its_range_and_the_weeping_one_leaves_the_list()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         Survey(g);
         Ok(g.Execute(new Defer("seacock")));
+        var range = Ready(g).Open.Single(o => o.Problem == WeepingSeacock);
+        int from = Status(g).Day;
 
-        var early = Ok(g.Execute(new WaitDays(days - 2))); // the survey took the first day
-        Assert.Empty(early.NewlyDiscovered);
-        Assert.Contains(WeepingSeacock, OpenNames(g));
+        var late = WaitUntilSeized(g); // every earlier day found nothing, or WaitUntilSeized would have returned
+        Assert.InRange(Status(g).Day, from + range.LikelyMinDays!.Value, from + range.LikelyMaxDays!.Value + 2);
+        Assert.DoesNotContain("seized", Text(late)); // she was left: the wait tells nothing
+        Assert.Contains(WeepingSeacock, OpenNames(g)); // the player still believes what they knew
+        Assert.DoesNotContain(SeizedSeacock, OpenNames(g));
 
-        var late = Ok(g.Execute(new WaitDays(1)));
-        Assert.Contains(late.NewlyDiscovered, k => k.Name == SeizedSeacock);
-        Assert.Contains("seized", Text(late));
+        Assert.Contains("seized solid", Text(Ok(Walk.Do(g, "seacock", n => new Inspect(n)))));
         Assert.DoesNotContain(WeepingSeacock, OpenNames(g));
         Assert.DoesNotContain(WeepingSeacock, Ready(g).Fixed);
         Assert.Contains(SeizedSeacock, OpenNames(g));
@@ -217,11 +219,11 @@ public class PreLaunchTests
     [Fact]
     public void After_escalation_only_the_seized_seacock_is_known_and_it_is_not_deferred()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         Survey(g);
         Ok(g.Execute(new Defer("seacock")));
-        Ok(g.Execute(new WaitDays(days)));
+        WaitUntilSeized(g);
+        Inspect(g, "seacock"); // the finding
 
         var known = Status(g).DiscoveredFaults.Select(k => k.Name).ToList();
         Assert.Contains(SeizedSeacock, known);
@@ -239,11 +241,11 @@ public class PreLaunchTests
     [Fact]
     public void Launch_counts_the_seized_seacock_as_open_until_the_player_defers_it_again()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         FindSeacock(g);
         Ok(g.Execute(new Defer("seacock")));
-        Ok(g.Execute(new WaitDays(days)));
+        WaitUntilSeized(g);
+        Inspect(g, "seacock"); // found seized, and not deferred again
         var launch = Ok(g.Execute(new Launch()));
         var view = Assert.IsType<LaunchView>(launch.Observation);
         Assert.Equal(0, view.DeferredCount);
@@ -253,11 +255,27 @@ public class PreLaunchTests
         var g2 = NewGame();
         FindSeacock(g2);
         Ok(g2.Execute(new Defer("seacock")));
-        Ok(g2.Execute(new WaitDays(days)));
+        WaitUntilSeized(g2);
+        Inspect(g2, "seacock");
         Ok(g2.Execute(new Defer("seacock")));
         var view2 = Assert.IsType<LaunchView>(Ok(g2.Execute(new Launch())).Observation);
         Assert.Equal(1, view2.DeferredCount);
         Assert.Equal(1, view2.OpenCount);
+    }
+
+    /// <summary>
+    /// Wait one day at a time until the weeping seacock has seized (read from the sim's internals: the player learns nothing from a wait);
+    /// returns the wait that did it. The spread moves the day, so no fixed day is assumed.
+    /// </summary>
+    private static CommandResult WaitUntilSeized(Game g, int maxDays = 45)
+    {
+        for (int i = 0; i < maxDays; i++)
+        {
+            var r = Ok(g.Execute(new WaitDays(1)));
+            if (g.HasEscalated("seacock-weeping")) return r;
+        }
+        Assert.Fail($"The seacock had not seized after {maxDays} days.");
+        return null!;
     }
 
     private static void FindSeacock(Game g)
@@ -280,23 +298,26 @@ public class PreLaunchTests
     }
 
     [Fact]
-    public void A_discovered_but_undeferred_seacock_escalates_on_day_95_by_waiting()
+    public void A_discovered_but_undeferred_seacock_escalates_by_waiting_inside_the_range_readiness_gave()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
-        Assert.Equal(20, days);
         var g = NewGame();
         FindSeacock(g);
-        Assert.Equal("Discovered", Ready(g).Open.Single(o => o.Problem == WeepingSeacock).State);
+        var item = Ready(g).Open.Single(o => o.Problem == WeepingSeacock);
+        Assert.Equal("Discovered", item.State);
+        int from = Status(g).Day;
 
-        int toGo = 95 - Status(g).Day;
-        var early = Ok(g.Execute(new WaitDays(toGo - 1)));
-        Assert.Empty(early.NewlyDiscovered);
-        Assert.Contains(WeepingSeacock, OpenNames(g));
-
-        var late = Ok(g.Execute(new WaitDays(1)));
-        Assert.Equal(95, Status(g).Day);
-        Assert.Contains(late.NewlyDiscovered, k => k.Name == SeizedSeacock);
-        Assert.Contains("seized", Text(late));
+        // Keep the player aboard every day so the factors stay constant while the range is tested.
+        CommandResult? late = null;
+        for (int i = 0; i < 45 && late is null; i++)
+        {
+            Ok(g.Execute(new Look()));
+            var r = Ok(g.Execute(new WaitDays(1)));
+            if (g.HasEscalated("seacock-weeping")) late = r;
+        }
+        Assert.NotNull(late);
+        Assert.InRange(Status(g).Day, from + item.LikelyMinDays!.Value, from + item.LikelyMaxDays!.Value);
+        Assert.DoesNotContain("seized", Text(late!));
+        Assert.Contains("seized solid", Text(Ok(Walk.Do(g, "seacock", n => new Inspect(n)))));
         var open = Ready(g).Open.Single(o => o.Problem == SeizedSeacock);
         Assert.Equal("Discovered", open.State);
         Assert.DoesNotContain(WeepingSeacock, OpenNames(g));
@@ -306,11 +327,12 @@ public class PreLaunchTests
     public void A_latent_seacock_escalates_silently_by_waiting()
     {
         var g = NewGame();
-        var wait = Ok(g.Execute(new WaitDays(20)));
+        var wait = Ok(g.Execute(new WaitDays(45))); // long enough for any spread
 
         Assert.Empty(wait.NewlyDiscovered);
         Assert.DoesNotContain("seacock", Text(wait), StringComparison.OrdinalIgnoreCase);
         Assert.Empty(Log(g).Entries.Where(e => e.Text.StartsWith("Found")));
+        Assert.DoesNotContain(Log(g).Entries, e => e.Text.Contains("came on", StringComparison.Ordinal));
         Assert.Empty(Ready(g).Open);
 
         var inspected = Ok(Walk.Do(g, "seacock", n => new Inspect(n)));
@@ -319,29 +341,29 @@ public class PreLaunchTests
     }
 
     [Fact]
-    public void EscalatesInDays_counts_down_for_a_known_fault_and_is_null_for_an_undiscovered_one()
+    public void Readiness_gives_a_likely_range_for_a_known_fault_and_none_for_the_rest()
     {
         var g = NewGame();
         Assert.Empty(Ready(g).Open);
 
         FindSeacock(g);
         var item = Ready(g).Open.Single(o => o.Problem == WeepingSeacock);
-        int day = Status(g).Day;
-        Assert.Equal(20 - (day - 75), item.EscalatesInDays);
+        Assert.True(item.LikelyMinDays < item.LikelyMaxDays);
         Assert.True(item.EscalatesOnLaunch);
 
         Ok(g.Execute(new WaitDays(5)));
-        Assert.Equal(20 - (day + 5 - 75), Ready(g).Open.Single(o => o.Problem == WeepingSeacock).EscalatesInDays);
+        var later = Ready(g).Open.Single(o => o.Problem == WeepingSeacock);
+        Assert.True(later.LikelyMaxDays < item.LikelyMaxDays, "five days of progress shorten the range");
 
-        // A fault with no timer reports nothing.
-        Assert.All(Ready(g).Open.Where(o => o.Problem != WeepingSeacock), o => Assert.Null(o.EscalatesInDays));
+        // A fault with no progression reports nothing.
+        Assert.All(Ready(g).Open.Where(o => o.Problem != WeepingSeacock), o => Assert.Null(o.LikelyMaxDays));
     }
 
     [Fact]
     public void Seized_seacock_with_the_engine_started_overheats_through_the_cooling_warning()
     {
         var g = NewGame();
-        Ok(g.Execute(new WaitDays(20)));
+        Ok(g.Execute(new WaitDays(45))); // seized by now, whatever the spread
         Ok(Walk.Do(g, "negative terminal", n => new Clean(n)));
         var start = Ok(Walk.Start(g));
 

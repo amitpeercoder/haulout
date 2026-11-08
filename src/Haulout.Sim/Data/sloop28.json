@@ -89,6 +89,7 @@
       ],
       "description": "You're up on deck, the mast stepped in the middle, dew on the cabin top and the whole yard laid out below.",
       "way": "up on deck",
+      "exposed": true,
       "adjacent": [
         "cockpit",
         "beside-the-hull"
@@ -118,6 +119,7 @@
   "covers": [
     {
       "id": "companionway-steps",
+      "offPhrase": "the steps out",
       "name": "Companionway steps",
       "aliases": [
         "steps",
@@ -133,6 +135,7 @@
     },
     {
       "id": "quarter-berth-panel",
+      "offPhrase": "the berth panel off",
       "name": "Quarter-berth panel",
       "aliases": [
         "panel",
@@ -149,6 +152,7 @@
     },
     {
       "id": "battery-box-lid",
+      "offPhrase": "the battery box open",
       "name": "Battery-box lid",
       "aliases": [
         "battery lid",
@@ -165,6 +169,7 @@
     },
     {
       "id": "cockpit-locker-lid",
+      "offPhrase": "the cockpit locker open",
       "name": "Cockpit-locker lid",
       "aliases": [
         "locker lid",
@@ -181,6 +186,7 @@
     },
     {
       "id": "saloon-floorboards",
+      "offPhrase": "the floorboards up",
       "name": "Saloon floorboards",
       "aliases": [
         "floorboards",
@@ -194,6 +200,50 @@
       "refitMinutes": 4,
       "removeText": "You lift the floorboards one by one and stack them on the settee; the bilge smells of brine.",
       "refitText": "You lay the floorboards back in their order, shoulder to shoulder."
+    },
+    {
+      "id": "companionway-hatch",
+      "name": "Companionway hatch",
+      "aliases": [
+        "hatch",
+        "washboard",
+        "companionway hatch"
+      ],
+      "place": "cockpit",
+      "plural": false,
+      "startsOff": true,
+      "offPhrase": "the hatch open",
+      "stateWords": [
+        "open",
+        "shut"
+      ],
+      "removeMinutes": 1,
+      "refitMinutes": 1,
+      "removeText": "You slide the hatch open.",
+      "refitText": "You slide the hatch shut and drop in the washboard.",
+      "removeLog": "Slid the companionway hatch open.",
+      "refitLog": "Slid the companionway hatch shut."
+    },
+    {
+      "id": "bilge-pump-fuse",
+      "name": "Bilge pump fuse",
+      "aliases": [
+        "fuse",
+        "pump fuse"
+      ],
+      "place": "companionway",
+      "plural": false,
+      "removeMinutes": 1,
+      "refitMinutes": 1,
+      "removeText": "You pull the bilge pump fuse out of its holder.",
+      "refitText": "You push the bilge pump fuse back into its holder.",
+      "removeLog": "Pulled the bilge pump fuse.",
+      "refitLog": "Put the bilge pump fuse back in.",
+      "offPhrase": "the pump fuse pulled",
+      "stateWords": [
+        "out",
+        "in"
+      ]
     }
   ],
   "positions": [
@@ -297,6 +347,51 @@
             "nok": 2600,
             "leadDays": 1
           }
+        },
+        {
+          "id": "battery-soaked",
+          "name": "Battery soaked in bilge water",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "selfDischargePerDay",
+              "op": "add",
+              "value": 0.05
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "water.awashHours",
+            "atLeast": 2
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "A tide line of bilge scum on the battery case, the terminals furred green underneath.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The battery leaks its charge away and will not hold it for long.",
+          "costLaterNok": 2600,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new battery",
+            "partsNok": 1900,
+            "minutes": 60
+          },
+          "yard": {
+            "how": "The yard fits a new battery",
+            "nok": 2600,
+            "leadDays": 1
+          }
         }
       ]
     },
@@ -367,7 +462,60 @@
       "seriesOhms": 0.0003,
       "cleanable": true,
       "replaceCostNok": 60,
-      "replaceMinutes": 30
+      "replaceMinutes": 30,
+      "faults": [
+        {
+          "id": "terminal-strained",
+          "name": "Strained positive terminal",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "seriesOhms",
+              "op": "add",
+              "value": 0.02
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "electrical.dragStarts",
+            "atLeast": 4
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The clamp is discoloured with heat, bluish at the edge, and the lug is bent from the long drags on the starter.",
+              "discovers": true
+            },
+            {
+              "action": "measure",
+              "text": "The meter shows a real drop across the clamp while she cranks: it is eating volts.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "clean",
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The starter gets less and less each time; one day it only clicks.",
+          "costLaterNok": 400,
+          "laterNote": null,
+          "diy": {
+            "how": "Clean the clamp and straighten the lug, or fit a new terminal",
+            "partsNok": 60,
+            "minutes": 30
+          },
+          "yard": {
+            "how": "The yard fits a new terminal and lug",
+            "nok": 350,
+            "leadDays": 1
+          }
+        }
+      ]
     },
     {
       "id": "main-positive-cable",
@@ -528,7 +676,55 @@
       "seriesOhms": 0.0005,
       "cleanable": true,
       "replaceCostNok": 80,
-      "replaceMinutes": 30
+      "replaceMinutes": 30,
+      "faults": [
+        {
+          "id": "ground-stud-soaked",
+          "name": "Engine ground stud soaked in bilge water",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "seriesOhms",
+              "op": "add",
+              "value": 0.04
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "water.awashHours",
+            "atLeast": 2
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The ground stud wears a crust of bilge scum, the ring lug green and the nut rusted fast.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "clean",
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The ground connection resists the starter's current and the engine cranks slowly.",
+          "costLaterNok": 300,
+          "laterNote": null,
+          "diy": {
+            "how": "Clean and tighten the stud, or fit a new one",
+            "partsNok": 0,
+            "minutes": 30
+          },
+          "yard": {
+            "how": "The yard cleans the ground stud",
+            "nok": 300,
+            "leadDays": 1
+          }
+        }
+      ]
     },
     {
       "id": "starter-solenoid",
@@ -579,7 +775,54 @@
       "note": "seriesOhms 0.045 is an unverified placeholder, decision 2",
       "cleanable": false,
       "replaceCostNok": 3800,
-      "replaceMinutes": 180
+      "replaceMinutes": 180,
+      "faults": [
+        {
+          "id": "starter-soaked",
+          "name": "Starter soaked in bilge water",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "seriesOhms",
+              "op": "add",
+              "value": 0.03
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "water.awashHours",
+            "atLeast": 2
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "A tide line of bilge scum on the starter body, rust blooming at the bolts.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The starter cranks slower as the corrosion works in, and one day it will not turn.",
+          "costLaterNok": 4900,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new starter motor",
+            "partsNok": 3800,
+            "minutes": 180
+          },
+          "yard": {
+            "how": "The yard fits a new starter motor",
+            "nok": 4900,
+            "leadDays": 2
+          }
+        }
+      ]
     },
     {
       "id": "ignition-panel",
@@ -993,9 +1236,19 @@
           ],
           "escalation": {
             "to": "seacock-seized",
-            "afterDays": 20,
             "onLaunch": true,
             "text": "The raw-water seacock has seized: the salt has crusted the stem solid and the handle won't move."
+          },
+          "progression": {
+            "baseRatePerDay": 0.0455,
+            "factors": [
+              "exposure",
+              "neglect"
+            ],
+            "exposedBy": [
+              "saloon-floorboards",
+              "companionway-hatch"
+            ]
           },
           "onHardOnly": true,
           "consequence": "It weeps now and will seize; a seized seacock can't be shut if a hose lets go.",
@@ -1010,7 +1263,15 @@
             "how": "The yard replaces the seacock and through-hull",
             "nok": 3800,
             "leadDays": 4
-          }
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "leakLitresPerHour",
+              "op": "add",
+              "value": 0.05
+            }
+          ]
         },
         {
           "id": "seacock-seized",
@@ -1043,7 +1304,15 @@
             "how": "The yard cuts out and replaces the seacock",
             "nok": 4800,
             "leadDays": 5
-          }
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "leakLitresPerHour",
+              "op": "add",
+              "value": 0.05
+            }
+          ]
         }
       ]
     },
@@ -1313,7 +1582,46 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 1500,
-      "replaceMinutes": 180
+      "replaceMinutes": 180,
+      "faults": [
+        {
+          "id": "exhaust-hose-cooked",
+          "name": "Exhaust hose cooked",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "dormant": true,
+          "spawn": {
+            "when": "cooling.overheatMinutes",
+            "atLeast": 10
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The hose by the elbow is hard and blistered, the rubber cooked brown: it ran hot and dry.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "It will split and pour exhaust and water into the boat when she runs.",
+          "costLaterNok": 2800,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new wet-exhaust hose and clamps",
+            "partsNok": 1500,
+            "minutes": 180
+          },
+          "yard": {
+            "how": "The yard fits a new exhaust hose",
+            "nok": 2800,
+            "leadDays": 2
+          }
+        }
+      ]
     },
     {
       "id": "anti-siphon-loop",
@@ -1474,7 +1782,50 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 90,
-      "replaceMinutes": 20
+      "replaceMinutes": 20,
+      "faults": [
+        {
+          "id": "alternator-belt-slipping",
+          "name": "Slipping alternator belt",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "chargeFactor",
+              "op": "multiply",
+              "value": 0,
+              "component": "alternator"
+            }
+          ],
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "You press the belt mid-span: it gives a good inch, and the flanks are glazed. It's slipping on the pulley.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The battery isn't charging while she runs; it will go flat.",
+          "costLaterNok": 900,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new belt and set the tension",
+            "partsNok": 90,
+            "minutes": 20
+          },
+          "yard": {
+            "how": "The yard fits a new belt",
+            "nok": 450,
+            "leadDays": 1
+          }
+        }
+      ]
     },
     {
       "id": "glow-plugs",
@@ -1675,6 +2026,7 @@
       "replaceCostNok": 1600,
       "replaceMinutes": 480,
       "belowWaterline": true,
+      "needsDry": true,
       "replaceText": "You sand, wipe down and roll on two fresh coats of antifouling.",
       "faults": [
         {
@@ -1821,6 +2173,21 @@
           "fixedBy": [
             "replace"
           ],
+          "escalation": {
+            "to": "drain-hose-failed",
+            "onLaunch": false,
+            "text": "The cockpit drain hose has come off its tail: a rusted clamp let go and the hose slipped off the through-hull."
+          },
+          "progression": {
+            "baseRatePerDay": 0.02,
+            "factors": [
+              "exposure",
+              "neglect"
+            ],
+            "exposedBy": [
+              "companionway-hatch"
+            ]
+          },
           "onHardOnly": false,
           "consequence": "A clamp that lets go floods the boat through the drain through-hull.",
           "costLaterNok": 600,
@@ -1834,7 +2201,65 @@
             "how": "The yard renews the clamps",
             "nok": 600,
             "leadDays": 1
-          }
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "rainLitresPerMm",
+              "op": "add",
+              "value": 1.5
+            }
+          ]
+        },
+        {
+          "id": "drain-hose-failed",
+          "name": "Cockpit drain hose off its tail",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "dormant": true,
+          "arrivalSign": {
+            "text": "The cockpit drain hose hangs loose from its tail; you can see it through the gap at the cockpit-locker lid. Worth lifting the lid."
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The drain hose has slipped right off its through-hull tail and hangs loose; the rusted clamps lie in the bottom of the locker.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "With the hose off, the through-hull is open to the sea and the cockpit no longer drains.",
+          "costLaterNok": 900,
+          "laterNote": "can be done afloat, with the drain seacock shut",
+          "diy": {
+            "how": "Push the hose back on its tail and fit new doubled clamps",
+            "partsNok": 180,
+            "minutes": 60
+          },
+          "yard": {
+            "how": "The yard refits the drain hose with new clamps",
+            "nok": 900,
+            "leadDays": 1
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "rainLitresPerMm",
+              "op": "add",
+              "value": 4
+            },
+            {
+              "kind": "property",
+              "property": "leakLitresPerHour",
+              "op": "add",
+              "value": 60
+            }
+          ]
         }
       ]
     },
@@ -1902,6 +2327,118 @@
             "how": "The yard rigger renews the terminals",
             "nok": 1800,
             "leadDays": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "bilge",
+      "name": "Bilge",
+      "subsystem": "hull",
+      "position": "bilge-under-saloon",
+      "reach": [
+        {
+          "place": "saloon",
+          "cover": "saloon-floorboards",
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "bilge",
+        "bilge water"
+      ],
+      "description": "The lowest part of the hull under the saloon sole, where everything that gets in ends up.",
+      "condition": 1.0,
+      "wearYears": 50,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 0,
+      "replaceMinutes": 0
+    },
+    {
+      "id": "bilge-pump",
+      "name": "Bilge pump",
+      "subsystem": "hull",
+      "position": "bilge-under-saloon",
+      "reach": [
+        {
+          "place": "saloon",
+          "cover": "saloon-floorboards",
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "bilge pump",
+        "automatic bilge pump",
+        "float switch"
+      ],
+      "description": "A small submersible pump bolted down at the lowest point of the bilge, a float switch on a short arm beside it. A two-core cable runs aft and up to the battery, through a fuse in a holder by the battery switch.",
+      "condition": 0.75,
+      "wearYears": 8,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 650,
+      "replaceMinutes": 45,
+      "properties": {
+        "litresPerMinute": 20,
+        "onLitres": 15,
+        "offLitres": 5,
+        "chargePerCycle": 0.0005,
+        "chargePerRunMinute": 0.0003
+      },
+      "replaceText": "You unbolt the old pump, bolt a new one down at the low point, fit the float switch beside it and splice the cable.",
+      "faults": [
+        {
+          "id": "bilge-pump-burnt-out",
+          "name": "Burnt-out bilge pump",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "litresPerMinute",
+              "op": "multiply",
+              "value": 0
+            }
+          ],
+          "dormant": true,
+          "spawn": [
+            {
+              "when": "water.pumpCycles",
+              "atLeast": 150
+            },
+            {
+              "when": "water.pumpRunMinutes",
+              "atLeast": 300
+            }
+          ],
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The pump body is hot-smelling and the impeller housing is scorched; it hums but nothing moves.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The bilge has no pump: whatever comes in stays in, and the float switch clicks for nothing.",
+          "costLaterNok": 1500,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new pump and float switch",
+            "partsNok": 650,
+            "minutes": 45
+          },
+          "yard": {
+            "how": "The yard fits a new bilge pump",
+            "nok": 1400,
+            "leadDays": 1
           }
         }
       ]
@@ -2103,7 +2640,87 @@
       }
     }
   },
+  "rates": {
+    "threshold": 1.0,
+    "spread": [
+      0.6,
+      1.6
+    ],
+    "exposure": {
+      "rainWeight": 0.5,
+      "rainCapMm": 10,
+      "frostWeight": 0.3,
+      "perOpenCover": 0.25
+    },
+    "weatherGates": {
+      "windForce": 7,
+      "rainMm": 0.5
+    },
+    "use": {
+      "perEngineHour": 0.25
+    },
+    "neglect": {
+      "perKnownOpenFault": 0.05,
+      "batteryLow": 0.2,
+      "perCoverLeftOff": 0.15,
+      "perDayAwayBeyond3": 0.05,
+      "covers": [
+        "companionway-hatch"
+      ]
+    }
+  },
+  "water": {
+    "startLitres": 0.5,
+    "soleLitres": 120,
+    "sinkLitres": 1500,
+    "rainThroughOpenHatchLitresPerMm": 0.5,
+    "manualPumpLitresPerMinute": 10,
+    "manualPumpMinutes": 15,
+    "soleText": "Water stands over the saloon sole.",
+    "levelWords": [
+      {
+        "underLitres": 1,
+        "text": "dry, a damp sheen"
+      },
+      {
+        "underLitres": 5,
+        "text": "a finger of water"
+      },
+      {
+        "underLitres": 30,
+        "text": "a few inches, sloshing"
+      },
+      {
+        "underLitres": 120,
+        "text": "deep, up to the floorboards"
+      },
+      {
+        "text": "over the sole"
+      }
+    ]
+  },
+  "electrical": {
+    "selfDischargePerDay": 0.002,
+    "pumpMinStateOfCharge": 0.15,
+    "crankDraw": 0.01,
+    "chargePerHour": 0.1,
+    "runDrawPerHour": 0.03
+  },
+  "insurance": {
+    "valueNok": 180000,
+    "payoutFraction": 0.6
+  },
   "placeholders": [
-    "PLACEHOLDER (design note 005): every price, hour, lead time, timer and chance in economy, survey, diyQuality and in each fault's diy/yard/costLaterNok is a placeholder for Amit to calibrate."
+    "PLACEHOLDER (design note 006): rates.weatherGates (the wind force from which nobody goes on deck or launches, the rain in mm from which a paint job is refused) are placeholders for Amit to calibrate.",
+    "PLACEHOLDER (design note 005): every price, hour, lead time, timer and chance in economy, survey, diyQuality and in each fault's diy/yard/costLaterNok is a placeholder for Amit to calibrate.",
+    "PLACEHOLDER (design note 006): every number in rates (threshold, spread, exposure, use and neglect weights) is a placeholder for Amit to calibrate.",
+    "PLACEHOLDER (design note 006): every progression.baseRatePerDay is a placeholder: seacock-weeping 0.0455 (median about 20 days at neutral factors and the median spread of 1.1), drain-clamps-rusted 0.02 (median about 45 days).",
+    "PLACEHOLDER (design note 006): the economics of drain-hose-failed (diy 180 NOK and 60 min, yard 900 NOK and 1 day, 900 NOK later) are placeholders.",
+    "PLACEHOLDER (design note 006): water { startLitres, soleLitres 120, sinkLitres 1500, rainThroughOpenHatchLitresPerMm 0.5, manual pump 10 L/min for 15 min, levelWords bands } are placeholders for Amit.",
+    "PLACEHOLDER (design note 006): ingress rates: seacock-weeping and seacock-seized leak 0.05 L/h, drain-clamps-rusted lets 1.5 L of rain in per mm, drain-hose-failed 4 L per mm and 60 L/h afloat.",
+    "PLACEHOLDER (design note 006): the bilge pump (20 L/min, on at 15 L, off at 5 L, 0.0005 charge per cycle, 0.0003 per run minute) and its burn-out spawn thresholds (150 cycles, 300 run minutes) are placeholders.",
+    "PLACEHOLDER (design note 006): electrical { selfDischargePerDay 0.002, pumpMinStateOfCharge 0.15 }, and the soaked faults (spawn at 2 awash hours; starter +0.03 ohm, ground stud +0.04 ohm, battery +0.05 self-discharge per day) and their prices.",
+    "PLACEHOLDER (design note 006): insurance { valueNok 180000, payoutFraction 0.6 }, void if a Before-launch survey item was put off and never fixed.",
+    "PLACEHOLDER (design note 006): electrical { crankDraw 0.01 per start, chargePerHour 0.10 at full chargeFactor, runDrawPerHour 0.03 }, the spawn thresholds terminal-strained (4 drag starts) and exhaust-hose-cooked (10 overheat minutes), their effects (+0.02 ohm) and the prices of alternator-belt-slipping, terminal-strained and exhaust-hose-cooked are placeholders."
   ]
 }

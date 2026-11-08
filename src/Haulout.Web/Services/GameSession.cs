@@ -36,6 +36,20 @@ public sealed class GameSession
     /// <summary>The survey letter is open in the Readiness tab.</summary>
     public bool SurveyOpen { get; private set; }
 
+    /// <summary>How many alerts the logbook held when the Readiness tab was last shown (web-local).</summary>
+    private int _alertsSeen;
+
+    /// <summary>Alerts since the player last opened the Readiness tab (zero while it is open).</summary>
+    public int UnseenAlerts
+    {
+        get
+        {
+            int total = Log.Entries.Count(e => e.Alert);
+            if (ReadinessTab) _alertsSeen = total;
+            return Math.Max(0, total - _alertsSeen);
+        }
+    }
+
     public void ShowTab(bool readiness)
     {
         ReadinessTab = readiness;
@@ -63,6 +77,9 @@ public sealed class GameSession
 
     /// <summary>The lines of the launch card, kept so the closing stays readable.</summary>
     public IReadOnlyList<string>? LaunchNarrative { get; private set; }
+
+    /// <summary>The closing card when she has sunk, kept so it stays readable.</summary>
+    public LossView? Loss { get; private set; }
 
     // ------------------------------------------------------------- queries
 
@@ -108,6 +125,7 @@ public sealed class GameSession
         if (result.Accepted)
         {
             if (command is Launch && result.Observation is LaunchView lv) LaunchNarrative = lv.Lines;
+            if (result.Observation is LossView loss) Loss = loss;
             switch (command, result.Observation)
             {
                 case (Inspect c, InspectionView v): _lastInspect[c.Component] = v.Text; break;
@@ -205,6 +223,8 @@ public sealed class GameSession
         return result;
     }
 
+    public CommandResult PumpBilge() => Execute(new PumpBilge());
+
     public CommandResult Wait(int days) => Execute(new WaitDays(days));
 
     public CommandResult Defer(string problem) => Execute(new Defer(problem));
@@ -212,6 +232,8 @@ public sealed class GameSession
     public CommandResult Undefer(string problem) => Execute(new Undefer(problem));
 
     public CommandResult TryStart() => Execute(new StartEngine());
+
+    public CommandResult StopEngine() => Execute(new StopEngine());
 
     public CommandResult BuyRemoteStartButton() => Execute(new Buy(Shop.RemoteStartButton));
 }

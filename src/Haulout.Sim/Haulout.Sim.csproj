@@ -7,7 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Haulout.Sim.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Data\sloop28.json" LogicalName="Haulout.Sim.Data.sloop28.json" />
+    <EmbeddedResource Include="Data\weather.json" LogicalName="Haulout.Sim.Data.weather.json" />
   </ItemGroup>
 
 </Project>

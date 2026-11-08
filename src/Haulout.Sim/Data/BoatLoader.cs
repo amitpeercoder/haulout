@@ -31,10 +31,11 @@ public static class BoatLoader
             ?? throw new InvalidOperationException("Boat JSON is empty.");
 
         var places = dto.Places.Select(p => new Place(
-            p.Id, p.Name, p.Aliases ?? [], p.Description ?? "", p.Way ?? "", p.Adjacent ?? [], p.OnlyOnTheHard));
+            p.Id, p.Name, p.Aliases ?? [], p.Description ?? "", p.Way ?? "", p.Adjacent ?? [], p.OnlyOnTheHard, p.Exposed));
         var covers = dto.Covers.Select(c => new Cover(
             c.Id, c.Name, c.Aliases ?? [], c.Place, c.Plural, c.RemoveMinutes, c.RefitMinutes,
-            c.RemoveText ?? "", c.RefitText ?? ""));
+            c.RemoveText ?? "", c.RefitText ?? "", c.StartsOff, c.OffPhrase ?? "", c.StateWords is { Count: 2 } ? c.StateWords : null,
+            c.RemoveLog ?? "", c.RefitLog ?? ""));
         var positions = dto.Positions.Select(p => new Position(p.Id, p.Label));
 
         var components = dto.Components.Select(c =>
@@ -46,16 +47,18 @@ public static class BoatLoader
                 c.SeriesOhms, c.Cleanable, c.ReplaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
-                c.BelowWaterline, c.ReplaceText);
+                c.BelowWaterline, c.ReplaceText, c.NeedsDry);
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
             var faults = (c.Faults ?? []).Select(f => new Fault(
-                f.Id, f.Name, c.Id, f.Effect,
+                f.Id, f.Name, c.Id, f.Effect ?? new FaultEffect(FaultEffectKind.None, 0),
                 f.Reveals ?? [], f.FixedBy ?? [], f.Present ?? true,
                 f.OnHardOnly, f.Harmless, f.Dormant, f.Consequence ?? "", f.CostLaterNok, f.LaterNote,
                 f.Diy is { } d ? new DiyRoute(d.How, d.PartsNok, d.Minutes) : null,
                 f.Yard is { } y ? new YardRoute(y.How, y.Nok, y.LeadDays) : null,
-                f.Escalation is { } e ? new Escalation(e.To, e.AfterDays, e.OnLaunch, e.Text ?? "") : null,
-                f.Properties is null ? null : new Dictionary<string, double>(f.Properties)));
+                f.Escalation is { } e ? new Escalation(e.To, e.OnLaunch, e.Text ?? "") : null,
+                f.Properties is null ? null : new Dictionary<string, double>(f.Properties),
+                f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? []) : null,
+                f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         });
 
@@ -79,7 +82,37 @@ public static class BoatLoader
                     .ToDictionary(kv => Enum.Parse<Subsystem>(kv.Key, ignoreCase: true), kv => kv.Value))
             : null;
 
-        return new Boat(dto.Name, places, covers, positions, components, economy, survey, quality);
+        var rates = dto.Rates is { } rt
+            ? new Rates(
+                rt.Threshold, rt.Spread is { Count: 2 } sp ? sp[0] : 0.6, rt.Spread is { Count: 2 } sp2 ? sp2[1] : 1.6,
+                new ExposureRates(rt.Exposure?.RainWeight ?? 0, rt.Exposure?.RainCapMm ?? 1, rt.Exposure?.FrostWeight ?? 0, rt.Exposure?.PerOpenCover ?? 0),
+                new UseRates(rt.Use?.PerEngineHour ?? 0),
+                new NeglectRates(
+                    rt.Neglect?.PerKnownOpenFault ?? 0, rt.Neglect?.BatteryLow ?? 0, rt.Neglect?.PerCoverLeftOff ?? 0,
+                    rt.Neglect?.PerDayAwayBeyond3 ?? 0, rt.Neglect?.Covers ?? []),
+                new WeatherGates(rt.WeatherGates?.WindForce ?? 7, rt.WeatherGates?.RainMm ?? 0.5))
+            : null;
+
+        var water = dto.Water is { } w
+            ? new WaterRules(
+                w.StartLitres, w.SoleLitres, w.SinkLitres, w.RainThroughOpenHatchLitresPerMm,
+                w.ManualPumpLitresPerMinute, w.ManualPumpMinutes, w.SoleText ?? WaterRules.Default.SoleText,
+                w.LevelWords is { Count: > 0 } words ? words.Select(x => new LevelWord(x.UnderLitres, x.Text)).ToList() : WaterRules.Default.LevelWords)
+            : null;
+        var electrical = dto.Electrical is { } el ? new ElectricalRules(el.SelfDischargePerDay, el.PumpMinStateOfCharge, el.CrankDraw, el.ChargePerHour, el.RunDrawPerHour) : null;
+        var insurance = dto.Insurance is { } ins ? new InsuranceRules(ins.ValueNok, ins.PayoutFraction) : null;
+
+        return new Boat(dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance);
+    }
+
+    /// <summary>"spawn": one rule or a list of rules; any one crossing wakes the fault.</summary>
+    private static List<SpawnRule> ParseSpawn(JsonElement? spawn)
+    {
+        if (spawn is not { } el || el.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return [];
+        var items = el.ValueKind == JsonValueKind.Array ? el.EnumerateArray().ToList() : [el];
+        return items.Select(i => new SpawnRule(
+            i.GetProperty("when").GetString() ?? throw new InvalidOperationException("A spawn rule needs 'when'."),
+            i.GetProperty("atLeast").GetDouble())).ToList();
     }
 
     private sealed class BoatDto
@@ -92,6 +125,88 @@ public static class BoatLoader
         public EconomyDto? Economy { get; set; }
         public SurveyDto? Survey { get; set; }
         public DiyQualityDto? DiyQuality { get; set; }
+        public RatesDto? Rates { get; set; }
+        public WaterDto? Water { get; set; }
+        public ElectricalDto? Electrical { get; set; }
+        public InsuranceDto? Insurance { get; set; }
+    }
+
+    private sealed class LevelWordDto
+    {
+        public double? UnderLitres { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class WaterDto
+    {
+        public double StartLitres { get; set; }
+        public double SoleLitres { get; set; } = 120;
+        public double SinkLitres { get; set; } = 1500;
+        public double RainThroughOpenHatchLitresPerMm { get; set; }
+        public double ManualPumpLitresPerMinute { get; set; } = 10;
+        public int ManualPumpMinutes { get; set; } = 15;
+        public string? SoleText { get; set; }
+        public List<LevelWordDto>? LevelWords { get; set; }
+    }
+
+    private sealed class ElectricalDto
+    {
+        public double SelfDischargePerDay { get; set; }
+        public double PumpMinStateOfCharge { get; set; } = 0.15;
+        public double CrankDraw { get; set; } = 0.01;
+        public double ChargePerHour { get; set; } = 0.10;
+        public double RunDrawPerHour { get; set; } = 0.03;
+    }
+
+    private sealed class InsuranceDto
+    {
+        public int ValueNok { get; set; }
+        public double PayoutFraction { get; set; }
+    }
+
+    private sealed class RatesDto
+    {
+        public double Threshold { get; set; } = 1.0;
+        public List<double>? Spread { get; set; }
+        public ExposureDto? Exposure { get; set; }
+        public UseDto? Use { get; set; }
+        public NeglectDto? Neglect { get; set; }
+        public WeatherGatesDto? WeatherGates { get; set; }
+    }
+
+    private sealed class ExposureDto
+    {
+        public double RainWeight { get; set; }
+        public double RainCapMm { get; set; } = 1;
+        public double FrostWeight { get; set; }
+        public double PerOpenCover { get; set; }
+    }
+
+    private sealed class WeatherGatesDto
+    {
+        public int WindForce { get; set; } = 7;
+        public double RainMm { get; set; } = 0.5;
+    }
+
+    private sealed class UseDto
+    {
+        public double PerEngineHour { get; set; }
+    }
+
+    private sealed class NeglectDto
+    {
+        public double PerKnownOpenFault { get; set; }
+        public double BatteryLow { get; set; }
+        public double PerCoverLeftOff { get; set; }
+        public double PerDayAwayBeyond3 { get; set; }
+        public List<string>? Covers { get; set; }
+    }
+
+    private sealed class ProgressionDto
+    {
+        public double BaseRatePerDay { get; set; }
+        public List<RateFactor>? Factors { get; set; }
+        public List<string>? ExposedBy { get; set; }
     }
 
     private sealed class EconomyDto
@@ -140,7 +255,6 @@ public static class BoatLoader
     private sealed class EscalationDto
     {
         public string To { get; set; } = "";
-        public int? AfterDays { get; set; }
         public bool OnLaunch { get; set; }
         public string? Text { get; set; }
     }
@@ -172,6 +286,7 @@ public static class BoatLoader
         public string? Way { get; set; }
         public List<string>? Adjacent { get; set; }
         public bool OnlyOnTheHard { get; set; }
+        public bool Exposed { get; set; }
     }
 
     private sealed class CoverDto
@@ -185,6 +300,11 @@ public static class BoatLoader
         public int RefitMinutes { get; set; }
         public string? RemoveText { get; set; }
         public string? RefitText { get; set; }
+        public bool StartsOff { get; set; }
+        public string? OffPhrase { get; set; }
+        public List<string>? StateWords { get; set; }
+        public string? RemoveLog { get; set; }
+        public string? RefitLog { get; set; }
     }
 
     private sealed class PositionDto
@@ -224,6 +344,7 @@ public static class BoatLoader
         public RemovablePartDto? RemovablePart { get; set; }
         public bool BelowWaterline { get; set; }
         public string? ReplaceText { get; set; }
+        public bool NeedsDry { get; set; }
     }
 
     private sealed class RemovablePartDto
@@ -239,7 +360,9 @@ public static class BoatLoader
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
-        public FaultEffect Effect { get; set; } = new(FaultEffectKind.SeriesOhms, 0);
+        public FaultEffect? Effect { get; set; }
+        public List<FaultEffect>? Effects { get; set; }
+        public JsonElement? Spawn { get; set; }
         public List<FaultReveal>? Reveals { get; set; }
         public List<PlayerAction>? FixedBy { get; set; }
         public bool? Present { get; set; }
@@ -253,5 +376,12 @@ public static class BoatLoader
         public YardDto? Yard { get; set; }
         public EscalationDto? Escalation { get; set; }
         public Dictionary<string, double>? Properties { get; set; }
+        public ProgressionDto? Progression { get; set; }
+        public ArrivalSignDto? ArrivalSign { get; set; }
+    }
+
+    private sealed class ArrivalSignDto
+    {
+        public string Text { get; set; } = "";
     }
 }

@@ -25,6 +25,9 @@ public static class Prose
     public static string Result(CommandResult result, StatusView status)
     {
         var sb = new StringBuilder();
+        // At the start of any look the boat speaks first; after anything else it speaks last.
+        bool lookFirst = result.Accepted && result.Action == "look";
+        if (lookFirst) AppendAlerts(sb, result.Alerts);
         foreach (var line in result.Narrative) sb.AppendLine(line);
         if (!result.Accepted) return sb.ToString();
 
@@ -38,7 +41,14 @@ public static class Prose
             if (result.CostNok > 0) parts.Add($"{result.CostNok} NOK");
             sb.AppendLine($"  [{string.Join(", ", parts)} · {status.TimeOfDay}]");
         }
+        if (!lookFirst) AppendAlerts(sb, result.Alerts);
         return sb.ToString();
+    }
+
+    private static void AppendAlerts(StringBuilder sb, IReadOnlyList<Alert>? alerts)
+    {
+        if (alerts is null) return;
+        foreach (var a in alerts) sb.AppendLine($"  ! {a.Text}");
     }
 
     public static string Query(QueryResult result)
@@ -46,12 +56,20 @@ public static class Prose
         var sb = new StringBuilder();
         switch (result)
         {
+            case NoticesView n when n.Alerts.Count == 0:
+                sb.AppendLine("Nothing new from the boat.");
+                break;
+            case NoticesView n:
+                AppendAlerts(sb, n.Alerts);
+                break;
             case LogView log when log.Entries.Count == 0:
+                if (WeatherHeader(log) is { } emptyHeader) sb.AppendLine(emptyHeader);
                 sb.AppendLine("The logbook is empty.");
                 break;
             case LogView log:
+                if (WeatherHeader(log) is { } header) sb.AppendLine(header);
                 foreach (var e in log.Entries)
-                    sb.AppendLine($"Day {e.Day} {e.TimeOfDay}  {e.Text}{(e.Document is null ? "" : " (read survey)")}");
+                    sb.AppendLine($"Day {e.Day} {e.TimeOfDay}  {(e.Alert ? "! " : "")}{e.Text}{(e.Document is null ? "" : " (read survey)")}");
                 break;
             case CommandList list:
                 foreach (var c in list.Commands)
@@ -61,14 +79,20 @@ public static class Prose
                 }
                 break;
             case StatusView s:
+                AppendAlerts(sb, s.Notices);
                 sb.AppendLine($"Day {s.Day}, {s.TimeOfDay} · worked {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min · money spent {s.MoneySpentNok} NOK.");
                 if (s.LaunchDeadlineDay > 0)
                     sb.AppendLine($"Money left: {s.BalanceNok} NOK. Launch deadline: day {s.LaunchDeadlineDay}.");
+                if (s.Weather is not null) sb.AppendLine(s.Weather);
                 sb.AppendLine($"You're {PlacePhrase(s.Place)}.");
-                if (s.Afloat) sb.AppendLine("She's in the water.");
+                if (s.Sunk) sb.AppendLine("She's on the bottom of the harbour.");
+                else if (s.Afloat) sb.AppendLine("She's in the water.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) sb.AppendLine($"  Known: {f.Name} ({f.ComponentName})");
+                break;
+            case WeatherView w:
+                sb.AppendLine(w.Text);
                 break;
             case AboardView a:
                 sb.Append(Aboard(a));
@@ -82,6 +106,10 @@ public static class Prose
         }
         return sb.ToString();
     }
+
+    /// <summary>"Day 75 · Bright, 6 °C, ..." the logbook's header; null when the view carries no weather.</summary>
+    private static string? WeatherHeader(LogView log) =>
+        log.Weather is null ? null : log.Day > 0 ? $"Day {log.Day} \u00b7 {log.Weather}" : log.Weather;
 
     /// <summary>Where you are, the places and covers aboard, and what you have found. Names only.</summary>
     public static string Aboard(AboardView view)
@@ -185,9 +213,10 @@ public static class Prose
         return sb.ToString();
     }
 
-    /// <summary>"Escalates in N days." or "Escalates on launch."; null when nothing is on a timer.</summary>
+    /// <summary>"Likely to get worse in 9–24 days." or "Escalates on launch."; null when nothing is expected.</summary>
     public static string? EscalationText(ReadinessItem item) =>
-        item.EscalatesInDays is { } n ? $"Escalates in {n} {(n == 1 ? "day" : "days")}."
+        (item.LikelyMinDays, item.LikelyMaxDays) is ({ } lo, { } hi)
+            ? (lo == hi ? $"Likely to get worse in {lo} {(lo == 1 ? "day" : "days")}." : $"Likely to get worse in {lo}\u2013{hi} days.")
         : item.EscalatesOnLaunch ? "Escalates on launch." : null;
 
     /// <summary>"in the quarter berth", but "on deck" and "beside the hull".</summary>

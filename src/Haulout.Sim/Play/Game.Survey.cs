@@ -31,6 +31,7 @@ public sealed partial class Game
             else if (item.Finding == SurveyFinding.Investigate) fault.MarkSymptomatic();
         }
 
+        ShutDownEngine(t);
         int reportDay = _startDay + (StartMinuteOfDay + ClockMinutes + data.Days * 1440) / 1440;
         _report = new SurveyReportView(
             true, reportDay, data.Surveyor, _boat.Name, data.FeeNok, data.Opening,
@@ -65,14 +66,15 @@ public sealed partial class Game
 
     private ReadinessView ReadinessSnapshot()
     {
-        var open = OpenFaults().Select(f =>
+        var open = KnownOpenFaults().Select(f =>
         {
             var comp = _boat.Get(f.ComponentId);
             var routes = new List<FixRoute>();
             if (f.Diy is { } diy)
-                routes.Add(new FixRoute("DIY", diy.How, diy.PartsNok, diy.Minutes, 0,
-                    AfloatRefusal(f, comp) is null && MoneyRefusal(diy.PartsNok) is null,
-                    AfloatRefusal(f, comp) ?? MoneyRefusal(diy.PartsNok)));
+            {
+                var diyReason = AfloatRefusal(f, comp) ?? WetRefusal(comp) ?? MoneyRefusal(diy.PartsNok);
+                routes.Add(new FixRoute("DIY", diy.How, diy.PartsNok, diy.Minutes, 0, diyReason is null, diyReason));
+            }
             if (f.Yard is { } yard)
             {
                 var reason = YardRefusal(f);
@@ -81,12 +83,11 @@ public sealed partial class Game
             int now = f.Diy?.PartsNok ?? f.Yard?.Nok ?? 0;
             var esc = f.Escalation;
             bool known = f.State is FaultState.Discovered or FaultState.Deferred;
-            int? inDays = known && esc is { AfterDays: { } n } && f.ActiveSinceDay is { } since
-                ? Math.Max(0, n - (Day - since)) : null;
+            var (likelyMin, likelyMax) = known && !f.Escalated ? LikelyDays(f) : (null, null);
             bool onLaunch = known && esc is { OnLaunch: true } && !_launched;
             return new ReadinessItem(
                 f.Name, comp.Name, f.State.ToString(), now, f.CostLaterNok, f.LaterNote,
-                f.OnHardOnly || comp.BelowWaterline, f.Consequence, routes, inDays, onLaunch);
+                f.OnHardOnly || comp.BelowWaterline, f.Consequence, routes, likelyMin, likelyMax, onLaunch);
         }).ToList();
 
         var investigate = _surveyKept.Where(PointsAtUnfoundFault)
@@ -95,7 +96,7 @@ public sealed partial class Game
         var fixedNames = _discovered
             .Select(k => FaultById(k.Id))
             .Where(f => f is { State: FaultState.Fixed, Escalated: false })
-            .Select(f => f!.Name).ToList();
+            .Select(f => f!.Name).Concat(SupersededFixed().Select(f => f.Name)).ToList();
 
         int deadline = _boat.Economy.LaunchDeadlineDay;
         return new ReadinessView(Day, deadline, deadline - Day, Balance, _launched, open, investigate, fixedNames, Afloat, _boat.Economy.EmergencyLiftNok);

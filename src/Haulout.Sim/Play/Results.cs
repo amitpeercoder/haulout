@@ -17,7 +17,14 @@ public sealed record CommandResult(
     Observation? Observation,
     IReadOnlyList<KnownFault> NewlyDiscovered,
     bool EngineRunning,
-    bool Finished);
+    bool Finished,
+    IReadOnlyList<Alert> Alerts);
+
+/// <summary>Something the boat has told the player: a lamp, a smell, a counter. Text is the player's own perception, never a fault name.</summary>
+public sealed record Alert(int Day, string TimeOfDay, string Text);
+
+/// <summary>The unread alerts, handed over once (the query marks them read).</summary>
+public sealed record NoticesView(IReadOnlyList<Alert> Alerts) : QueryResult;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PlaceView), "place-view")]
@@ -29,6 +36,7 @@ public sealed record CommandResult(
 [JsonDerivedType(typeof(RawWaterFlowView), "raw-water-flow-view")]
 [JsonDerivedType(typeof(RepairView), "repair-view")]
 [JsonDerivedType(typeof(LaunchView), "launch-view")]
+[JsonDerivedType(typeof(LossView), "loss-view")]
 public abstract record Observation;
 
 /// <summary>
@@ -61,6 +69,13 @@ public sealed record RepairView(string ComponentName, string Text) : Observation
 /// <summary>The closing card of the pre-launch slice. DeferredCount: problems the player deferred; OpenCount: discovered problems still open (deferred included).</summary>
 public sealed record LaunchView(int Day, int DeadlineDay, int DeferredCount, int OpenCount, IReadOnlyList<string> Lines) : Observation;
 
+/// <summary>
+/// The closing card when she sinks. Lines: the card in the game's voice. ValueNok: what the insurer values her at;
+/// PayoutNok: what they pay (0 when Voided, with VoidReason in plain words).
+/// </summary>
+public sealed record LossView(
+    int Day, IReadOnlyList<string> Lines, int ValueNok, int PayoutNok, bool Voided, string? VoidReason) : Observation;
+
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(BriefingView), "briefing-view")]
 [JsonDerivedType(typeof(StatusView), "status-view")]
@@ -70,6 +85,8 @@ public sealed record LaunchView(int Day, int DeadlineDay, int DeferredCount, int
 [JsonDerivedType(typeof(ComponentActionsView), "component-actions-view")]
 [JsonDerivedType(typeof(SurveyReportView), "survey-report-view")]
 [JsonDerivedType(typeof(ReadinessView), "readiness-view")]
+[JsonDerivedType(typeof(WeatherView), "weather-view")]
+[JsonDerivedType(typeof(NoticesView), "notices-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -88,13 +105,20 @@ public sealed record StatusView(
     int BalanceNok = 0,
     int LaunchDeadlineDay = 0,
     bool Launched = false,
-    bool Afloat = false) : QueryResult;
+    bool Afloat = false,
+    string? Weather = null,
+    bool Sunk = false,
+    IReadOnlyList<Alert>? Notices = null) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 /// <summary>Document: set when the entry is a document the player can read again (e.g. "survey report").</summary>
-public sealed record LogEntry(int Day, string TimeOfDay, string Text, int CostNok = 0, string? Document = null);
+public sealed record LogEntry(int Day, string TimeOfDay, string Text, int CostNok = 0, string? Document = null, bool Alert = false);
 
-public sealed record LogView(IReadOnlyList<LogEntry> Entries) : QueryResult;
+/// <summary>Weather: today's text for the header. Day: today (0 when unknown).</summary>
+public sealed record LogView(IReadOnlyList<LogEntry> Entries, string? Weather = null, int Day = 0) : QueryResult;
+
+/// <summary>Today's weather: the words and the numbers behind them. Wind from a compass word.</summary>
+public sealed record WeatherView(int Day, string Text, int WindForce, string WindFrom, double RainMm, double TempC) : QueryResult;
 
 public sealed record CommandInfo(string Verb, string? Argument, string Description);
 
@@ -148,12 +172,13 @@ public sealed record FixRoute(string Route, string How, int CostNok, int Minutes
 /// <summary>
 /// A discovered problem that is still open. State: "Discovered" | "Deferred". CostNowNok: cheapest route now.
 /// CostLaterNok: the likely bill if it is left until after launch; LaterNote e.g. "needs an emergency lift".
+/// LikelyMinDays / LikelyMaxDays: the range in which a known problem will probably get worse (null: no estimate, or it never does).
 /// OnHardOnly: can only be fixed with her out of the water. Consequence: one line in plain words.
 /// </summary>
 public sealed record ReadinessItem(
     string Problem, string Component, string State, int CostNowNok, int CostLaterNok, string? LaterNote,
     bool OnHardOnly, string Consequence, IReadOnlyList<FixRoute> Routes,
-    int? EscalatesInDays = null, bool EscalatesOnLaunch = false);
+    int? LikelyMinDays = null, int? LikelyMaxDays = null, bool EscalatesOnLaunch = false);
 
 /// <summary>A surveyor's pointer the player has not run down yet: the part and the surveyor's words. Not a fault.</summary>
 public sealed record InvestigateItem(string Component, string Note);

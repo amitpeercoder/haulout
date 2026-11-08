@@ -77,6 +77,10 @@ public sealed class HaulTools(GameSession session)
         "Try to start the engine. Takes 2 minutes, free. Only from the cockpit, where the key is. Reports what happens. If she runs properly the game ends.")]
     public string StartEngine() => session.Do("start_engine", new StartEngine());
 
+    [McpServerTool(Name = "stop_engine"), Description(
+        "Pull the stop and shut the running engine down. Takes 1 minute, free. Works from anywhere aboard; refused when the engine is not running.")]
+    public string StopEngine() => session.Do("stop_engine", new StopEngine());
+
     [McpServerTool(Name = "order_survey"), Description(
         "Hire the surveyor to go over the boat. Costs 200 NOK per foot of boat (5600 NOK) and one day. The report arrives in the logbook; read it with survey.")]
     public string OrderSurvey() => session.Do("order_survey", new OrderSurvey());
@@ -117,9 +121,21 @@ public sealed class HaulTools(GameSession session)
         "Only when she is afloat: pay the yard to lift her out again. Costs 9000 NOK and 2 days of calendar time (no work time). She is back on the hard: the ground beside the hull is there again and below-waterline fixes are possible. Launch again afterwards, free.")]
     public string EmergencyLift() => session.Do("emergency_lift", new EmergencyLift());
 
+    [McpServerTool(Name = "pump_bilge"), Description(
+        "Work the manual bilge pump by hand. Takes 15 minutes of work, free, and moves up to 150 litres out of the bilge. Only from the cockpit, where the handle is. The result says whether the pump emptied her or the water still comes.")]
+    public string PumpBilge() => session.Do("pump_bilge", new PumpBilge());
+
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
     public string Status() => session.Ask("status", new Status());
+
+    [McpServerTool(Name = "weather", ReadOnly = true), Description(
+        "Look at the sky and the wind today: rain, temperature, wind force and direction. Costs no time. Rain stops paint jobs and a gale keeps you off the deck and the yard from launching.")]
+    public string Weather() => session.Ask("weather", new Weather());
+
+    [McpServerTool(Name = "notices", ReadOnly = true), Description(
+        "What the boat has told you since you last asked: a lamp, an alarm, a smell, a counter, the voltmeter. Lines marked '!' are the boat talking; they also arrive with the result of any action and in look and status. Asking marks them read. Costs no time.")]
+    public string Notices() => session.Ask("notices", new Notices());
 
     [McpServerTool(Name = "logbook", ReadOnly = true), Description(
         "Read the logbook: everything you have done so far, with the day, time and cost. Costs no time.")]
@@ -135,9 +151,9 @@ public sealed class HaulTools(GameSession session)
 
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
-        "Here each command is a tool of the same name, except: start = start_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix. " +
-        "There is no quit; also available: status, aboard (what you have found so far), readiness, briefing.\n";
+        "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge. " +
+        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

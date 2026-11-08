@@ -1,5 +1,6 @@
 using Haulout.Sim.Components;
 using Haulout.Sim.Faults;
+using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Play;
 
@@ -40,6 +41,12 @@ public sealed partial class Game
     private string? AfloatRefusal(Fault f, Component c) =>
         Afloat && (f.OnHardOnly || c.BelowWaterline) ? EmergencyLiftLine : null;
 
+    /// <summary>For tests only (the player never sees this): the fault has turned into its successor.</summary>
+    internal bool HasEscalated(string faultId) => FaultById(faultId) is { Escalated: true };
+
+    /// <summary>For tests only: where the fault really stands.</summary>
+    internal FaultState StateOf(string faultId) => FaultById(faultId)!.State;
+
     private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
 
     private string LaunchIn()
@@ -56,9 +63,39 @@ public sealed partial class Game
     /// <summary>Discovered problems still present: the only ones a player can name.</summary>
     private IEnumerable<Fault> OpenFaults() => _boat.AllFaults.Where(f => f.Present && f.Discovered);
 
+    /// <summary>The faults an escalated fault turned into, in order, as far as the chain goes.</summary>
+    private IEnumerable<Fault> Successors(Fault f)
+    {
+        var seen = new List<Fault>();
+        var cur = f;
+        while (cur.Escalation?.To is { } to && _boat.Get(cur.ComponentId).Faults.FirstOrDefault(x => x.Id == to) is { } next && !seen.Contains(next))
+        {
+            seen.Add(next);
+            cur = next;
+        }
+        return seen;
+    }
+
+    /// <summary>
+    /// A known fault that escalated while the player was away and whose successors are still unfound: to the player it has not
+    /// changed. They keep seeing it (readiness, the known list, the component marker) until they find what it became.
+    /// </summary>
+    private bool Superseded(Fault f) => f is { Escalated: true, Discovered: true } && Successors(f).All(s => !s.Discovered);
+
+    /// <summary>Superseded faults the player still believes are open (the thing they would be fixing has not been found fixed).</summary>
+    private IEnumerable<Fault> SupersededOpen() =>
+        _boat.AllFaults.Where(f => Superseded(f) && f.State != FaultState.Fixed && Successors(f).Last().State != FaultState.Fixed);
+
+    /// <summary>Superseded faults whose successor was put right before it was ever found: to the player, those are fixed.</summary>
+    private IEnumerable<Fault> SupersededFixed() =>
+        _boat.AllFaults.Where(f => Superseded(f) && f.State != FaultState.Fixed && Successors(f).Last().State == FaultState.Fixed);
+
+    /// <summary>What the player knows is open: the discovered problems still present, and the ones that have since turned into something unfound.</summary>
+    private IEnumerable<Fault> KnownOpenFaults() => OpenFaults().Concat(SupersededOpen());
+
     private bool ResolveFault(string action, string name, out Fault fault, out CommandResult? rejected)
     {
-        var open = OpenFaults().ToList();
+        var open = KnownOpenFaults().ToList();
         var r = NameResolver.Resolve(open, name, f => f.Id, f => f.Name, _ => []);
         if (r.Kind == ResolutionKind.Unknown)
             r = NameResolver.Resolve(open, name, f => f.Id, f => f.Name,
@@ -102,8 +139,9 @@ public sealed partial class Game
         var yard = f.Yard!;
         var comp = _boat.Get(f.ComponentId);
 
-        StopEngine(t);
-        f.Clear();
+        ShutDownEngine(t);
+        // A fault the player believes open that has since become something else: the yard puts right what is there.
+        (f.Escalated ? Successors(f).Last() : f).Clear();
         var text = $"The yard takes it on: {yard.How}. {Days(yard.LeadDays)} later it's done.";
         t.Narrative.Add(text);
         return Accept(t, "yard-fix", yard.LeadDays * 1440, yard.Nok, new RepairView(comp.Name, text), $"The yard fixed: {f.Name}.", work: false);
@@ -112,22 +150,23 @@ public sealed partial class Game
     private CommandResult DoWait(Turn t, int days)
     {
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
+        ShutDownEngine(t);
         t.Narrative.Add($"You leave her for {Days(days)}.");
+        // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
+        var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();
+        t.Narrative.Add(WeatherWords.Summarise(left));
         return Accept(t, "wait", days * 1440, 0, null, $"Waited {Days(days)}.", work: false);
     }
 
     // ------------------------------------------------------------------ escalation
 
-    private void RunClockEscalations(Turn t)
-    {
-        int today = Day;
-        var due = _boat.AllFaults.Where(f =>
-            f is { Present: true, ActiveSinceDay: { } since }
-            && f.Escalation is { AfterDays: { } n } && today - since >= n).ToList();
-        foreach (var f in due) Escalate(t, f);
-    }
-
-    private void Escalate(Turn t, Fault f)
+    /// <param name="present">
+    /// The player is aboard as it happens (an aboard tick crossing midnight, or the launch): a known predecessor then tells its
+    /// escalation text and the successor is Discovered on the spot, because the player is there to see it. Away, nothing is
+    /// seen: the successor wakes Latent, its cause line waits for the moment it is found, and it may show an arrival sign.
+    /// </param>
+    /// <param name="withCause">From the daily progression: a known fault also gets its cause line in the logbook.</param>
+    private void Escalate(Turn t, Fault f, bool present, bool withCause = false)
     {
         var esc = f.Escalation;
         if (esc is null) return;
@@ -136,9 +175,20 @@ public sealed partial class Game
         bool known = f.State is FaultState.Discovered or FaultState.Deferred;
         f.MarkEscalated();
         next.Wake(Day);
+        DrawSpread(next);
+        if (!present)
+        {
+            _pendingCause[next.Id] = CauseLine(f, next);
+            _wokenAway.Add(next);
+            return;
+        }
         if (!known) return; // hidden stays hidden
+        int from = t.Newly.Count;
         if (esc.Text.Length > 0) t.Narrative.Add(esc.Text);
         Discover(t, next);
+        if (!withCause) return;
+        _log.Add(new LogEntry(Day, TimeOfDay, CauseLine(f, next)));
+        LogFound(t, from, Day, TimeOfDay);
     }
 
     private void LogFound(Turn t, int from, int day, string stamp)
@@ -146,6 +196,7 @@ public sealed partial class Game
         for (int i = from; i < t.Newly.Count; i++)
         {
             var k = t.Newly[i];
+            if (t.Causes.TryGetValue(k.Id, out var cause)) _log.Add(new LogEntry(day, stamp, cause));
             _log.Add(new LogEntry(day, stamp, t.RuledOut.Contains(k.Id) ? $"Ruled out: {k.Name}." : $"Found: {k.Name}."));
         }
     }
@@ -155,6 +206,8 @@ public sealed partial class Game
     private CommandResult DoLaunch(Turn t)
     {
         if (Afloat) return Reject("launch", "She's already in the water.");
+        if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
+            return Reject("launch", $"The yard won't launch her in this: {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}). Try another day.");
 
         _onTheHard = false;
         _launched = true;
@@ -165,12 +218,12 @@ public sealed partial class Game
 
         t.Narrative.Add("The travel hoist lifts her out of the cradle and lowers her into the water.");
         t.Narrative.Add("She's in the water.");
-        foreach (var f in _boat.AllFaults.Where(f => f.Present && f.Escalation is { OnLaunch: true }).ToList()) Escalate(t, f);
+        foreach (var f in _boat.AllFaults.Where(f => f.Present && f.Escalation is { OnLaunch: true }).ToList()) Escalate(t, f, present: true);
 
         int deadline = _boat.Economy.LaunchDeadlineDay;
         int early = deadline - day;
         string when = early > 0 ? $"{Days(early)} before the deadline" : early == 0 ? "on the deadline" : $"{Days(-early)} after the deadline";
-        var open = OpenFaults().ToList();
+        var open = KnownOpenFaults().ToList();
         int deferred = open.Count(f => f.State == FaultState.Deferred);
         int others = open.Count - deferred;
         var summary = $"Launched on day {day}, {when}, with {deferred} deferred {(deferred == 1 ? "item" : "items")}";
@@ -189,7 +242,7 @@ public sealed partial class Game
         var economy = _boat.Economy;
         if (MoneyRefusal(economy.EmergencyLiftNok) is { } broke) return Reject("emergency-lift", broke);
 
-        StopEngine(t);
+        ShutDownEngine(t);
         _onTheHard = true;
         t.Narrative.Add($"The yard crane lifts her out and sets her back in the cradle. {Days(economy.EmergencyLiftDays)} later she's standing on the hard again.");
         return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok, null,
@@ -219,6 +272,7 @@ public sealed partial class Game
                 onHardOnly: c.BelowWaterline, consequence: template.Consequence, costLaterNok: template.CostLaterNok,
                 diy: template.Diy, yard: template.Yard);
             poor.ActivateOn(Day);
+            DrawSpread(poor);
             c.AddFault(poor);
         }
         _skill[c.Subsystem] = skill + 1;
@@ -269,7 +323,7 @@ public sealed partial class Game
 
     private void AddProblemOptions(Component c, List<ActionOption> options)
     {
-        foreach (var f in c.ActiveFaults.Where(f => f.Discovered))
+        foreach (var f in c.ActiveFaults.Where(f => f.Discovered).Concat(SupersededOpen().Where(f => f.ComponentId == c.Id)))
         {
             bool deferred = f.State == FaultState.Deferred;
             options.Add(deferred

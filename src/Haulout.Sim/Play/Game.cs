@@ -3,6 +3,9 @@ using Haulout.Sim.Components;
 using Haulout.Sim.Data;
 using Haulout.Sim.Engine;
 using Haulout.Sim.Faults;
+using Haulout.Sim.Systems;
+using Haulout.Sim.Time;
+using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Play;
 
@@ -31,14 +34,14 @@ public sealed partial class Game
     private bool _onTheHard = true;
     private readonly Reach _reach;
     private const string StartPlaceId = "cockpit";
+    private const string BelowPlaceId = "companionway";
+    private const string HatchId = "companionway-hatch";
     /// <summary>Where the exhaust outlet (the transom) can be seen from.</summary>
     private static readonly string[] ExhaustOutletPlaces = ["cockpit", "on-deck", "beside-the-hull"];
     private const string NoOutletMessage = "You can't see the exhaust outlet from down here.";
     private const string KeyMessage = "The key is on the panel in the cockpit.";
-    /// <summary>Work minutes: the player's own actions.</summary>
-    private int _minutes;
-    /// <summary>Calendar time that is not work: waiting, the survey, the yard's lead days.</summary>
-    private int _idleMinutes;
+    /// <summary>The one clock. Written only by <see cref="Tick"/>.</summary>
+    private readonly SimTime _time = new();
     private int _money;
     private bool _running;
     private bool _finished;
@@ -46,22 +49,37 @@ public sealed partial class Game
     private readonly List<string> _tools = [];
     private StartOutcome? _lastStart;
 
+    /// <summary>The player-luck stream (poor jobs).</summary>
     private readonly IRandom _random;
+    /// <summary>The world stream: draws each fault's spread when it becomes active.</summary>
+    private readonly IRandom _world;
+    /// <summary>The daily weather, absolute game days 0 to 720.</summary>
+    private readonly WeatherSeries _weather;
 
-    public Game(Boat boat, int startDay = 75, IRandom? random = null)
+    public Game(Boat boat, int startDay = 75, IRandom? random = null, int worldSeed = DefaultSeed, WeatherSeries? weather = null)
     {
+        _weather = weather ?? WeatherSeries.Generate(worldSeed);
         _boat = boat ?? throw new ArgumentNullException(nameof(boat));
         _startDay = startDay;
         _random = random ?? new SeededRandom(DefaultSeed);
+        _world = new SeededRandom(worldSeed * 7919 + 17);
         _reach = new Reach(boat, _removed);
+        _lastAboardDay = startDay;
+        _water = new WaterSystem(boat);
+        foreach (var cover in boat.Covers.Where(c => c.StartsOff)) _removed.Add(cover.Id);
         InitSkills();
-        foreach (var f in boat.AllFaults) f.ActivateOn(startDay);
+        foreach (var f in boat.AllFaults)
+        {
+            f.ActivateOn(startDay);
+            DrawSpread(f);
+        }
+        _water.Publish(_values);
     }
 
     /// <summary>The seed of the shipped first game: it decides the poor-job rolls.</summary>
     public const int DefaultSeed = 4;
 
-    public static Game NewFirstFault(int seed = DefaultSeed) => new(BoatLoader.LoadSloop28(), 75, new SeededRandom(seed));
+    public static Game NewFirstFault(int seed = DefaultSeed) => new(BoatLoader.LoadSloop28(), 75, new SeededRandom(seed), seed);
 
     // ---------------------------------------------------------------- queries
 
@@ -79,9 +97,12 @@ public sealed partial class Game
                 $"The yard has her down for launch on day {_boat.Economy.LaunchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
             ]),
             Status => new StatusView(
-                Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true }).ToList(), _tools.ToList(), CurrentPlace.Name,
-                Balance, _boat.Economy.LaunchDeadlineDay, _launched, Afloat),
-            Logbook => new LogView(_log.ToList()),
+                Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true } || Superseded(FaultById(k.Id)!)).ToList(), _tools.ToList(), CurrentPlace.Name,
+                Balance, _boat.Economy.LaunchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today), _sunk,
+                UnreadAlerts()),
+            Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
+            Weather => TodayView(),
+            Notices => new NoticesView(TakeUnread()),
             Commands => new CommandList(CommandCatalogue),
             Aboard => AboardSnapshot(),
             ComponentActions q => ActionsFor(q.Component),
@@ -101,18 +122,22 @@ public sealed partial class Game
         new("uncover", "component", "Pull back a boot or cap to see underneath"),
         new("measure", "component", "Put the multimeter on something (cranking needs a remote start button)"),
         new("start", null, "Try to start the engine"),
+        new("stop", null, "Pull the stop and shut the engine down (1 min)"),
         new("clean", "component", "Clean and tighten a part"),
         new("replace", "component", "Fit a new part"),
         new("buy", "item", "Buy a tool at the yard chandlery"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
         new("order survey", null, "Hire the surveyor to go over her (costs money and a day)"),
         new("read survey", null, "Read the surveyor's report"),
+        new("notices", null, "What the boat has told you since you last asked"),
         new("readiness", null, "See the open problems, their price now and later, the deadline and the money"),
         new("defer", "problem", "Leave a known problem for later, on purpose"),
         new("undefer", "problem", "Take a deferred problem back onto the list"),
         new("yard fix", "problem", "Pay the yard to fix a known problem"),
+        new("weather", null, "Look at the sky and the wind today"),
         new("wait", "days", "Let some days pass"),
         new("launch", null, "Put her in the water"),
+        new("pump bilge", null, "Work the manual bilge pump from the cockpit (15 min, up to 150 litres)"),
         new("emergency lift", null, "Pay the yard to lift her out again, afloat only (costs money and days)"),
         new("check filter", null, "Look in the fuel filter bowl"),
         new("check flow", null, "Look at the cooling water at the exhaust (engine running)"),
@@ -120,6 +145,22 @@ public sealed partial class Game
         new("help", null, "List the commands"),
         new("quit", null, "Leave the boat for now"),
     ];
+
+    private WeatherDay Today => _weather[Day];
+
+    private WeatherView TodayView()
+    {
+        var w = Today;
+        return new WeatherView(Day, WeatherWords.Describe(w), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
+    }
+
+    /// <summary>A job that needs a dry day is refused when it is raining today.</summary>
+    private string? WetRefusal(Component c)
+    {
+        var w = Today;
+        if (!c.Spec.NeedsDry || w.RainMm < _boat.Rates.WeatherGates.RainMm) return null;
+        return $"It's raining ({WeatherWords.RainWord(w)}, {WeatherWords.Temperature(w)}): the paint won't take on a wet hull. Wait for a dry day.";
+    }
 
     private AboardView AboardSnapshot()
     {
@@ -130,7 +171,7 @@ public sealed partial class Game
         var covers = _boat.Covers.Select(c => new AboardCover(c.Name, _boat.GetPlace(c.PlaceId).Name, _removed.Contains(c.Id))).ToList();
         var found = _boat.Components.Where(c => _seen.Contains(c.Id))
             .Select(c => new FoundComponent(
-                c.Name, _boat.GetPosition(c.PositionId).Label, c.Faults.Any(f => f.Discovered && f.Present),
+                c.Name, _boat.GetPosition(c.PositionId).Label, c.Faults.Any(f => f.Discovered && (f.Present || SupersededOpen().Contains(f))),
                 _reach.Visible(c, _placeId), _reach.Reachable(c, _placeId), IsFlagged(c)))
             .ToList();
         return new AboardView(here.Name, places, covers, found);
@@ -160,9 +201,9 @@ public sealed partial class Game
         else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
             Add("measure", "Measure", touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
 
-        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", AfloatRefusal(c) ?? touch, 30, 0);
+        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", AfloatRefusal(c) ?? touch ?? WetRefusal(c), 30, 0);
         if (c.ReplaceCostNok > 0)
-            Add("replace", "Replace", AfloatRefusal(c) ?? touch ?? MoneyRefusal(c.ReplaceCostNok), c.ReplaceMinutes, c.ReplaceCostNok);
+            Add("replace", "Replace", AfloatRefusal(c) ?? touch ?? WetRefusal(c) ?? MoneyRefusal(c.ReplaceCostNok), c.ReplaceMinutes, c.ReplaceCostNok);
         if (c.Id == "start-battery") Add("charge", "Charge", touch, 480, 0);
         if (c.Id == "primary-filter") Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
         if (RawWaterParts.Contains(c.Id))
@@ -183,6 +224,7 @@ public sealed partial class Game
     public CommandResult Execute(Command command)
     {
         ArgumentNullException.ThrowIfNull(command);
+        if (_sunk) return Reject(command.GetType().Name.ToLowerInvariant(), SunkMessage);
         var turn = new Turn();
         return command switch
         {
@@ -207,6 +249,8 @@ public sealed partial class Game
             WaitDays c => DoWait(turn, c.Days),
             Launch => DoLaunch(turn),
             EmergencyLift => DoEmergencyLift(turn),
+            PumpBilge => DoPumpBilge(turn),
+            StopEngine => DoStopEngine(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -217,6 +261,8 @@ public sealed partial class Game
         public List<KnownFault> Newly { get; } = [];
         /// <summary>Ids of faults found and ruled out in the same breath (red herrings).</summary>
         public HashSet<string> RuledOut { get; } = [];
+        /// <summary>Cause lines told at this turn's discoveries, by fault id; the logbook writes each just before its Found line.</summary>
+        public Dictionary<string, string> Causes { get; } = [];
     }
 
     private Place CurrentPlace => _boat.GetPlace(_placeId);
@@ -258,8 +304,9 @@ public sealed partial class Game
         _visited.Add(place.Id);
         MarkSeen(t);
         t.Narrative.Add(place.Description);
+        if (SoleLine(place) is { } soleLook) t.Narrative.Add(soleLook);
         foreach (var cover in _boat.Covers.Where(c => c.PlaceId == place.Id))
-            t.Narrative.Add($"The {Words.CoverName(cover)} {Words.Is(cover)} {(_removed.Contains(cover.Id) ? "off" : "in place")}.");
+            t.Narrative.Add($"The {Words.CoverName(cover)} {Words.Is(cover)} {Words.State(cover, _removed.Contains(cover.Id))}.");
         t.Narrative.Add(SeeLine(place));
         t.Narrative.Add(ExitsLine(place));
         return Accept(t, "look", 2, 0, PlaceViewOf(place), $"Looked around {Words.The(place)}.");
@@ -277,11 +324,20 @@ public sealed partial class Game
         if (!IsAvailable(target)) return Reject("go", $"You can't go {Words.To(target)} while she's afloat.");
         if (!CurrentPlace.Adjacent.Contains(target.Id))
             return Reject("go", $"You can't get {Words.To(target)} from here. {ExitsLine(CurrentPlace)}");
+        if (target.Exposed && Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
+            return Reject("go", $"It's blowing {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}): not a day to be up on deck.");
 
+        // Going below with the hatch shut: you slide it open on the way, for free.
+        if (_placeId == StartPlaceId && target.Id == BelowPlaceId && _boat.Covers.Any(c => c.Id == HatchId) && !_removed.Contains(HatchId))
+        {
+            _removed.Add(HatchId);
+            t.Narrative.Add("You slide the hatch open to go below.");
+        }
         _placeId = target.Id;
         _visited.Add(target.Id);
         MarkSeen(t);
         t.Narrative.Add(target.Description);
+        if (SoleLine(target) is { } soleGo) t.Narrative.Add(soleGo);
         t.Narrative.Add(SeeLine(target));
         return Accept(t, "go", 1, 0, PlaceViewOf(target), $"Went {target.Way}.");
     }
@@ -300,8 +356,8 @@ public sealed partial class Game
         if (cover.PlaceId != _placeId)
             return Reject(action, $"The {label} {Words.Is(cover)} {Words.In(coverPlace)}.");
         bool off = _removed.Contains(cover.Id);
-        if (remove && off) return Reject(action, $"The {label} {Words.Is(cover)} already off.");
-        if (!remove && !off) return Reject(action, $"The {label} {Words.Is(cover)} already in place.");
+        if (remove && off) return Reject(action, $"The {label} {Words.Is(cover)} already {Words.State(cover, true)}.");
+        if (!remove && !off) return Reject(action, $"The {label} {Words.Is(cover)} already {Words.State(cover, false)}.");
 
         var before = _reach.VisibleAt(_placeId).Select(c => c.Id).ToHashSet();
         if (remove) _removed.Add(cover.Id); else _removed.Remove(cover.Id);
@@ -314,7 +370,9 @@ public sealed partial class Game
         MarkSeen(t);
         return Accept(t, action, remove ? cover.RemoveMinutes : cover.RefitMinutes, 0,
             new CoverView(cover.Name, coverPlace.Name, remove, newlyVisible),
-            remove ? $"Took off the {label}." : $"Put back the {label}.");
+            remove
+                ? cover.RemoveLog.Length > 0 ? cover.RemoveLog : $"Took off the {label}."
+                : cover.RefitLog.Length > 0 ? cover.RefitLog : $"Put back the {label}.");
     }
 
     private CommandResult DoInspect(Turn t, string name)
@@ -323,6 +381,7 @@ public sealed partial class Game
 
         bool off = _uncovered.Contains(c.Id);
         t.Narrative.Add(c.Description + " " + WearPhrase(c.Condition));
+        if (c.Id == BilgeId) t.Narrative.Add($"In the bilge: {_boat.Water.Words(_water.Level)}.");
         if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
         foreach (var f in c.ActiveFaults.ToList())
         {
@@ -419,13 +478,15 @@ public sealed partial class Game
         var result = EngineModel.Attempt(EngineInputsBuilder.Build(_boat));
         _lastStart = result.Outcome;
         t.Narrative.Add(result.Description);
+        if (result.Outcome != StartOutcome.Nothing) Electrical.Crank(_boat); // a start that cranks takes its share of the charge
+        if (result.Outcome == StartOutcome.SlowCrank || result.LabouredCrank) _values.Set(SystemValues.DragStarts, _values.Get(SystemValues.DragStarts) + 1);
         _running = result.Outcome is StartOutcome.RunsRough or StartOutcome.Runs;
 
         const int minutes = 2;
         if (result.Outcome == StartOutcome.Runs && !result.OverheatWarning && !_finished)
         {
             _finished = true;
-            int total = _minutes + minutes;
+            int total = _time.WorkMinutes + minutes;
             t.Narrative.Add($"She'll do. {LaunchIn()}");
             t.Narrative.Add($"Time spent: {total / 60} h {total % 60} min. Money spent: {_money} NOK.");
         }
@@ -451,8 +512,9 @@ public sealed partial class Game
         if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected,
                 pre: x => x.Cleanable || CanRedoByClean(x) ? AfloatRefusal(x) : null)) return rejected!;
         if (!c.Cleanable && !CanRedoByClean(c)) return Reject("clean", "Nothing to clean there.");
+        if (WetRefusal(c) is { } wet) return Reject("clean", wet);
 
-        StopEngine(t);
+        ShutDownEngine(t);
         bool bootWasOff = _uncovered.Remove(c.Id);
         var fixedFaults = c.ActiveFaults.Where(f => f.FixedBy.Contains(PlayerAction.Clean)).ToList();
         string text;
@@ -486,9 +548,10 @@ public sealed partial class Game
         if (!ResolveComponent("replace", name, needTouch: true, out var c, out var rejected,
                 pre: x => x.ReplaceCostNok > 0 ? AfloatRefusal(x) : null)) return rejected!;
         if (c.ReplaceCostNok <= 0) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
+        if (WetRefusal(c) is { } wet) return Reject("replace", wet);
         if (MoneyRefusal(c.ReplaceCostNok) is { } broke) return Reject("replace", broke);
 
-        StopEngine(t);
+        ShutDownEngine(t);
         c.Replace();
         _uncovered.Remove(c.Id);
         var text = c.ReplaceText ?? $"You fit a new {c.Name.ToLowerInvariant()}.";
@@ -508,8 +571,9 @@ public sealed partial class Game
         if (!ResolveComponent("charge", name, needTouch: true, out var c, out var rejected)) return rejected!;
         if (c.Id != "start-battery") return Reject("charge", "Only a battery takes a charge.");
 
-        StopEngine(t);
+        ShutDownEngine(t);
         foreach (var f in c.ActiveFaults.Where(f => f.FixedBy.Contains(PlayerAction.Charge)).ToList()) f.Clear();
+        Electrical.Fill(_boat);
         var text = "You plug in the shore-power charger and wait out eight hours. By the end of it the battery is full.";
         t.Narrative.Add(text);
         return Accept(t, "charge", 480, 0, new RepairView(c.Name, text), "Charged the start battery for eight hours.");
@@ -563,7 +627,7 @@ public sealed partial class Game
 
     // ---------------------------------------------------------------- helpers
 
-    private int ClockMinutes => _minutes + _idleMinutes;
+    private int ClockMinutes => _time.ClockMinutes;
     private int Day => _startDay + (StartMinuteOfDay + ClockMinutes) / 1440;
     private string TimeOfDay => FormatTime(ClockMinutes);
 
@@ -579,7 +643,15 @@ public sealed partial class Game
         : condition >= 0.3 ? "Tired."
         : "In poor shape.";
 
-    private void StopEngine(Turn t)
+    private CommandResult DoStopEngine(Turn t)
+    {
+        if (!_running) return Reject("stop-engine", "The engine isn't running.");
+        _running = false;
+        t.Narrative.Add("You pull the stop and the engine dies.");
+        return Accept(t, "stop-engine", 1, 0, null, "Stopped the engine.");
+    }
+
+    private void ShutDownEngine(Turn t)
     {
         if (!_running) return;
         _running = false;
@@ -602,6 +674,11 @@ public sealed partial class Game
         var known = new KnownFault(f.Id, f.Name, _boat.Get(f.ComponentId).Name);
         _discovered.Add(known);
         t.Newly.Add(known);
+        if (_pendingCause.Remove(f.Id, out var cause))
+        {
+            t.Narrative.Add(cause);
+            t.Causes[f.Id] = cause;
+        }
         if (!f.Harmless) return;
         f.Clear();
         t.RuledOut.Add(f.Id);
@@ -634,7 +711,7 @@ public sealed partial class Game
             : Reject(action, $"You can't find '{name.Trim()}' on this boat.");
 
     private CommandResult Reject(string action, string message) =>
-        new(false, action, [message], 0, 0, null, [], _running, _finished);
+        new(false, action, [message], 0, 0, null, [], _running, _finished, []);
 
     private CommandResult Accept(Turn t, string action, int minutes, int costNok, Observation? obs, string logText, bool work = true)
     {
@@ -642,11 +719,16 @@ public sealed partial class Game
         int day = Day;
         _log.Add(new LogEntry(day, stamp, logText, costNok));
         LogFound(t, 0, day, stamp);
-        int already = t.Newly.Count;
-        if (work) _minutes += minutes; else _idleMinutes += minutes;
         _money += costNok;
-        RunClockEscalations(t);
-        LogFound(t, already, Day, TimeOfDay);
-        return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished);
+        int before = ClockMinutes;
+        Tick(t, minutes, work);
+        if (_sunk)
+        {
+            // She went down while the time passed: the card is the result, and the rest of the time does not pass.
+            minutes = ClockMinutes - before;
+            obs = _loss;
+            t.Narrative.AddRange(_loss!.Lines);
+        }
+        return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished, TakeUnread());
     }
 }

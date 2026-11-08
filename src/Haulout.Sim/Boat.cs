@@ -10,12 +10,14 @@ namespace Haulout.Sim;
 /// </summary>
 public sealed record Place(
     string Id, string Name, IReadOnlyList<string> Aliases, string Description, string Way,
-    IReadOnlyList<string> Adjacent, bool OnlyOnTheHard);
+    IReadOnlyList<string> Adjacent, bool OnlyOnTheHard, bool Exposed = false);
 
 /// <summary>Something you take off to see or reach what is behind it. Removed at PlaceId.</summary>
 public sealed record Cover(
     string Id, string Name, IReadOnlyList<string> Aliases, string PlaceId, bool Plural,
-    int RemoveMinutes, int RefitMinutes, string RemoveText, string RefitText);
+    int RemoveMinutes, int RefitMinutes, string RemoveText, string RefitText,
+    bool StartsOff = false, string OffPhrase = "", IReadOnlyList<string>? StateWords = null,
+    string RemoveLog = "", string RefitLog = "");
 
 /// <summary>The true physical spot of a component, with the label the player sees.</summary>
 public sealed record Position(string Id, string Label);
@@ -36,8 +38,13 @@ public sealed class Boat
     public Boat(
         string name, IEnumerable<Place> places, IEnumerable<Cover> covers,
         IEnumerable<Position> positions, IEnumerable<Component> components,
-        Economy? economy = null, SurveyData? survey = null, DiyQuality? diyQuality = null)
+        Economy? economy = null, SurveyData? survey = null, DiyQuality? diyQuality = null, Rates? rates = null,
+        WaterRules? water = null, ElectricalRules? electrical = null, InsuranceRules? insurance = null)
     {
+        Rates = rates ?? Rates.Default;
+        Water = water ?? WaterRules.Default;
+        Electrical = electrical ?? ElectricalRules.Default;
+        Insurance = insurance ?? InsuranceRules.Default;
         Economy = economy ?? new Economy(0, 0, 0, 0);
         Survey = survey;
         DiyQuality = diyQuality;
@@ -91,6 +98,10 @@ public sealed class Boat
 
     public string Name { get; }
     public Economy Economy { get; }
+    public Rates Rates { get; }
+    public WaterRules Water { get; }
+    public ElectricalRules Electrical { get; }
+    public InsuranceRules Insurance { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }
     /// <summary>Null: no poor-job rule.</summary>

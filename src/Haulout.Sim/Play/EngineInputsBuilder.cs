@@ -1,6 +1,7 @@
 using Haulout.Sim.Components;
 using Haulout.Sim.Engine;
 using Haulout.Sim.Faults;
+using Haulout.Sim.Systems;
 
 namespace Haulout.Sim.Play;
 
@@ -20,7 +21,7 @@ internal static class EngineInputsBuilder
         var loop = LoopOrder.Select(id =>
         {
             var c = boat.Get(id);
-            double ohms = c.SeriesOhms ?? 0.0;
+            double ohms = Properties.Effective(boat, id, "seriesOhms", c.SeriesOhms ?? 0.0);
             foreach (var f in c.ActiveFaults)
             {
                 if (f.Effect.Kind == FaultEffectKind.OpenCircuit) ohms = double.PositiveInfinity;
@@ -30,9 +31,7 @@ internal static class EngineInputsBuilder
         }).ToList();
 
         var battery = boat.Get("start-battery");
-        double soc = battery.Properties.GetValueOrDefault("stateOfCharge", 1.0);
-        var socFault = battery.ActiveFaults.FirstOrDefault(f => f.Effect.Kind == FaultEffectKind.StateOfCharge);
-        if (socFault is not null) soc = socFault.Effect.Value;
+        double soc = Electrical.StateOfCharge(boat);
 
         var electrical = new ElectricalInputs(
             SwitchOn: boat.Get("battery-switch").Properties.GetValueOrDefault("on") == 1,

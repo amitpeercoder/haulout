@@ -25,6 +25,7 @@ public sealed class Component
         Wear = wear;
         Spec = spec;
         _faults = (faults ?? []).ToList();
+        State = new Dictionary<string, double>(spec.Properties);
     }
 
     public string Id { get; }
@@ -48,6 +49,12 @@ public sealed class Component
     /// <summary>The narrative of Replace; null: the default "You fit a new {name}."</summary>
     public string? ReplaceText => Spec.ReplaceText;
 
+    /// <summary>
+    /// The live values of the component's properties (a battery's charge, a pump's cycle count). Starts as a copy of
+    /// <see cref="Properties"/>; the systems write it; <see cref="Replace"/> puts it back to the spec.
+    /// </summary>
+    public Dictionary<string, double> State { get; }
+
     public IReadOnlyList<Fault> Faults => _faults;
     public IEnumerable<Fault> ActiveFaults => _faults.Where(f => f.Present);
 
@@ -69,6 +76,8 @@ public sealed class Component
     {
         foreach (var fault in _faults.Where(f => f.Present).ToList()) fault.Clear();
         Condition = 1;
+        State.Clear();
+        foreach (var (key, value) in Spec.Properties) State[key] = value;
     }
 }
 

@@ -24,9 +24,10 @@ public class AdapterQueryTests
         var view = Aboard(g);
         Assert.Equal("Cockpit", view.Place);
         Assert.Equal(7, view.Places.Count);
-        Assert.Equal(5, view.Covers.Count);
+        Assert.Equal(7, view.Covers.Count);
         Assert.Empty(view.Components);
-        Assert.All(view.Covers, c => Assert.False(c.Removed));
+        // Only the companionway hatch starts off (open).
+        Assert.Equal(["Companionway hatch"], view.Covers.Where(c => c.Removed).Select(c => c.Name));
         Assert.All(view.Places, p => Assert.False(p.Visited));
         Assert.False(Actions(g, "negative terminal").Found);
     }
