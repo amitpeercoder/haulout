@@ -126,21 +126,37 @@ public sealed partial class Game
         _water.ResetSinceAboard();
     }
 
+    /// <summary>
+    /// A wait at a mooring runs day by day but reads the smell and the voltmeter only when it ends, as one long stretch away would:
+    /// nobody rings about them, so they are not worth a line every morning in the logbook.
+    /// </summary>
+    private bool _holdMorningReadings;
+
     /// <summary>On coming back aboard after an away period of a day or more: what built up while she sat.</summary>
     private void ArrivalAlerts()
     {
         if (!_holdPumpCounter) PumpCounterAlert();
 
         bool over = OverSole;
-        if (!over && _water.Level >= BilgeDeepLitres && !_removed.Contains(FloorboardsId))
-            Raise("bilge-smell", "A damp, sour smell from under the saloon sole. The bilge wants looking at.");
+        if (!_holdMorningReadings) BilgeSmell(over);
         if (over) Raise("sole", SoleAlert);
         _alerts.WasOverSole = over;
 
-        if (!IsBatteryAshore && Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
+        if (!_holdMorningReadings) Voltmeter();
         _alerts.LastMorningCheckDay = Day;
         MooringArrivalAlert();
         RaiseArrivalSigns();
+    }
+
+    private void BilgeSmell(bool over)
+    {
+        if (!over && _water.Level >= BilgeDeepLitres && !_removed.Contains(FloorboardsId))
+            Raise("bilge-smell", "A damp, sour smell from under the saloon sole. The bilge wants looking at.");
+    }
+
+    private void Voltmeter()
+    {
+        if (!IsBatteryAshore && Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
     }
 
     /// <summary>

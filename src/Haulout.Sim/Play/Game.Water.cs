@@ -18,6 +18,9 @@ public sealed partial class Game
     private readonly CoolingSystem _cooling = new();
     private readonly SystemValues _values = new();
     private bool _sunk;
+    /// <summary>A wait at a mooring is on: the bilge passing the harbourmaster's level, even for an hour, is remembered for the day.</summary>
+    private bool _watchingBilge;
+    private bool _bilgePassedToday;
     private LossView? _loss;
 
     /// <summary>For tests only (not on the facade: a player cannot read the bilge in litres).</summary>
@@ -42,6 +45,7 @@ public sealed partial class Game
         _water.Step(new WaterSystem.Inputs(minutes, Afloat, UnderWinterCover ? 0 : _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
             AtSea ? Sea.SeaState(_boat.SeaRules, _weather[day].WindForce) : 0));
         _water.Publish(_values);
+        if (_watchingBilge && _water.Level > _boat.Water.HarbourmasterLitres) _bilgePassedToday = true;
         if (Afloat && _water.Level >= _boat.Water.SinkLitres) Sink(day);
     }
 

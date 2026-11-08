@@ -109,7 +109,8 @@ public static class BoatLoader
             ? new WaterRules(
                 w.StartLitres, w.SoleLitres, w.SinkLitres, w.RainThroughOpenHatchLitresPerMm,
                 w.ManualPumpLitresPerMinute, w.ManualPumpMinutes, w.SoleText ?? WaterRules.Default.SoleText,
-                w.LevelWords is { Count: > 0 } words ? words.Select(x => new LevelWord(x.UnderLitres, x.Text)).ToList() : WaterRules.Default.LevelWords)
+                w.LevelWords is { Count: > 0 } words ? words.Select(x => new LevelWord(x.UnderLitres, x.Text)).ToList() : WaterRules.Default.LevelWords,
+                w.HarbourmasterLitres ?? w.SoleLitres, w.HarbourmasterText ?? WaterDefaults.HarbourmasterText)
             : null;
         var electrical = dto.Electrical is { } el ? new ElectricalRules(el.SelfDischargePerDay, el.PumpMinStateOfCharge, el.CrankDraw, el.ChargePerHour, el.RunDrawPerHour) : null;
         var insurance = dto.Insurance is { } ins ? new InsuranceRules(ins.ValueNok, ins.PayoutFraction) : null;
@@ -203,6 +204,8 @@ public static class BoatLoader
         public double ManualPumpLitresPerMinute { get; set; } = 10;
         public int ManualPumpMinutes { get; set; } = 15;
         public string? SoleText { get; set; }
+        public double? HarbourmasterLitres { get; set; }
+        public string? HarbourmasterText { get; set; }
         public List<LevelWordDto>? LevelWords { get; set; }
     }
 

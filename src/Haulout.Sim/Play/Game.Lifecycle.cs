@@ -174,6 +174,7 @@ public sealed partial class Game
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
         ShutDownEngine(t);
         days = StopAtSlot(t, days);
+        if (Afloat) return DoWaitMoored(t, days);
         t.Narrative.Add($"You leave her for {Days(days)}.");
         // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
         var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();

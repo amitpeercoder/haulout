@@ -3021,6 +3021,8 @@
     "manualPumpLitresPerMinute": 10,
     "manualPumpMinutes": 15,
     "soleText": "Water stands over the saloon sole.",
+    "harbourmasterLitres": 120,
+    "harbourmasterText": "The harbourmaster rang: she's sitting low on her mooring. Worth getting down there.",
     "levelWords": [
       {
         "underLitres": 1,
@@ -3176,6 +3178,7 @@
     "serviceComponents": ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"]
   },
   "placeholders": [
+    "PLACEHOLDER (design note 008): water.harbourmasterLitres (the bilge level at which the harbourmaster rings about a boat on her mooring, default the sole level) and water.harbourmasterText (what he says) are placeholders for Amit.",
     "PLACEHOLDER (decision 007/6): the harbour shop at Hestholmen stocks only filter elements and impellers, at 1.3 times the yard chandlery price.",
     "PLACEHOLDER (design note 006): rates.weatherGates (the wind force from which nobody goes on deck or launches, the rain in mm from which a paint job is refused) are placeholders for Amit to calibrate.",
     "PLACEHOLDER (design note 005): every price, hour, lead time, timer and chance in economy, survey, diyQuality and in each fault's diy/yard/costLaterNok is a placeholder for Amit to calibrate.",

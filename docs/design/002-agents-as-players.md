@@ -95,3 +95,5 @@ Finding 2 (after hiding): a model still skips the meter if an Uncover verb is of
 ### Finding 3: a long wait at a mooring is blind
 
 The sinking in the 008 run took two months of nobody looking. The sim is right that she sinks (rule 3: consequences delayed, never hidden), but in a real marina someone rings you when a boat sits low. Proposed: a plain `WaitDays` is interrupted the way `WaitUntilSpring` already is when the water passes the sole at a mooring ("The harbourmaster rang: she's sitting low"), with the days actually waited reported. The player still has to go and find the leak. For Amit.
+
+*Done (approved by Amit): see "(done) Harbourmaster" in `008-season-and-haulout.md`.*

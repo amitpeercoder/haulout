@@ -404,8 +404,10 @@ public sealed partial class Game
     /// An alert of a kind that was not already being raised the day before: a condition that goes on (a flat battery) stops the wait once,
     /// not on every day after.
     /// </summary>
-    private bool FreshAlert(Dictionary<string, int> before) =>
-        _alerts.LastRaised.Any(kv => NeedsHands(kv.Key) &&
+    private static readonly Func<string, bool> NeedsHandsPredicate = NeedsHands;
+
+    private bool FreshAlert(Dictionary<string, int> before, Func<string, bool>? stops = null) =>
+        _alerts.LastRaised.Any(kv => (stops ?? NeedsHandsPredicate)(kv.Key) &&
             (!before.TryGetValue(kv.Key, out var was) || (was != kv.Value && was < kv.Value - 1)));
 
     /// <summary>

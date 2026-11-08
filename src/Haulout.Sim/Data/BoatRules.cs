@@ -62,7 +62,8 @@ public sealed record LevelWord(double? UnderLitres, string Text);
 /// </summary>
 public sealed record WaterRules(
     double StartLitres, double SoleLitres, double SinkLitres, double RainThroughOpenHatchLitresPerMm,
-    double ManualPumpLitresPerMinute, int ManualPumpMinutes, string SoleText, IReadOnlyList<LevelWord> LevelWords)
+    double ManualPumpLitresPerMinute, int ManualPumpMinutes, string SoleText, IReadOnlyList<LevelWord> LevelWords,
+    double HarbourmasterLitres = 120, string HarbourmasterText = WaterDefaults.HarbourmasterText)
 {
     public static WaterRules Default { get; } = new(0, 120, 1500, 0.5, 10, 15, "Water stands over the sole.",
     [
@@ -359,4 +360,10 @@ public sealed record SaleRules
         ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"];
 
     public static SaleRules Default { get; } = new();
+}
+
+/// <summary>Text the water rules fall back to when the boat's data says none.</summary>
+public static class WaterDefaults
+{
+    public const string HarbourmasterText = "The harbourmaster rang: she's sitting low on her mooring. Worth getting down there.";
 }

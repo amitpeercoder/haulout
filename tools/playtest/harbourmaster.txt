@@ -1,0 +1,73 @@
+look
+go companionway
+go quarter berth
+remove battery-box lid
+inspect negative terminal
+clean negative terminal
+go companionway
+go saloon
+remove saloon floorboards
+look
+inspect raw-water seacock
+replace raw-water seacock
+go companionway
+go cockpit
+remove cockpit-locker lid
+buy alternator belt
+buy impeller
+buy primary filter element
+buy secondary filter element
+buy engine oil
+go companionway
+remove companionway steps
+inspect alternator belt
+replace alternator belt
+inspect raw-water impeller
+replace raw-water impeller
+go quarter berth
+charge start battery
+go companionway
+go cockpit
+start
+stop
+season
+book haulout 262
+start
+launch
+start
+season
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+heave to
+check filter
+replace primary filter
+start
+motor
+inventory
+buy primary filter element
+check filter
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+heave to
+replace primary filter
+start
+motor
+motor
+buy primary filter element
+check filter
+wait 1
+check filter
+wait 1
+check filter
+replace primary filter
+wait 60
+wait 60
+wait 60
+wait 60
+status
+quit
