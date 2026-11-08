@@ -76,6 +76,7 @@ public sealed partial class Game
         _world = new SeededRandom(worldSeed * 7919 + 17);
         _reach = new Reach(boat, _removed, _gone);
         _lastAboardDay = startDay;
+        _vacationLeft = boat.Calendar.VacationDaysPerYear;
         _water = new WaterSystem(boat);
         foreach (var cover in boat.Covers.Where(c => c.StartsOff)) _removed.Add(cover.Id);
         InitSkills();
@@ -108,12 +109,13 @@ public sealed partial class Game
                 "The yard hose is rigged to the raw-water intake, so the engine can run ashore.",
                 "You're standing in the cockpit, the companionway hatch slid open.",
                 $"The yard has her down for launch on day {_launchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
-                "The season runs on past the launch, to the autumn haulout at the yard, the winter on the hard and a sale.",
+                "The season runs on past the launch: paydays and bills, a calendar of things worth sailing for, the autumn haulout and the winter; then sell her or keep her for another year.",
             ]),
             Status => new StatusView(
                 Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, KnownStatus(), ToolNames(), CurrentPlace.Name,
-                Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today), _sunk,
-                UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea, SeasonLine(), _sold, ReadinessSeasonLead()),
+                Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today, HourOfDay), _sunk,
+                UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea, SeasonLine(), _sold, ReadinessSeasonLead(),
+                CalendarOn ? WeekLine() : null, CalendarOn && _boat.Calendar.ChargesDays ? _vacationLeft : 0, NextWords(), FuelStatusLine()),
             Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
             Weather => TodayView(),
             Notices => new NoticesView(TakeUnread()),
@@ -128,6 +130,9 @@ public sealed partial class Game
             Season => SeasonSnapshot(),
             Sale => SaleSnapshot(),
             Chart q => ChartSnapshot(q.Planned),
+            Calendar => CalendarSnapshot(),
+            Upgrades => UpgradesSnapshot(),
+            SeasonPage q => SeasonPageSnapshot(q.Season),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -184,6 +189,15 @@ public sealed partial class Game
         new("yard fix", "problem", "Pay the yard to fix a known problem"),
         new("weather", null, "Look at the sky and the wind today"),
         new("wait", "days", "Let some days pass"),
+        new("next weekend", null, "Not at sea: go back to work and come back aboard at eight on the next Saturday"),
+        new("wait week", null, "Not at sea: go back to work and come back aboard at eight, a week on"),
+        new("order", "item", "Ring the yard chandlery and order a part it doesn't keep on the shelf (it arrives in days)"),
+        new("invite friend", "day", "Ring a friend and ask them aboard for a week starting on that day (once a year, in July, a few days' notice)"),
+        new("calendar", null, "The week: today, your evenings and vacation days, the bills and payday ahead, what is on order, the money"),
+        new("install", "item", "Fit an upgrade you have aboard, in the place it goes (your own work, hours)"),
+        new("yard install", "item", "The yard fits an upgrade for labour and days, with the part if you have none aboard"),
+        new("season page", "season", "The page the logbook wrote at the autumn haulout: miles, nights away, events, money and what she is worth (no season: the latest)"),
+        new("upgrades", null, "The upgrades: what is aboard, on order or fitted, the prices and what each makes possible"),
         new("launch", null, "Put her in the water"),
         new("pump bilge", null, "Work the manual bilge pump from the cockpit (15 min, up to 150 litres)"),
         new("emergency lift", null, "Pay the yard to lift her out again, afloat only (costs money and days)"),
@@ -199,7 +213,7 @@ public sealed partial class Game
     private WeatherView TodayView()
     {
         var w = Today;
-        return new WeatherView(Day, WeatherWords.Describe(w), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
+        return new WeatherView(Day, WeatherWords.Describe(w, HourOfDay), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
     }
 
     /// <summary>A job that needs a dry day is refused when it is raining today.</summary>
@@ -283,6 +297,7 @@ public sealed partial class Game
         if (_sunk) return Reject(command.GetType().Name.ToLowerInvariant(), SunkMessage);
         if (_sold) return Reject(command.GetType().Name.ToLowerInvariant(), SoldMessage);
         var turn = new Turn();
+        CollectWaiting(turn);
         return command switch
         {
             Look => DoLook(turn),
@@ -304,6 +319,12 @@ public sealed partial class Game
             FixByYard c => DoYardFix(turn, c.Fault),
             OrderSurvey => DoOrderSurvey(turn),
             WaitDays c => DoWait(turn, c.Days),
+            NextWeekend => DoNextWeekend(turn),
+            WaitWeek => DoWaitWeek(turn),
+            Order c => DoOrder(turn, c.Item),
+            InviteFriend c => DoInviteFriend(turn, c.Day),
+            Install c => DoInstall(turn, c.Item),
+            YardInstall c => DoYardInstall(turn, c.Item),
             Launch => DoLaunch(turn),
             EmergencyLift => DoEmergencyLift(turn),
             PumpBilge => DoPumpBilge(turn),
@@ -463,6 +484,7 @@ public sealed partial class Game
         bool off = _uncovered.Contains(c.Id);
         t.Narrative.Add(c.Description + " " + WearPhrase(c.Condition));
         if (c.Id == BilgeId) t.Narrative.Add($"In the bilge: {_boat.Water.Words(_water.Level)}.");
+        if (c.Id == FuelTankId && GaugeWords() is { } level) t.Narrative.Add($"In the tank: {level}.");
         if (c.Id == HullId && Band.Pick(_boat.Fouling.HullWords, Fouling) is { Length: > 0 } below)
         {
             t.Narrative.Add($"Under the waterline: {below}.");
@@ -732,7 +754,8 @@ public sealed partial class Game
         var before = t.Narrative.Count;
         // Water in the fuel lives on the tank, but it is the filter bowl that shows it.
         foreach (var f in filter.ActiveFaults.Concat(_boat.Get("fuel-tank").ActiveFaults).ToList()) BowlCheck(t, f);
-        if (t.Narrative.Count == before) t.Narrative.Add("Clear, pale diesel. No water at the bottom.");
+        if (t.Narrative.Count == before)
+            t.Narrative.Add(FuelEmpty ? "The bowl is half air. Nothing is coming through from the tank." : "Clear, pale diesel. No water at the bottom.");
         return Accept(t, "check-filter-bowl", 10, 0, new FilterBowlView(string.Join(" ", t.Narrative)), "Checked the fuel filter bowl.");
     }
 
@@ -868,7 +891,7 @@ public sealed partial class Game
             if (_passage is not null && action is "clean" or "replace") _passage?.Fixes.Add(logText);
         }
         LogFound(t, 0, day, stamp);
-        _money += costNok;
+        if (costNok > 0) Spend(costNok, action is "haul-out" or "emergency-lift" or "call-tow" ? LedgerBill : LedgerSpending, logText ?? action);
         int before = ClockMinutes;
         Tick(t, minutes, work);
         if (afterTick is not null) obs = afterTick();
@@ -885,6 +908,7 @@ public sealed partial class Game
             _arrived = null;
             obs = FinishArrival(t, arrived);
         }
+        if (!_sunk && !AtSea) CheckEvents(t);
         return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished, TakeUnread());
     }
 }

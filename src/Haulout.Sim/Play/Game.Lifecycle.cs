@@ -26,11 +26,6 @@ public sealed partial class Game
 
     private int Balance => _boat.Economy.StartingBalanceNok - _money + _incomeNok;
 
-    private string? MoneyRefusal(int costNok) =>
-        costNok <= Balance ? null
-        : Balance < 0 ? $"That's {costNok} NOK and you owe {-Balance} NOK already."
-        : $"That's {costNok} NOK and you have {Balance} NOK left.";
-
     private bool Afloat => !_onTheHard;
 
     private string EmergencyLiftLine =>
@@ -173,13 +168,18 @@ public sealed partial class Game
         if (AtSea) return Reject("wait", "You're at sea: continue, heave to or anchor.");
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
         ShutDownEngine(t);
-        days = StopAtSlot(t, days);
-        if (Afloat) return DoWaitMoored(t, days);
+        _weekEvents.Clear();
+        days = StopAtCalendar(t, days * 1440) / 1440;
+        if (Afloat) return DoWaitMoored(t, "wait", days * 1440, $"leave her for {Days(days)}", $"You leave her for {Days(days)}.", null);
         t.Narrative.Add($"You leave her for {Days(days)}.");
         // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
         var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();
         t.Narrative.Add(WeatherWords.Summarise(left));
-        return Accept(t, "wait", days * 1440, 0, null, $"Waited {Days(days)}.", work: false);
+        return Accept(t, "wait", days * 1440, 0, null, $"Waited {Days(days)}.", work: false, afterTick: () =>
+        {
+            AddWeekLine(t);
+            return null;
+        });
     }
 
     // ------------------------------------------------------------------ escalation
@@ -297,8 +297,10 @@ public sealed partial class Game
             }
             card = LiftCard(t, economy.EmergencyLiftNok, storage);
         }
+        int liftDay = Day;
         return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok + storage, card,
-            autumn ? $"Emergency lift for the winter: back on the hard, storage {storage} NOK." : "Emergency lift: back on the hard.", work: false);
+            autumn ? $"Emergency lift for the winter: back on the hard, storage {storage} NOK." : "Emergency lift: back on the hard.", work: false,
+            afterTick: autumn && card is not null ? () => { WriteSeasonPage(t, liftDay); return card with { Lines = t.Narrative.ToList() }; } : null);
     }
 
     // ------------------------------------------------------------------ the player's own work

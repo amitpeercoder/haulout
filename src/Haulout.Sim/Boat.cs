@@ -34,6 +34,8 @@ public sealed class Boat
     private readonly Dictionary<string, Place> _places = new();
     private readonly Dictionary<string, Cover> _covers = new();
     private readonly Dictionary<string, Position> _positions = new();
+    private readonly List<Component> _components;
+    private readonly Dictionary<string, UpgradeRule> _upgrades = new();
 
     public Boat(
         string name, IEnumerable<Place> places, IEnumerable<Cover> covers,
@@ -42,8 +44,14 @@ public sealed class Boat
         WaterRules? water = null, ElectricalRules? electrical = null, InsuranceRules? insurance = null,
         IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null,
         YardRules? yard = null, FoulingRules? fouling = null, MooringRules? mooring = null, LayupRules? layup = null,
-        SaleRules? sale = null)
+        SaleRules? sale = null, CalendarRules? calendar = null, OrderRules? orders = null, FuelRules? fuel = null, NightRules? night = null,
+        IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null)
     {
+        Reputation = reputation ?? ReputationRules.Default;
+        Fuel = fuel ?? FuelRules.Default;
+        Night = night ?? NightRules.Default;
+        Calendar = calendar ?? CalendarRules.Default;
+        Orders = orders ?? OrderRules.Default;
         Sale = sale ?? SaleRules.Default;
         Layup = layup ?? LayupRules.Default;
         Yard = yard ?? YardRules.Default;
@@ -64,7 +72,7 @@ public sealed class Boat
         Places = places.ToList();
         Covers = covers.ToList();
         Positions = positions.ToList();
-        Components = components.ToList();
+        _components = components.ToList();
 
         foreach (var p in Places)
             if (!_places.TryAdd(p.Id, p)) throw new ArgumentException($"Duplicate place id '{p.Id}'.");
@@ -87,25 +95,43 @@ public sealed class Boat
         foreach (var p in Positions)
             if (!_positions.TryAdd(p.Id, p)) throw new ArgumentException($"Duplicate position id '{p.Id}'.");
 
-        foreach (var c in Components)
+        foreach (var c in _components)
         {
             if (!_byId.TryAdd(c.Id, c))
                 throw new ArgumentException($"Duplicate component id '{c.Id}'.");
-            if (!_positions.ContainsKey(c.PositionId))
-                throw new ArgumentException($"Component '{c.Id}' is at unknown position '{c.PositionId}'.");
-            foreach (var r in c.Reach)
-            {
-                if (!_places.ContainsKey(r.PlaceId))
-                    throw new ArgumentException($"Component '{c.Id}' has reach at unknown place '{r.PlaceId}'.");
-                if (r.CoverId is not null && !_covers.ContainsKey(r.CoverId))
-                    throw new ArgumentException($"Component '{c.Id}' has reach behind unknown cover '{r.CoverId}'.");
-                if (r.Reachable && !r.Visible)
-                    throw new ArgumentException($"Component '{c.Id}' is reachable but not visible from '{r.PlaceId}'.");
-            }
-            foreach (var f in c.Faults)
-                if (f.ComponentId != c.Id)
-                    throw new ArgumentException($"Fault '{f.Id}' names component '{f.ComponentId}' but is owned by '{c.Id}'.");
+            Validate(c);
         }
+
+        // Upgrades are components that are not aboard yet (design note 010, step 3): checked like any other, kept apart until fitted.
+        foreach (var u in upgrades ?? [])
+        {
+            var c = u.Component;
+            if (_byId.ContainsKey(c.Id) || !_upgrades.TryAdd(c.Id, u))
+                throw new ArgumentException($"Duplicate component id '{c.Id}'.");
+            Validate(c);
+            if (!_places.ContainsKey(u.PlaceId))
+                throw new ArgumentException($"Upgrade '{c.Id}' is fitted at unknown place '{u.PlaceId}'.");
+            if ((u.YardNok is null) != (u.YardDays is null))
+                throw new ArgumentException($"Upgrade '{c.Id}' needs both yardNok and yardDays, or neither.");
+        }
+    }
+
+    private void Validate(Component c)
+    {
+        if (!_positions.ContainsKey(c.PositionId))
+            throw new ArgumentException($"Component '{c.Id}' is at unknown position '{c.PositionId}'.");
+        foreach (var r in c.Reach)
+        {
+            if (!_places.ContainsKey(r.PlaceId))
+                throw new ArgumentException($"Component '{c.Id}' has reach at unknown place '{r.PlaceId}'.");
+            if (r.CoverId is not null && !_covers.ContainsKey(r.CoverId))
+                throw new ArgumentException($"Component '{c.Id}' has reach behind unknown cover '{r.CoverId}'.");
+            if (r.Reachable && !r.Visible)
+                throw new ArgumentException($"Component '{c.Id}' is reachable but not visible from '{r.PlaceId}'.");
+        }
+        foreach (var f in c.Faults)
+            if (f.ComponentId != c.Id)
+                throw new ArgumentException($"Fault '{f.Id}' names component '{f.ComponentId}' but is owned by '{c.Id}'.");
     }
 
     public string Name { get; }
@@ -125,17 +151,39 @@ public sealed class Boat
     public MooringRules Mooring { get; }
     public LayupRules Layup { get; }
     public SaleRules Sale { get; }
+    public CalendarRules Calendar { get; }
+    public OrderRules Orders { get; }
+    public FuelRules Fuel { get; }
+    public NightRules Night { get; }
+    public ReputationRules Reputation { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }
     /// <summary>Null: no poor-job rule.</summary>
     public DiyQuality? DiyQuality { get; }
-    public IReadOnlyList<Component> Components { get; }
+    /// <summary>What is aboard. Grows at the end when an upgrade is fitted; nothing before the fit sees an upgrade.</summary>
+    public IReadOnlyList<Component> Components => _components;
+    /// <summary>The upgrades the boat can be given, fitted or not, in data order.</summary>
+    public IReadOnlyCollection<UpgradeRule> Upgrades => _upgrades.Values;
     public IReadOnlyList<Place> Places { get; }
     public IReadOnlyList<Cover> Covers { get; }
     public IReadOnlyList<Position> Positions { get; }
 
     public Component Get(string id) =>
         _byId.TryGetValue(id, out var c) ? c : throw new KeyNotFoundException($"No component '{id}'.");
+
+    /// <summary>The upgrade has been fitted (it is among the components).</summary>
+    public bool IsFitted(string id) => _upgrades.ContainsKey(id) && _byId.ContainsKey(id);
+
+    public bool TryGetUpgrade(string id, out UpgradeRule upgrade) => _upgrades.TryGetValue(id, out upgrade!);
+
+    /// <summary>Appends the upgrade to the end of the components and registers it by id. Throws if it is unknown or fitted already.</summary>
+    internal void Fit(string id)
+    {
+        if (!_upgrades.TryGetValue(id, out var u)) throw new KeyNotFoundException($"No upgrade '{id}'.");
+        if (_byId.ContainsKey(id)) throw new InvalidOperationException($"Upgrade '{id}' is fitted already.");
+        _components.Add(u.Component);
+        _byId[id] = u.Component;
+    }
 
     public bool TryGet(string id, out Component c) => _byId.TryGetValue(id, out c!);
 

@@ -29,10 +29,18 @@ public sealed partial class Game
 
     /// <summary>The spare aboard that replaces this component, if any.</summary>
     private ChandleryItem? SpareFor(string componentId) =>
-        _boat.Chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == componentId && _inventory.GetValueOrDefault(i.Id) > 0);
+        _boat.Chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == componentId && _inventory.GetValueOrDefault(i.Id) > 0)
+        ?? (_partsAboard.GetValueOrDefault(componentId) > 0 ? PartItem(componentId) : null);
 
     private void ConsumeSpare(ChandleryItem item)
     {
+        if (item.Id.StartsWith(PartPrefix, StringComparison.Ordinal))
+        {
+            string id = item.Id[PartPrefix.Length..];
+            int parts = _partsAboard.GetValueOrDefault(id) - 1;
+            if (parts <= 0) _partsAboard.Remove(id); else _partsAboard[id] = parts;
+            return;
+        }
         int left = _inventory.GetValueOrDefault(item.Id) - 1;
         if (left <= 0) _inventory.Remove(item.Id); else _inventory[item.Id] = left;
     }
@@ -76,6 +84,7 @@ public sealed partial class Game
     /// </summary>
     private (int CostNok, string? Refusal) ReplacePartHere(Component c)
     {
+        if (UnstockedRefusal(c) is { } order) return (0, order);
         var part = _boat.Chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == c.Id);
         if (CurrentPort is { Shop: false } noShop)
             return (0, $"There's no shop at {noShop.Name}, and no spare {part?.Name ?? c.Name.ToLowerInvariant()} aboard.");
@@ -87,6 +96,8 @@ public sealed partial class Game
     {
         var aboard = _boat.Chandlery.Where(i => _inventory.GetValueOrDefault(i.Id) > 0)
             .Select(i => new InventoryLine(i.Name, _inventory[i.Id], i.Tool)).ToList();
+        foreach (var (id, count) in _partsAboard.Where(kv => kv.Value > 0))
+            aboard.Add(new InventoryLine($"{_boat.Get(id).Name.ToLowerInvariant()} (new, in its box)", count, false));
         if (AtSea) return new InventoryView(aboard, null, []);
         return new InventoryView(aboard, CurrentPort is { Shop: false } ? null : ShopName, StockHere().Select(i => new ShopLine(i.Name, PriceHere(i)!.Value, i.Minutes)).ToList());
     }
@@ -105,6 +116,13 @@ public sealed partial class Game
             return r.Kind == ResolutionKind.Ambiguous
                 ? RejectResolution("buy", r, item, i => i.Name)
                 : Reject("buy", $"The chandlery doesn't have '{item.Trim()}'.");
+        if (!shopItem.Stocked && _boat.Orders.Enabled)
+        {
+            // Not on the yard's shelf: at the yard buying is ordering; elsewhere the shop's stock rule stands and the yard is named.
+            if (AtYard) return PlaceOrder(t, "buy", shopItem.Name, shopItem.PriceNok, null, shopItem.Id);
+            if (PriceHere(shopItem) is null)
+                return Reject("buy", NotStockedMessage(shopItem) + $" You can order it from the yard (order {shopItem.Name}).");
+        }
         if (PriceHere(shopItem) is not { } price) return Reject("buy", NotStockedMessage(shopItem));
         if (shopItem.Tool && _inventory.GetValueOrDefault(shopItem.Id) > 0) return Reject("buy", "You already have one.");
         if (MoneyRefusal(price) is { } broke) return Reject("buy", broke);

@@ -27,6 +27,9 @@ public class PreLaunchTests
     private static Component DataComponent(string id) => Data.Get(id);
 
     /// <summary>A fresh game whose poor-job roll never comes up, unless a test says otherwise.</summary>
+    /// <summary>The boat as it was before design note 010: no pay, no bills, no overdraft limit, every part on the shelf.</summary>
+    private static Game NewGameWithoutCalendar() => new(BoatLoader.LoadSloop28(withCalendar: false), 75, new FixedRandom(0.99), weather: WeatherSeries.Fair());
+
     private static Game NewGame(IRandom? random = null) => new(BoatLoader.LoadSloop28(), 75, random ?? new FixedRandom(0.99), weather: WeatherSeries.Fair());
 
     private static string Text(CommandResult r) => string.Join(" ", r.Narrative);
@@ -722,7 +725,7 @@ public class PreLaunchTests
     public void Spending_the_balance_down_refuses_the_next_purchase_and_names_both_amounts()
     {
         var engine = DataComponent("engine-block").ReplaceCostNok;
-        var g = NewGame();
+        var g = NewGameWithoutCalendar();
         Ok(Walk.Do(g, "engine block", n => new Replace(n)));
         var left = Data.Economy.StartingBalanceNok - engine;
         Assert.Equal(left, Status(g).BalanceNok);
@@ -741,7 +744,7 @@ public class PreLaunchTests
     [Fact]
     public void The_balance_never_goes_negative_and_the_yard_is_refused_too_when_it_is_short()
     {
-        var g = NewGame();
+        var g = NewGameWithoutCalendar();
         Survey(g);
         var pump = DataComponent("injection-pump").ReplaceCostNok;
         CommandResult last;

@@ -61,7 +61,8 @@ public static class WordParser
             "inventory" or "inv" or "spares" => new RunQuery(new Inventory()),
             "trip" => new RunQuery(new Trip()),
             "chart" => new RunQuery(new Chart(OrNull(StripTo(arg)))),
-            "season" => new RunQuery(new Season()),
+            "season" => ParseSeason(arg),
+            "page" => ParseSeason("page " + arg),
             "sale" => new RunQuery(new Sale()),
             "list" or "sell" => ParseList(arg),
             "accept" => ParseAccept(arg),
@@ -87,7 +88,14 @@ public static class WordParser
             "undefer" => WithArg(arg, "undefer <problem>", a => new Undefer(a)),
             "yard" => ParseYard(arg),
             "order" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunCommand(new OrderSurvey()),
-            "order" => new Problem("Usage: order survey"),
+            "order" => WithArg(arg, "order survey | order <item>", a => new Order(a)),
+            "calendar" or "week" => new RunQuery(new Calendar()),
+            "install" => WithArg(arg, "install <item>", a => new Install(a)),
+            "upgrades" => new RunQuery(new Upgrades()),
+            "invite" => ParseInvite(arg),
+            "next" when arg.Equals("weekend", StringComparison.OrdinalIgnoreCase) => new RunCommand(new NextWeekend()),
+            "next" => new Problem("Usage: next weekend"),
+            "weekend" => new RunCommand(new NextWeekend()),
             "read" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunQuery(new SurveyReport()),
             "read" => new Problem("Usage: read survey"),
             "survey" => new RunQuery(new SurveyReport()),
@@ -158,6 +166,8 @@ public static class WordParser
     private static Parsed ParseYard(string arg)
     {
         if (arg.Equals("wash", StringComparison.OrdinalIgnoreCase)) return new RunCommand(new WashHull());
+        if (arg.StartsWith("install", StringComparison.OrdinalIgnoreCase) && (arg.Length == 7 || arg[7] == ' ' || arg[7] == '\t'))
+            return WithArg(arg[7..].Trim(), "yard install <item>", a => new YardInstall(a));
         if (arg.StartsWith("fix", StringComparison.OrdinalIgnoreCase) && (arg.Length == 3 || arg[3] == ' ' || arg[3] == '\t'))
             arg = arg[3..].Trim();
         return WithArg(arg, "yard fix <problem>", a => new FixByYard(a));
@@ -196,12 +206,36 @@ public static class WordParser
         return words.Count == 1 && int.TryParse(words[0], out var n) && n >= 0 ? new RunCommand(new BookHaulout(n)) : new Problem(usage);
     }
 
+    /// <summary>"season" is the yard's calendar; "season page", "season page 1" and "page" read the page the logbook wrote at the autumn lift.</summary>
+    private static Parsed ParseSeason(string arg)
+    {
+        if (arg.Length == 0) return new RunQuery(new Season());
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (!words[0].Equals("page", StringComparison.OrdinalIgnoreCase)) return new RunQuery(new Season());
+        if (words.Count == 1) return new RunQuery(new SeasonPage());
+        return words.Count == 2 && int.TryParse(words[1], out var n) && n >= 1 ? new RunQuery(new SeasonPage(n)) : new Problem("Usage: season page [<season>]");
+    }
+
+    /// <summary>"invite friend 183", "invite friend day 183", "invite 183".</summary>
+    private static Parsed ParseInvite(string arg)
+    {
+        const string usage = "Usage: invite friend <day>";
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0].Equals("friend", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        if (words.Count > 0 && words[0].Equals("day", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        return words.Count == 1 && int.TryParse(words[0], out var n) && n >= 0 ? new RunCommand(new InviteFriend(n)) : new Problem(usage);
+    }
+
     /// <summary>"wait 3", "wait 3 days", "wait a day", "wait until spring", "wait spring".</summary>
     private static Parsed ParseWait(string arg)
     {
-        const string usage = "Usage: wait <days> | wait until spring";
+        const string usage = "Usage: wait <days> | wait a week | wait until spring";
         if (arg.Equals("spring", StringComparison.OrdinalIgnoreCase) || arg.Equals("until spring", StringComparison.OrdinalIgnoreCase))
             return new RunCommand(new WaitUntilSpring());
+        if (arg.Equals("week", StringComparison.OrdinalIgnoreCase) || arg.Equals("a week", StringComparison.OrdinalIgnoreCase) || arg.Equals("one week", StringComparison.OrdinalIgnoreCase))
+            return new RunCommand(new WaitWeek());
+        if (arg.Equals("weekend", StringComparison.OrdinalIgnoreCase) || arg.Equals("until the weekend", StringComparison.OrdinalIgnoreCase) || arg.Equals("for the weekend", StringComparison.OrdinalIgnoreCase))
+            return new RunCommand(new NextWeekend());
         var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
         if (words.Count == 0 || words.Count > 2) return new Problem(usage);
         if (words.Count == 2 && !words[1].Equals("day", StringComparison.OrdinalIgnoreCase) && !words[1].Equals("days", StringComparison.OrdinalIgnoreCase))

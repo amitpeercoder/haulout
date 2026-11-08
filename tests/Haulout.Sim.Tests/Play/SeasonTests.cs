@@ -61,8 +61,16 @@ public class SeasonTests
         return reader.ReadToEnd();
     }
 
+    /// <summary>She starts with a seized anchor chain (design note 010): a test that anchors begins with it replaced.</summary>
+    private static Boat ChainFixed()
+    {
+        var boat = BoatLoader.LoadSloop28();
+        boat.Get("anchor-gear").Replace();
+        return boat;
+    }
+
     private static Boat BoatWithBalance(int nok) =>
-        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"));
+        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"), withCalendar: false);
 
     private static Game OnTheHard(int startDay, WeatherSeries? weather = null, int worldSeed = Game.DefaultSeed, Boat? boat = null) =>
         new(boat ?? BoatLoader.LoadSloop28(), startDay, new FixedRandom(0.99), worldSeed, weather ?? Calm());
@@ -321,7 +329,7 @@ public class SeasonTests
         No(hard.Execute(new HaulOut()), "She's already ashore.");
 
         // At sea, and at a port that has no yard.
-        var sea = Afloat(250);
+        var sea = Afloat(250, boat: ChainFixed());
         Book(sea, 262);
         Depart(sea);
         No(sea.Execute(new HaulOut()), "You're at sea.");
@@ -481,7 +489,7 @@ public class SeasonTests
     [Fact]
     public void Looking_over_the_side_names_the_growth_but_only_when_there_is_some()
     {
-        var g = Afloat(100);
+        var g = Afloat(100, boat: ChainFixed());
         g.FoulingGrowth = 0.02;
         Assert.DoesNotContain(Ok(g.Execute(new Look())).Narrative, l => l.StartsWith("Over the side:", StringComparison.Ordinal));
         g.FoulingGrowth = 0.1;
@@ -607,7 +615,7 @@ public class SeasonTests
         var hard = OnTheHard(100);
         No(hard.Execute(new Scrub()), "Clean the hull properly from the ground.");
 
-        var g = Afloat(100);
+        var g = Afloat(100, boat: ChainFixed());
         Depart(g);
         No(g.Execute(new Scrub()), "Anchor first.");
         Ok(g.Execute(new Anchor()));
@@ -956,7 +964,7 @@ public class SeasonTests
         var seen = new List<string>();
         void Snap()
         {
-            foreach (Query q in new Query[] { new Status(), new Season(), new Trip(), new PlanTrip(), new Chart(), new Chart("Hestholmen"), new Logbook(), new Notices(), new Inventory(), new Aboard() })
+            foreach (Query q in new Query[] { new Status(), new Season(), new Haulout.Sim.Play.Calendar(), new Upgrades(), new SeasonPage(), new Trip(), new PlanTrip(), new Chart(), new Chart("Hestholmen"), new Logbook(), new Notices(), new Inventory(), new Aboard() })
                 seen.Add(JsonSerializer.Serialize<QueryResult>(g.Ask(q)));
         }
         void Keep(CommandResult r) => seen.Add(JsonSerializer.Serialize(r));
@@ -984,7 +992,7 @@ public class SeasonTests
             Assert.False(json.Contains(f.Id, StringComparison.Ordinal), f.Id);
             if (!f.Discovered) Assert.False(json.Contains(f.Name, StringComparison.Ordinal), f.Name);
         }
-        foreach (var id in boat.Components.Select(c => c.Id).Where(id => id.Contains('-')).Concat(["at-the-bow", "hull-exterior"]))
+        foreach (var id in boat.Components.Select(c => c.Id).Concat(boat.Upgrades.Select(u => u.Component.Id)).Where(id => id.Contains('-')).Concat(["at-the-bow", "hull-exterior"]))
             Assert.False(json.Contains(id, StringComparison.Ordinal), id);
         foreach (var id in boat.Places.Select(p => p.Id).Where(id => id.Contains('-')))
             Assert.False(json.Contains($"\"{id}\"", StringComparison.Ordinal), id);

@@ -131,6 +131,106 @@ public class ProseTests
     }
 
     [Fact]
+    public void Calendar_renders_the_week_the_money_the_list_ahead_and_the_orders_without_ids()
+    {
+        var money = new MoneyView(12400, 6000, 3800, 3000, 0, 0, [new LedgerEntry(90, "income", "Payday.", 6000), new LedgerEntry(90, "bill", "Berth and mooring at Skjærvik, the quarter", -3000)]);
+        var view = new CalendarView(
+            89, "Wednesday", false, "Wednesday, day 89: a weekday. An evening aboard: 2 h 10 min left before it costs a vacation day.", 130, 22, 25, 3, 0,
+            12400, 20000, 6000, 90,
+            [new CalendarEntry(90, "Thursday", "payday", "Payday", 6000), new CalendarEntry(92, "Saturday", "delivery", "The starter motor is due at the yard", 0)],
+            [new OrderView("starter motor", 85, 92, "on its way")], money);
+        var text = P.Query(view);
+        Assert.Contains("Wednesday, day 89: a weekday. An evening aboard: 2 h 10 min left before it costs a vacation day.", text);
+        Assert.Contains("Vacation days: 22 of 25 left this year (3 used).", text);
+        Assert.Contains("Balance 12400 NOK (the bank allows 20000 overdrawn).", text);
+        Assert.Contains("Day 90, Thursday: Payday +6000 NOK.", text);
+        Assert.Contains("Day 92, Saturday: The starter motor is due at the yard.", text);
+        Assert.Contains("starter motor: ordered day 85, due day 92 (on its way).", text);
+        Assert.Contains("Day 90: Berth and mooring at Skjærvik, the quarter -3000 NOK.", text);
+        Assert.DoesNotContain("starter-motor", text);
+    }
+
+    [Fact]
+    public void Upgrades_render_status_price_hours_the_yard_and_what_they_open_without_ids()
+    {
+        var view = new UpgradesView(
+        [
+            new UpgradeView("diesel heater", "on order, due day 92", 14000, 600, 4000, 3, "the friend's week in a cold July", 8000),
+            new UpgradeView("bunk cushions", "fitted on day 100", 5500, 30, null, null, "dry bunks for the friend", 2000),
+        ]);
+        var text = P.Query(view);
+        Assert.Contains("diesel heater (on order, due day 92): 14000 NOK;", text);
+        Assert.Contains("; 10 h of your own work, or", text);
+        Assert.Contains("; 30 min of your own work, or not a job for the yard;", text);
+        Assert.Contains("or the yard 4000 NOK labour and 3 days;", text);
+        Assert.Contains("adds 8000 NOK to her value; opens the friend's week in a cold July.", text);
+        Assert.Contains("bunk cushions (fitted on day 100): 5500 NOK;", text);
+        Assert.Contains("not a job for the yard", text);
+        Assert.DoesNotContain("diesel-heater", text);
+        Assert.Contains("nothing to fit", P.Query(new UpgradesView([])));
+    }
+
+    [Fact]
+    public void Calendar_renders_the_events_with_their_requirements_in_words_not_symbols()
+    {
+        var money = new MoneyView(12400, 0, 0, 0, 0, 0, []);
+        var events = new List<EventView>
+        {
+            new("The club cruise to Kvitnes", "Kvitnes", 215, 216, "Saturday and Sunday, days 215 to 216", "ahead",
+                [new Requirement("anchor gear in order", true, "no known problem"), new Requirement("a bilge pump that works", false, "Burnt-out bilge pump")], ""),
+            new("A friend's week aboard", "Skjærvik", 180, 203, "a week of your choice in July, days 180 to 203", "ahead",
+                [new Requirement("warm enough below, if the week is cold", null, "depends on the weather")], ""),
+            new("The regatta party at Hestholmen", "Hestholmen", 152, 152, "Saturday, day 152", "made", [], "By evening the regatta party has spilled down onto the jetty."),
+        };
+        var view = new CalendarView(
+            89, "Wednesday", false, "Wednesday, day 89: a weekday.", 130, 22, 25, 3, 0, 12400, 20000, 6000, 90, [], [], money, events);
+        var text = P.Query(view);
+        Assert.Contains("Worth sailing for:", text);
+        Assert.Contains("The club cruise to Kvitnes, Saturday and Sunday, days 215 to 216: ahead.", text);
+        Assert.Contains("anchor gear in order: met (no known problem).", text);
+        Assert.Contains("a bilge pump that works: not met (Burnt-out bilge pump).", text);
+        Assert.Contains("warm enough below, if the week is cold: not known yet (depends on the weather).", text);
+        Assert.Contains("A friend's week aboard at Skjærvik, a week of your choice in July", text);
+        Assert.Contains("The regatta party at Hestholmen, Saturday, day 152: made.", text);
+        Assert.Contains("By evening the regatta party has spilled down onto the jetty.", text);
+        Assert.DoesNotContain("✓", text);
+        Assert.DoesNotContain("✗", text);
+    }
+
+    [Fact]
+    public void Status_prints_the_fuel_gauge_and_the_plan_prints_fuel_warnings_and_the_other_end()
+    {
+        var status = P.Query(new StatusView(75, "08:00", 0, 0, null, true, true, [], [], "Cockpit", Fuel: "Fuel: about 25 litres (a little under half a tank)."));
+        Assert.Contains("Fuel: about 25 litres (a little under half a tank).", status);
+        Assert.DoesNotContain("Fuel:", P.Query(new StatusView(75, "08:00", 0, 0, null, true, true, [], [], "Cockpit")));
+
+        var plan = SamplePlan() with
+        {
+            Fuel = "About 25 litres aboard: some 10 hours of motoring. This passage needs about 7 litres.",
+            Warnings = ["She'll arrive after dark (the light goes at about 22:30).", "This passage costs 1 vacation day (Friday). You have 23 left."],
+            AtDestination = ["The club cruise to Kvitnes (Saturday and Sunday, days 215 to 216) asks for anchor gear in order (no known problem).", "An anchorage: no shop, no fuel."],
+        };
+        var text = P.Query(plan);
+        Assert.Contains("About 25 litres aboard: some 10 hours of motoring.", text);
+        Assert.Contains("Mind: She'll arrive after dark (the light goes at about 22:30).", text);
+        Assert.Contains("Mind: This passage costs 1 vacation day (Friday). You have 23 left.", text);
+        Assert.Contains("At Hestholmen: An anchorage: no shop, no fuel.", text);
+        Assert.Contains("At Hestholmen: The club cruise to Kvitnes", text);
+        Assert.DoesNotContain("Mind:", P.Query(SamplePlan()));
+    }
+
+    [Fact]
+    public void Status_shows_the_week_and_what_is_next_only_when_there_is_a_calendar()
+    {
+        var text = P.Query(new StatusView(75, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 25000, 96, Week: "Saturday, day 75: a weekend, a boat day.", VacationDaysLeft: 25, Next: "Next: payday on day 90, 6000 NOK."));
+        Assert.Contains("Saturday, day 75: a weekend, a boat day.", text);
+        Assert.Contains("Next: payday on day 90, 6000 NOK.", text);
+        var plain = P.Query(new StatusView(75, "08:00", 0, 0, null, false, false, [], [], "Cockpit"));
+        Assert.DoesNotContain("Next:", plain);
+        Assert.DoesNotContain("weekend", plain);
+    }
+
+    [Fact]
     public void Status_shows_money_deadline_and_launch()
     {
         var view = new StatusView(1, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 9000, 96, true, true);
@@ -435,5 +535,38 @@ public class ProseTests
         var after = P.Query(new StatusView(100, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 1000, 96, Launched: true, SeasonLead: "Haulout booked for day 258."));
         Assert.Contains("Money left: 1000 NOK. Haulout booked for day 258.", after);
         Assert.DoesNotContain("Launch deadline", after);
+    }
+
+    [Fact]
+    public void The_season_page_is_its_lines_and_the_logbook_marks_it_as_a_page_to_reread()
+    {
+        string[] lines =
+        [
+            "Season 1, day 75 to day 262.",
+            "62 miles sailed; three nights away from Skjærvik; reached Hestholmen and Storholmen.",
+            "She cost you 41300 NOK this season. The broker would put her at 171000 NOK.",
+            "The yard knows you pay on time.",
+        ];
+        var page = new SeasonPageView(1, 75, 262, 62, 3, ["Hestholmen", "Storholmen"], [], [], 212, 9, 0, 41300, 0, 171000, "The yard knows you pay on time.", lines);
+        var text = P.Query(page).Replace("\r\n", "\n");
+        Assert.Equal(string.Join("\n", lines) + "\n", text);
+        Assert.DoesNotContain("62.0", text);
+
+        Assert.Contains("(season page)", P.Query(new LogView([new LogEntry(262, "17:24", "The page of season 1 is written: day 75 to day 262.", 0, "season 1")])));
+        Assert.Contains("No season page yet", P.Query(new SeasonPageView(0, 0, 0, 0, 0, [], [], [], 0, 0, 0, 0, 0, 0, "", ["No season page yet: it is written at the autumn haulout."])));
+    }
+
+    [Fact]
+    public void The_yards_opinion_is_a_sentence_in_the_calendar_and_the_season_never_a_number()
+    {
+        var money = new MoneyView(12400, 0, 0, 0, 0, 0, []);
+        var calendar = new CalendarView(
+            89, "Wednesday", false, "Wednesday, day 89: a weekday.", 0, 22, 25, 3, 0, 12400, 20000, 6000, 90, [], [], money,
+            Reputation: "The yard knows you pay on time.", PaydaysSeen: 3);
+        var text = P.Query(calendar);
+        Assert.Contains("The yard knows you pay on time.", text);
+        Assert.DoesNotContain("PaydaysSeen", text);
+        Assert.DoesNotContain("3 paydays", text);
+        Assert.DoesNotContain("The yard", P.Query(calendar with { Reputation = null }));
     }
 }

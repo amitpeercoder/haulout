@@ -22,6 +22,16 @@ internal static class EngineInputsBuilder
         "starter-motor", "engine-ground-stud", "negative-cable", "negative-terminal",
     ];
 
+    public const string FuelTankId = "fuel-tank";
+    public const string FuelLitresProperty = "fuelLitres";
+    /// <summary>The restriction of an empty tank: fully restricted, so the engine rules' own words apply (design note 010).</summary>
+    public const double EmptyRestriction = 1.0;
+
+    /// <summary>The tank is empty: the boat burns fuel at all (the data says so) and the tank is below the data's empty line.</summary>
+    public static bool FuelEmpty(Boat boat) =>
+        boat.Fuel.Burns && boat.TryGet(FuelTankId, out var tank)
+        && tank.State.TryGetValue(FuelLitresProperty, out var litres) && litres < boat.Fuel.EmptyBelowLitres;
+
     public static EngineInputs Build(Boat boat)
     {
         var loop = LoopOrder.Select(id =>
@@ -58,6 +68,8 @@ internal static class EngineInputsBuilder
         double restriction = activeFaults
             .Where(f => f.Effect.Kind == FaultEffectKind.FuelRestriction)
             .Select(f => f.Effect.Value).DefaultIfEmpty(0.0).Max();
+
+        if (FuelEmpty(boat)) restriction = Math.Max(restriction, EmptyRestriction);
 
         // Stirred-up water from the tank has reached the primary filter (design note 007).
         if (boat.TryGet(PrimaryFilterId, out _)

@@ -17,18 +17,23 @@ internal sealed class WaterSystem
 
     private readonly Boat _boat;
     /// <summary>Components that can let water in at all: the rest are skipped every step.</summary>
-    private readonly List<string> _ingress;
+    private List<string> _ingress;
 
     public WaterSystem(Boat boat)
     {
         _boat = boat;
         Level = boat.Water.StartLitres;
-        _ingress = boat.Components
-            .Where(c => c.State.ContainsKey(LeakProperty) || c.State.ContainsKey(RainProperty)
-                || boat.AllFaults.Any(f => f.Effects.Any(e =>
-                    e.Kind == FaultEffectKind.Property && e.Property is LeakProperty or RainProperty && (e.Component ?? f.ComponentId) == c.Id)))
-            .Select(c => c.Id).ToList();
+        _ingress = IngressIds();
     }
+
+    /// <summary>An upgrade was fitted (design note 010, step 3): the list of components that can let water in is made again.</summary>
+    public void Refresh() => _ingress = IngressIds();
+
+    private List<string> IngressIds() => _boat.Components
+        .Where(c => c.State.ContainsKey(LeakProperty) || c.State.ContainsKey(RainProperty)
+            || _boat.AllFaults.Any(f => f.Effects.Any(e =>
+                e.Kind == FaultEffectKind.Property && e.Property is LeakProperty or RainProperty && (e.Component ?? f.ComponentId) == c.Id)))
+        .Select(c => c.Id).ToList();
 
     /// <summary>Litres in the bilge.</summary>
     public double Level { get; set; }

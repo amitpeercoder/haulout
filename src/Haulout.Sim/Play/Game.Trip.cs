@@ -1,6 +1,7 @@
 using System.Globalization;
 using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
+using Haulout.Sim.Time;
 using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Play;
@@ -35,6 +36,8 @@ public sealed partial class Game
         /// <summary>Nautical miles made through the water along the route. Drift is how far the sea has set her back; the goal is Distance + Drift.</summary>
         public double PositionNm { get; set; }
         public double DriftNm { get; set; }
+        /// <summary>Nautical miles the boat itself (or the tow) carried her along the route: the log of the passage. Drift is not counted (design note 010, step 4).</summary>
+        public double CoveredNm { get; set; }
         public SeaMode Mode { get; set; } = SeaMode.Motoring;
         public bool TurnedBack { get; set; }
         /// <summary>Overheat minutes in a row; cleared when the engine stops or cools.</summary>
@@ -46,6 +49,9 @@ public sealed partial class Game
         public int EndClockMinutes { get; set; }
         public int MoneyAtDeparture { get; init; }
         public int LogStart { get; init; }
+        /// <summary>The knots fog holds her to this step (null: none), for the hour line. The patrol fined her already this passage (design note 010).</summary>
+        public double? FogCap { get; set; }
+        public bool PatrolFined { get; set; }
         public List<string> Failures { get; } = [];
         public List<string> Fixes { get; } = [];
         /// <summary>The clock year she left in, and the hourly fixes of the passage (design note 009).</summary>
@@ -108,8 +114,11 @@ public sealed partial class Game
                     noisy = noisy with { RainMm = real.RainMm > 0 ? 0 : 1.0 };
             }
         }
-        return new ForecastDay(day, true, WeatherWords.Describe(noisy), noisy.WindForce, noisy.WindFrom,
-            noisy.RainMm > 0, Sea.Serves(_boat.SeaRules, noisy.WindForce, noisy.WindFrom, route.CourseDeg));
+        // The fog is a morning you see coming: the forecast's noise does not touch it.
+        string fog = WeatherWords.FogWord(real);
+        string text = WeatherWords.Describe(noisy) + (fog.Length > 0 ? $" {char.ToUpperInvariant(fog[0])}{fog[1..]}." : "");
+        return new ForecastDay(day, true, text, noisy.WindForce, noisy.WindFrom,
+            noisy.RainMm > 0, Sea.Serves(_boat.SeaRules, noisy.WindForce, noisy.WindFrom, route.CourseDeg), fog.Length > 0);
     }
 
     /// <summary>The route out of the current port to the named destination (null: the one route out). Null: there is none.</summary>
@@ -133,6 +142,7 @@ public sealed partial class Game
             if (!_finished) b.Add("The engine hasn't run yet this season.");
             if (departDay == Day && Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
                 b.Add($"It's blowing too hard to leave today: {WeatherWords.WindPhrase(Today)}.");
+            if (departDay == Day && FogHoldsHarbour) b.Add(FogHarbourMessage);
         }
         return b;
     }
@@ -144,7 +154,7 @@ public sealed partial class Game
         var sea = _boat.SeaRules;
         var from = CurrentPort;
         string fromName = from?.Name ?? "";
-        int towNok = _boat.Trips?.Tow.Nok ?? 0;
+        int towNok = _boat.Trips is null ? 0 : TowPriceNok;
 
         TripPlanView NoRoute(string to, string reason)
         {
@@ -189,11 +199,90 @@ public sealed partial class Game
         var missing = risks.Where(r => r.Spare is not null && !r.SpareAboard).Select(r => r.Spare!).Distinct().ToList();
         var shelter = route.Shelter.Select(s => $"{s.Name}, {s.AtNm.ToString("0.#", ci)} nm out").ToList();
 
+        var (fuelLine, warnings) = PassageWarnings(route, depart, motorHours, days, out int vacationDays);
+        var atDestination = EventsAt(route.To, ArrivalDay(depart, motorHours));
+        if (trips.FindPort(route.To) is { Anchorage: true }) atDestination.Add("An anchorage: no shop, no fuel.");
+
         return new TripPlanView(
             fromName, toName, route.DistanceNm, route.CourseDeg, depart, motorHours, sailHours, estimate, days, risks,
-            SparesAboardNames(), missing, shelter, Balance, towNok, blockers);
+            SparesAboardNames(), missing, shelter, Balance, towNok, blockers,
+            fuelLine, vacationDays, warnings, atDestination.Count == 0 ? null : atDestination);
+    }
+
+    /// <summary>The hour the plan assumes she casts off: now, today; 09:00 on a later day.</summary>
+    private double PlanDepartHour(int depart) => depart == Day ? HourOfDay : 9.0;
+
+    /// <summary>The day she would arrive, leaving at the planned hour and motoring for the estimated hours.</summary>
+    private int ArrivalDay(int depart, double motorHours) => depart + (int)Math.Floor((PlanDepartHour(depart) + motorHours) / 24);
+
+    /// <summary>
+    /// The plan's risks that are not walls: the fuel, the dark, fog, and the vacation days. Only what the player knows: the fuel gauge, the
+    /// forecast, the problems they have found. Never the true state of the lights or the tank.
+    /// </summary>
+    private (string? Fuel, List<string> Warnings) PassageWarnings(Route route, int depart, double motorHours, List<ForecastDay> days, out int vacationDays)
+    {
+        var warnings = new List<string>();
+        string? fuelLine = null;
+        var ci = CultureInfo.InvariantCulture;
+
+        if (GaugeLitres() is { } aboard && _boat.Fuel.MotorLitresPerHour > 0)
+        {
+            double burn = _boat.Fuel.MotorLitresPerHour;
+            int needs = (int)Math.Round(motorHours * burn, MidpointRounding.AwayFromZero);
+            int hours = (int)Math.Round(aboard / burn, MidpointRounding.AwayFromZero);
+            fuelLine = $"About {aboard} litres aboard: some {hours} hours of motoring. This passage needs about {needs} litres.";
+            if (motorHours * burn > aboard) warnings.Add("The fuel aboard won't motor her all the way: fill the tank or count on the wind.");
+        }
+
+        // Daylight: leave now (today) or at nine on a later day, motoring all the way.
+        double leave = PlanDepartHour(depart), arrive = leave + motorHours;
+        int arrivalDay = depart + (int)Math.Floor(arrive / 24);
+        double arriveHour = arrive % 24;
+        {
+            bool arrivesDark = IsDark(arrivalDay, arriveHour);
+            bool partDark = false;
+            for (double h = leave; h <= arrive && !partDark; h += 0.25)
+                partDark = IsDark(depart + (int)Math.Floor(h / 24), h % 24);
+            if (arrivesDark || partDark)
+            {
+                string text = arrivesDark
+                    ? $"She'll arrive after dark (the light goes at about {LightGoes(arrivalDay)})."
+                    : $"Part of the passage is in the dark (the light comes at about {LightComes(depart)}).";
+                if (KnownOpenFaults().Any(f => f.ComponentId == NavLightsId))
+                    text = text[..^1] + ", and you know the navigation lights have a problem: the patrol fines boats running without lights.";
+                warnings.Add(text);
+            }
+        }
+
+        // Fog: a wall today in the harbour (a blocker), a warning for a later day.
+        if (_boat.Night.FogMatters && days.Count > 0 && days[0].Fog && depart != Day
+            && !UpgradeWorks(PlotterId) && !UpgradeWorks(RadarId))
+            warnings.Add($"The forecast says fog on day {depart}: without a plotter or radar the harbourmaster holds you in until it lifts, and at sea you would creep at "
+                + $"{_boat.Night.FogKnots.ToString("0.#", ci)} knots.");
+
+        // The weekdays the passage touches, none counted twice, less one already charged.
+        vacationDays = 0;
+        if (_boat.Calendar.ChargesDays)
+        {
+            var charged = new List<string>();
+            bool anyWeekday = false;
+            for (int d = depart; d <= arrivalDay; d++)
+            {
+                var clock = new GameClock(d);
+                if (clock.IsWeekend) continue;
+                anyWeekday = true;
+                if (DayCharged(d)) continue;
+                charged.Add(clock.WeekdayName);
+            }
+            vacationDays = charged.Count;
+            if (charged.Count > 0)
+                warnings.Add($"This passage costs {charged.Count} vacation day{(charged.Count == 1 ? "" : "s")} ({JoinAnd(charged)}). "
+                    + (_vacationLeft >= charged.Count ? $"You have {_vacationLeft} left." : $"You have {(_vacationLeft == 0 ? "none" : _vacationLeft.ToString(ci))} left: the rest is unpaid leave."));
+            else if (!anyWeekday) warnings.Add("This passage falls on a weekend: no vacation days.");
+        }
+        return (fuelLine, warnings);
     }
 
     private List<string> SparesAboardNames() =>
-        _boat.Chandlery.Where(i => !i.Tool && _inventory.GetValueOrDefault(i.Id) > 0).Select(i => i.Name).ToList();
+        _boat.Chandlery.Where(i => !i.Tool && _inventory.GetValueOrDefault(i.Id) > 0).Select(i => i.Name).Concat(PartsAboardNames()).ToList();
 }

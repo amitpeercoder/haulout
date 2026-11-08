@@ -37,6 +37,9 @@ public sealed class WeatherSeries
     {
         climate ??= Climate.Default;
         var rng = new SeededRandom(seed * 31 + 7);
+        // Fog has its own stream, two draws a day whatever the outcome, so the main stream (and the golden hash of the series) never moves.
+        var fogRng = new SeededRandom(seed * 7349 + 101);
+        var (liftLo, liftHi) = climate.FogLifts;
         var days = new WeatherDay[LastDay + 1];
 
         double tempAnomaly = 0, windAnomaly = 0;
@@ -80,14 +83,26 @@ public sealed class WeatherSeries
                 else dir = (int)(rng.NextDouble() * 8);
             }
 
-            days[day] = new WeatherDay(day, force, Directions[dir], rain, Math.Round(temp, 1), Math.Round(night, 1));
+            double fogRoll = fogRng.NextDouble(), lengthRoll = fogRng.NextDouble();
+            int fogUntil = 0;
+            if (fogRoll < c.FogChance)
+            {
+                if (lengthRoll < climate.FogAllDayFraction) fogUntil = 24;
+                else
+                {
+                    double u = climate.FogAllDayFraction >= 1 ? 0 : (lengthRoll - climate.FogAllDayFraction) / (1 - climate.FogAllDayFraction);
+                    fogUntil = Math.Min(liftHi, liftLo + (int)(u * (liftHi - liftLo + 1)));
+                }
+            }
+
+            days[day] = new WeatherDay(day, force, Directions[dir], rain, Math.Round(temp, 1), Math.Round(night, 1), Math.Round(c.Daylight, 2), fogUntil);
         }
         return new WeatherSeries(days);
     }
 
     private readonly record struct Curve(
         double TempLo, double TempHi, double NightDrop, double RainChance, double RainAfterRain,
-        double RainMean, double WindMean, double GaleChance);
+        double RainMean, double WindMean, double GaleChance, double Daylight, double FogChance);
 
     /// <summary>Interpolates between month centres so no parameter jumps at a month boundary.</summary>
     private static Curve Blend(Climate climate, int day)
@@ -102,7 +117,8 @@ public sealed class WeatherSeries
         return new Curve(
             L(a.TempC[0], b.TempC[0]), L(a.TempC[1], b.TempC[1]), L(a.NightDropC, b.NightDropC),
             L(a.RainChance, b.RainChance), L(a.RainAfterRainChance, b.RainAfterRainChance),
-            L(a.RainMeanMm, b.RainMeanMm), L(a.WindMeanForce, b.WindMeanForce), L(a.GaleChance, b.GaleChance));
+            L(a.RainMeanMm, b.RainMeanMm), L(a.WindMeanForce, b.WindMeanForce), L(a.GaleChance, b.GaleChance),
+            L(a.DaylightHours, b.DaylightHours), L(a.FogChance, b.FogChance));
     }
 
     /// <summary>Standard normal via Box-Muller.</summary>

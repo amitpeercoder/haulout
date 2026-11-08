@@ -168,7 +168,7 @@ public sealed partial class Game
         if (!_boat.TryGet(FuelTankId, out var tank) || TankCapacity <= 0 || !tank.State.ContainsKey(FuelLitresProperty)) return "There's no tank to fill.";
         double litres = TankCapacity - FuelLitres;
         if (litres < 0.5) return "The tank is full.";
-        return MoneyRefusal((int)Math.Ceiling(litres * _boat.Layup.DieselNokPerLitre));
+        return FriendPays ? null : MoneyRefusal((int)Math.Ceiling(litres * _boat.Layup.DieselNokPerLitre));
     }
 
     private CommandResult DoFillTank(Turn t)
@@ -179,15 +179,19 @@ public sealed partial class Game
         var tank = _boat.Get(FuelTankId);
         double capacity = TankCapacity;
         double litres = capacity - FuelLitres;
-        int nok = (int)Math.Ceiling(litres * rules.DieselNokPerLitre);
+        bool friend = FriendPays;
+        int nok = friend ? 0 : (int)Math.Ceiling(litres * rules.DieselNokPerLitre);
 
         ShutDownEngine(t);
         tank.State[FuelLitresProperty] = capacity;
         int rounded = (int)Math.Round(litres, MidpointRounding.AwayFromZero);
-        var text = $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, {nok} NOK.";
+        var text = friend
+            ? $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, and your friend pays."
+            : $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, {nok} NOK.";
         t.Narrative.Add(text);
+        if (friend) _ledger.Add(new LedgerEntry(Day, LedgerSpending, "Diesel, paid by your friend.", 0));
         return Accept(t, action, rules.FillMinutes, nok, new RepairView(tank.Name, text),
-            $"Filled the tank: {rounded} litres of diesel for {nok} NOK.");
+            friend ? $"Filled the tank: {rounded} litres of diesel, paid by your friend." : $"Filled the tank: {rounded} litres of diesel for {nok} NOK.");
     }
 
     private string? BatteryAshoreRefusal()

@@ -21,9 +21,9 @@ public class WaterTests
 
     private static WeatherSeries Rain(double mm) => WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", mm, 6, 3));
 
-    private static Game NewGame(WeatherSeries weather, out Boat boat, int day = 75)
+    private static Game NewGame(WeatherSeries weather, out Boat boat, int day = 75, bool calendar = true)
     {
-        boat = BoatLoader.LoadSloop28();
+        boat = BoatLoader.LoadSloop28(withCalendar: calendar);
         return new Game(boat, day, new FixedRandom(0.99), Game.DefaultSeed, weather);
     }
 
@@ -352,7 +352,7 @@ public class WaterTests
     [Fact]
     public void Staying_awash_spawns_the_soaked_faults_once_silently_and_they_can_be_found_deferred_and_fixed()
     {
-        var g = NewGame(Rain(Monsoon), out var boat);
+        var g = NewGame(Rain(Monsoon), out var boat, calendar: false);
         PullFuse(g);
         var starter = FaultOf(boat, "starter-soaked");
         Assert.True(starter.Dormant);

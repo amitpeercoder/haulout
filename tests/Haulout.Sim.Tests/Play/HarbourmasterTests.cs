@@ -26,9 +26,9 @@ public class HarbourmasterTests
     private static WeatherSeries Calm() => WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 2));
 
     /// <summary>Afloat at her first port, the seacock new and the terminal clean, in the cockpit.</summary>
-    private static Game Moored(int day, WeatherSeries weather, out Boat boat, bool newSeacock = true)
+    private static Game Moored(int day, WeatherSeries weather, out Boat boat, bool newSeacock = true, bool calendar = true)
     {
-        boat = BoatLoader.LoadSloop28();
+        boat = BoatLoader.LoadSloop28(withCalendar: calendar);
         var g = new Game(boat, day, new FixedRandom(0.99), Game.DefaultSeed, weather);
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         if (newSeacock) Ok(Walk.Do(g, "seacock", c => new Replace(c)));
@@ -45,7 +45,7 @@ public class HarbourmasterTests
     [Fact]
     public void A_failed_drain_hose_and_a_dead_pump_stop_a_sixty_day_wait_after_the_first_day_and_she_does_not_sink()
     {
-        var g = Moored(100, Calm(), out var boat);
+        var g = Moored(100, Calm(), out var boat, calendar: false); // a calendar would cut the sixty days at the regatta (day 152)
         Wake(boat, "bilge-pump-burnt-out", 100);
         Wake(boat, "drain-hose-failed", 100);
         int start = Status(g).Day;
@@ -69,7 +69,7 @@ public class HarbourmasterTests
     [Fact]
     public void A_slow_leak_stops_the_wait_on_the_day_the_bilge_passes_the_level_and_the_narrative_counts_the_days_waited()
     {
-        var g = Moored(100, Calm(), out var boat, newSeacock: false);
+        var g = Moored(100, Calm(), out var boat, newSeacock: false, calendar: false); // the sixty days would otherwise be cut at the regatta
         Wake(boat, "bilge-pump-burnt-out", 100);
         g.BilgeLitres = 115; // the weeping seacock adds 1.2 litres a day: over 120 at the end of the fifth day
         int start = Status(g).Day;
@@ -115,7 +115,7 @@ public class HarbourmasterTests
     [Fact]
     public void A_dry_boat_waits_the_full_sixty_days_as_before()
     {
-        var g = Moored(100, Calm(), out _);
+        var g = Moored(100, Calm(), out _, calendar: false); // with a calendar the sixty days stop on the morning of the regatta (day 152)
         int start = Status(g).Day;
         var r = Ok(g.Execute(new WaitDays(60)));
 
@@ -243,7 +243,7 @@ public class HarbourmasterTests
     [Fact]
     public void The_call_names_no_fault()
     {
-        var g = Moored(100, Calm(), out var boat);
+        var g = Moored(100, Calm(), out var boat, calendar: false); // a calendar would cut the sixty days at the regatta (day 152)
         Wake(boat, "bilge-pump-burnt-out", 100);
         Wake(boat, "drain-hose-failed", 100);
         var r = Ok(g.Execute(new WaitDays(60)));

@@ -10,11 +10,13 @@ You can hire a surveyor, and you decide when she is launched; the yard expects h
 
 Your goal: find out why the engine won't start and get it running, spending as little in-game time and money as you can.
 
-Once she runs, the first goal is to get her to the regatta party at Hestholmen and back without a tow.
+Once she runs, the first goal is to get her to the regatta party at Hestholmen (day 152) and back without a tow.
 
-After that, the goal is to get through the season: keep her afloat and sound, haul her out at the yard in the autumn (the yard's slots go fast: book one early), lay her up for the winter, and sell her.
+You have a job ashore: weekdays are work and weekends are boat days. An evening aboard after work is free; a weekday aboard beyond an evening, or a weekday at sea, costs one of your vacation days for the year, and when they are spent a day's pay is docked. Pay comes in on the calendar, and so do the bills. The `calendar` tool shows the week, the money, the bills ahead and the things worth sailing for; `next_weekend` and `wait_week` pass the time a week at a time. Parts that are not on the yard's shelf have to be ordered and take days to come.
 
-When the sale has closed, or after you have chosen to keep her, reply with a single line:
+After that, make Midsummer at Storholmen (days 172 and 173: an overnight, 26 nm out), and get through the season: keep her afloat and sound, haul her out at the yard in the autumn (the yard's slots go fast: book one early), lay her up for the winter, and keep her for a second year.
+
+After you have chosen to keep her, reply with a single line:
 DONE <number of tool calls you made>
 
 If you have made 300 tool calls without success, stop and reply with a single line:

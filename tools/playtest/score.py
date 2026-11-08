@@ -10,7 +10,7 @@ DATA = os.path.join(HERE, "..", "..", "src", "Haulout.Sim", "Data", "sloop28.jso
 # first fault. Update when a new fault becomes the playtest target.
 FIX_COMPONENT_IDS = ["negative-terminal"]
 
-QUERIES = {"status", "logbook", "aboard", "help", "briefing"}
+QUERIES = {"status", "logbook", "aboard", "help", "briefing", "calendar", "season_page", "upgrades"}
 DECOY_TOOLS = {"clean", "replace", "charge"}
 
 
@@ -34,6 +34,7 @@ def fix_names():
 
 HOME_PORT = "Skjærvik"
 OUT_PORT = "Hestholmen"
+MIDSUMMER_PORT = "Storholmen"
 
 
 def trip_fields(rows):
@@ -85,6 +86,34 @@ def season_fields(rows):
     }
 
 
+def calendar_fields(rows):
+    """Design note 010: the wants. Trace fields added in step 4a; a trace without them scores zeros and no midsummer."""
+    def last(key):
+        for r in reversed(rows):
+            if key in r:
+                return r[key]
+        return 0
+    events_made_seen = 0
+    midsummer = False
+    for r in rows:
+        made = r.get("eventsMade", 0)
+        # Midsummer is judged at the midnight that ends its first day with her at Storholmen (days 172 to 173 of the year).
+        if made > events_made_seen and r.get("port") == MIDSUMMER_PORT and not r.get("atSea") and 172 <= r.get("day", 0) % 365 <= 174:
+            midsummer = True
+        if "bonfire on the point" in str(r.get("result", "")):
+            midsummer = True
+        events_made_seen = max(events_made_seen, made)
+    return {
+        "paydays": last("paydays"),
+        "vacation_days_used": last("vacationDaysUsed"),
+        "events_made": last("eventsMade"),
+        "events_missed": last("eventsMissed"),
+        "upgrades_fitted": last("upgradesFitted"),
+        "midsummer": "yes" if midsummer else "no",
+        "kept": "yes" if any(r.get("kept") or (r.get("tool") == "keep" and r.get("accepted")) for r in rows) else "no",
+    }
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     as_json = "--json" in argv
@@ -118,6 +147,7 @@ def main(argv):
             target = norm(a.get("component", a.get("item", "")))
             if target not in fixes:
                 decoys += 1
+    trip, seas, cal = trip_fields(rows), season_fields(rows), calendar_fields(rows)
     m = re.match(r"\d{8}-\d{6}-(.+)\.trace\.jsonl$", os.path.basename(path))
     out = {
         "solved": "yes" if solved else "no",
@@ -128,8 +158,8 @@ def main(argv):
         "money": last.get("moneySpentNok", 0),
         "decoys": decoys,
         "rejected": sum(1 for r in upto if r.get("accepted") is False),
-        **trip_fields(rows),
-        **season_fields(rows),
+        **trip, **seas, **cal,
+        "goal_wants": "yes" if (trip["trip_goal"] == "yes" and cal["midsummer"] == "yes" and seas["hauled_out"] == "yes" and cal["kept"] == "yes") else "no",
         "model": m.group(1) if m else "unknown",
         "trace": path,
     }

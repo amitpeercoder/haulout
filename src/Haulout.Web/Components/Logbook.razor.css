@@ -33,3 +33,4 @@ li.found .text { color: var(--fault); }
 li.receipt span.text { font-family: var(--face-type); font-size: 0.9rem; line-height: 28px; padding: 0; }
 li .amount { margin-left: auto; font-family: var(--face-type); font-size: 0.9rem; white-space: nowrap; }
 li.empty { color: var(--ink-faint); font-family: var(--face-hand); }
+.weekline { font-size: 0.85rem; color: var(--ink-faint); }

@@ -41,9 +41,10 @@ public class TripTests
     private static LogView Log(Game g) => (LogView)g.Ask(new Logbook());
 
     /// <summary>A fresh boat afloat with the engine running: terminal cleaned, seacock replaced (it seizes on launch otherwise), started, launched.</summary>
-    private static Game Afloat(WeatherSeries weather, out Boat boat, bool newImpeller = false)
+    private static Game Afloat(WeatherSeries weather, out Boat boat, bool newImpeller = false, bool calendar = true, bool chainFixed = false)
     {
-        boat = BoatLoader.LoadSloop28();
+        boat = BoatLoader.LoadSloop28(withCalendar: calendar);
+        if (chainFixed) boat.Get("anchor-gear").Replace(); // she starts with a seized anchor chain (design note 010); a test that anchors begins with it replaced
         var g = new Game(boat, 75, new FixedRandom(0.99), Game.DefaultSeed, weather);
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
@@ -58,6 +59,8 @@ public class TripTests
     }
 
     private static Game Afloat(WeatherSeries weather) => Afloat(weather, out _);
+
+    private static Game AfloatWithAnchor(WeatherSeries weather) => Afloat(weather, out _, chainFixed: true);
 
     private static CommandResult Depart(Game g)
     {
@@ -304,7 +307,7 @@ public class TripTests
         Assert.Equal("Hestholmen", card.Destination);
         Assert.False(card.Towed);
         Assert.False(card.TurnedBack);
-        Assert.Contains(card.Lines, l => l.Contains("regatta party"));
+        Assert.Contains(card.Lines, l => l.Contains("a shop with its door propped open")); // the party moved to the regatta event (design note 010)
         Assert.Contains("You pick up a mooring and stop the engine.", arrive.Narrative);
         Assert.Contains(arrive.Narrative, l => l.StartsWith("Hour ", StringComparison.Ordinal) && l.EndsWith("0.0 nm to Hestholmen.", StringComparison.Ordinal));
         Assert.Equal(0, card.MoneySpentNok); // the spare was bought before she cast off
@@ -455,7 +458,7 @@ public class TripTests
     [Fact]
     public void A_tow_is_allowed_into_a_negative_balance_and_the_game_goes_on()
     {
-        var g = Afloat(Wind(3, "southwest"));
+        var g = Afloat(Wind(3, "southwest"), out _, calendar: false);
         while (Status(g).BalanceNok >= 6000) Ok(g.Execute(new Buy("hose")));
         Depart(g);
         int balance = Status(g).BalanceNok;
@@ -647,7 +650,7 @@ public class TripTests
     [Fact]
     public void Anchor_works_only_within_a_mile_of_shelter()
     {
-        var g = Afloat(Wind(3, "southwest"));
+        var g = AfloatWithAnchor(Wind(3, "southwest"));
         Depart(g);
         Ok(g.Execute(new Continue()));    // 5 nm out: Lyngskjær is 2 nm ahead
         No(g.Execute(new Anchor()), "Nowhere to anchor here: Lyngskjær is 2.0 nm ahead.");
@@ -671,7 +674,7 @@ public class TripTests
     [Fact]
     public void Right_after_casting_off_she_can_anchor_at_the_port_she_left()
     {
-        var g = Afloat(Wind(3, "southwest"));
+        var g = AfloatWithAnchor(Wind(3, "southwest"));
         Depart(g);
         Assert.True(Trip(g).CanAnchor);
         Ok(g.Execute(new Anchor()));

@@ -134,7 +134,9 @@ public sealed partial class Game
             for (int w = 1; w <= weeks; w++)
                 drift += (int)(SeasonRoll(SaltYardDrift, clock.Year, w) * (yard.DriftMaxDaysPerWeek + 1));
         }
-        int first = Math.Max(from, today + yard.MinLeadDays) + drift;
+        int earliest = Math.Max(from, today + yard.MinLeadDays);
+        // Reputation (design note 010, step 4): a yard that knows you keeps a slot nearer, one that doesn't pushes it later; never before the earliest.
+        int first = Math.Max(earliest, earliest + drift - _boat.Reputation.SlotDaysPerPoint * ReputationScore);
         return first > to ? null : first;
     }
 
@@ -173,14 +175,6 @@ public sealed partial class Game
             change ? $"Moved the haulout slot from day {old} to day {day}." : $"Booked a haulout slot for day {day}.");
     }
 
-    /// <summary>The morning of the booked day is where a wait stops: the player is there to keep it.</summary>
-    private int StopAtSlot(Turn t, int days)
-    {
-        if (_bookedDay is not { } booked || booked <= Day || booked > Day + days) return days;
-        t.Narrative.Add($"You come back on day {booked} for your haulout slot.");
-        return booked - Day;
-    }
-
     // ------------------------------------------------------------------ the lift
 
     private bool IsAutumnLift() => new GameClock(Day).DayOfYear >= _boat.Yard.AutumnFromDayOfYear;
@@ -210,13 +204,17 @@ public sealed partial class Game
         ShutDownEngine(t);
         _onTheHard = true;
         _bookedDay = null;
+        _slotsKept++;
         _laidUp = autumn;
         if (autumn) _laidUpSinceDay = Day;
         t.Narrative.Add("You motor her round to the yard crane and the yard hands take your lines.");
         t.Narrative.Add("The slings go under her, and the crane lifts her out in a rush of water and sets her down in the cradle.");
         var card = LiftCard(t, yard.LiftNok, storage);
+        int liftDay = Day;
         return Accept(t, action, yard.HauloutMinutes, yard.LiftNok + storage, card,
-            autumn ? $"Hauled out for the winter: lift {yard.LiftNok} NOK, storage {storage} NOK." : $"Hauled out: lift {yard.LiftNok} NOK.");
+            autumn ? $"Hauled out for the winter: lift {yard.LiftNok} NOK, storage {storage} NOK." : $"Hauled out: lift {yard.LiftNok} NOK.",
+            // The autumn lift writes the season's page once the bill is booked: the card carries it.
+            afterTick: autumn ? () => { WriteSeasonPage(t, liftDay); return card with { Lines = t.Narrative.ToList() }; } : null);
     }
 
     /// <summary>What the hull looks like out of the water, told in the card; the player has seen it now.</summary>
@@ -347,6 +345,7 @@ public sealed partial class Game
         MooringDaily(day, present);
         LayupDaily(day);
         SlotDaily(day);
+        NightsDaily();
         SaleDaily(t, day);
     }
 
@@ -388,11 +387,12 @@ public sealed partial class Game
     /// <summary>The lines let go in the night: a tow, the repair and new lines are billed (below zero allowed); nothing is lost.</summary>
     private void PartMooring(Component lines)
     {
-        int tow = _boat.Trips?.Tow.Nok ?? 0;
+        int tow = _boat.Trips is null ? 0 : TowPriceNok;
+        _partings++;
         int repair = _boat.Mooring.PartedRepairNok;
         int newLines = ItemById(MooringLinesId)?.PriceNok ?? 0;
         int total = tow + repair + newLines;
-        _money += total;
+        Spend(total, LedgerBill, "Her mooring parted: the tow, the repair and new lines.");
         lines.Replace();
         _log.Add(new LogEntry(Day, TimeOfDay,
             $"Her mooring parted in the gale. The towboat brought her back and she is on new lines: {tow} NOK for the tow, {repair} NOK for the repair, {newLines} NOK for the lines.",
@@ -412,6 +412,7 @@ public sealed partial class Game
             return;
         }
         _bookedDay = null;
+        _slotsMissed++;
         var next = FirstFreeDay(Day);
         Raise("slot-missed",
             $"You missed your haulout slot on day {day}; the yard has given it to the next boat. Book again: "
@@ -498,7 +499,7 @@ public sealed partial class Game
             Day, clock.Year + 1, clock.DayOfYear, SeasonWord, SeasonLine(), Afloat, _laidUp, _launchDeadlineDay,
             _bookedDay, _sunk ? null : FirstFreeDay(Day), from, to, yard.LiftNok, yard.StorageNok, yard.ChangeFeeNok,
             _boat.Economy.EmergencyLiftNok, _launched && _onTheHard, LayupTasks(), _listed, _listed ? _askNok : null, OpenViewings().Count(), _kept,
-            SeasonActions());
+            SeasonActions(), UpgradeViews(), ReputationWords);
     }
 
     // ------------------------------------------------------------------ what the facade would accept now

@@ -67,7 +67,7 @@ public class LayupTests(ITestOutputHelper output)
     }
 
     private static Boat BoatWithBalance(int nok) =>
-        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"));
+        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"), withCalendar: false);
 
     private static void Prepare(Game g)
     {
@@ -132,7 +132,7 @@ public class LayupTests(ITestOutputHelper output)
     /// <summary>Laid up with exactly <paramref name="left"/> NOK of the balance still to spend.</summary>
     private static Game LaidUpWithLeft(int left, WeatherSeries? weather = null)
     {
-        int spent = Status(LaidUp(weather)).MoneySpentNok;
+        int spent = Status(LaidUp(weather, boat: BoatLoader.LoadSloop28(withCalendar: false))).MoneySpentNok;
         return LaidUp(weather, boat: BoatWithBalance(spent + left));
     }
 
@@ -269,19 +269,23 @@ public class LayupTests(ITestOutputHelper output)
         No(g.Execute(new FitWinterCover()), "You're at sea.");
     }
 
+    /// <summary>The 60 litre tank, 25.76 litres left after the layup helper's idling: 34.24 litres at 22 NOK, rounded up.</summary>
+    private const int FillCostNok = 754;
+
     [Fact]
     public void Filling_the_tank_pays_for_the_litres_and_makes_it_full()
     {
         var boat = BoatLoader.LoadSloop28();
         var g = LaidUp(boat: boat);
-        Assert.Equal(18, boat.Get("fuel-tank").State["fuelLitres"]);
+        // 27 litres at the start of the game, less the 124 minutes the engine idled (start, launch, the run to the crane) at 0.6 L/h.
+        Assert.Equal(25.76, boat.Get("fuel-tank").State["fuelLitres"], 6);
         var task = Season(g).Tasks.Single(t => t.Name == "Fill the tank");
         Assert.False(task.Done);
-        Assert.Equal(22 * 22, task.CostNok);
+        Assert.Equal(FillCostNok, task.CostNok);
 
         var r = Ok(g.Execute(new FillTank()));
-        Assert.Equal((30, 22 * 22), (r.MinutesTaken, r.CostNok));
-        Assert.Equal(40, boat.Get("fuel-tank").State["fuelLitres"]);
+        Assert.Equal((30, FillCostNok), (r.MinutesTaken, r.CostNok));
+        Assert.Equal(60, boat.Get("fuel-tank").State["fuelLitres"]);
         Assert.True(Season(g).Tasks.Single(t => t.Name == "Fill the tank").Done);
         No(g.Execute(new FillTank()), "The tank is full.");
     }
@@ -290,7 +294,7 @@ public class LayupTests(ITestOutputHelper output)
     public void Filling_the_tank_is_refused_without_money()
     {
         var g = LaidUpWithLeft(300);
-        No(g.Execute(new FillTank()), "That's 484 NOK and you have 300 NOK left.");
+        No(g.Execute(new FillTank()), $"That's {FillCostNok} NOK and you have 300 NOK left.");
     }
 
     [Fact]
@@ -458,7 +462,7 @@ public class LayupTests(ITestOutputHelper output)
         Assert.All(tasks, t => Assert.False(t.Done));
         Assert.All(tasks, t => Assert.False(string.IsNullOrWhiteSpace(t.Risk)));
         Assert.Equal([90, 45, 30, 30, 120], tasks.Select(t => t.Minutes));
-        Assert.Equal([250, 300, 484, 400, 2500], tasks.Select(t => t.CostNok));
+        Assert.Equal([250, 300, FillCostNok, 400, 2500], tasks.Select(t => t.CostNok));
     }
 
     [Fact]
@@ -512,8 +516,8 @@ public class LayupTests(ITestOutputHelper output)
     {
         var cold = LaidUp(Winter(0, 3, 2));
         Wait(cold, 10);
-        // (1 - 18/40) a night for ten nights.
-        Assert.Equal(5.5, Value(cold, SystemValues.CondensationDays), 6);
+        // (1 - 25.76/60) a night for ten nights: the tank is 60 litres and the layup helper's idling left 25.76 (design note 010).
+        Assert.Equal(10 * (1 - 25.76 / 60), Value(cold, SystemValues.CondensationDays), 6);
 
         var warm = LaidUp(Winter(0, 12, 8));
         Wait(warm, 10);
@@ -759,7 +763,7 @@ public class LayupTests(ITestOutputHelper output)
     [Fact]
     public void A_fixed_winter_fault_is_re_armed_and_fires_again_only_after_fresh_accumulation()
     {
-        var boat = BoatLoader.LoadSloop28();
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = LaidUp(Winter(0, 0, -6), boat: boat);
         Wait(g, 6);
         var first = FaultOf(boat, PumpCracked);
@@ -796,7 +800,7 @@ public class LayupTests(ITestOutputHelper output)
     [Fact]
     public void A_winterised_boat_whose_pump_was_replaced_is_not_cracked_again_until_the_water_is_back_in()
     {
-        var boat = BoatLoader.LoadSloop28();
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = LaidUp(Winter(0, 0, -6), boat: boat);
         Wait(g, 6);
         Ok(Walk.Do(g, "raw-water pump", c => new Inspect(c)));
@@ -915,7 +919,7 @@ public class LayupTests(ITestOutputHelper output)
     [Fact]
     public void A_game_hauled_out_in_autumn_year_one_winters_and_is_launched_in_spring_year_two_with_the_winters_faults_to_find()
     {
-        var boat = BoatLoader.LoadSloop28();
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = LaidUp(Harsh(), boat: boat);
         Assert.Equal(1, Season(g).Year);
         Assert.Contains("laid up", Season(g).Text);
@@ -969,7 +973,7 @@ public class LayupTests(ITestOutputHelper output)
     [Fact]
     public void A_second_autumn_in_year_two_has_its_own_window_and_a_re_armed_winter()
     {
-        var boat = BoatLoader.LoadSloop28();
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = LaidUp(Winter(0, 0, -6), boat: boat);
         Wait(g, 6);
         Ok(Walk.Do(g, "raw-water pump", c => new Inspect(c)));

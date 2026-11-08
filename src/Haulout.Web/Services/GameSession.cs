@@ -6,7 +6,7 @@ namespace Haulout.Web.Services;
 public enum ViewLevel { Map, CloseUp }
 
 /// <summary>The tabs of the context panel: the part and place, the launch picture, the passage.</summary>
-public enum PanelTab { Here, Readiness, Trip, Season }
+public enum PanelTab { Here, Readiness, Trip, Season, Calendar }
 
 /// <summary>Above the stage: the boat (cutaway, with its Map and Close-up) or the chart (docs/design/009).</summary>
 public enum StageView { Boat, Chart }
@@ -96,6 +96,17 @@ public sealed class GameSession
         Changed?.Invoke();
     }
 
+    /// <summary>The season page the player chose to read in the logbook (web-local); null: the latest.</summary>
+    public int? ShownPage { get; private set; }
+
+    /// <summary>Opens the Season tab with the page of the given season showing.</summary>
+    public void ShowSeasonPage(int season)
+    {
+        ShownPage = season;
+        Tab = PanelTab.Season;
+        Changed?.Invoke();
+    }
+
     public bool Finished => Status.Finished;
 
     /// <summary>The narrative of the start attempt that finished the slice; kept so the closing stays readable.</summary>
@@ -132,6 +143,8 @@ public sealed class GameSession
     public InventoryView Inventory => Ask<InventoryView>(new Inventory());
     public TripView Trip => Ask<TripView>(new Trip());
     public SeasonView Season => Ask<SeasonView>(new Season());
+    public CalendarView Calendar => Ask<CalendarView>(new Calendar());
+    public SeasonPageView SeasonPage => Ask<SeasonPageView>(new SeasonPage(ShownPage));
     public SaleView Sale => Ask<SaleView>(new Sale());
 
     public bool HasTool(string tool) => Status.Tools.Contains(tool);
@@ -316,6 +329,15 @@ public sealed class GameSession
     public CommandResult ListForSale(int askNok) => Execute(new ListForSale(askNok));
     public CommandResult AcceptOffer(int offer) => Execute(new AcceptOffer(offer));
     public CommandResult Keep() => Execute(new Keep());
+
+    // ------------------------------------------------------------ the week, the money and the wants (docs/design/010)
+
+    public CommandResult NextWeekend() => Execute(new NextWeekend());
+    public CommandResult WaitWeek() => Execute(new WaitWeek());
+    public CommandResult Order(string item) => Execute(new Order(item));
+    public CommandResult InviteFriend(int day) => Execute(new InviteFriend(day));
+    public CommandResult Install(string item) => Execute(new Install(item));
+    public CommandResult YardInstall(string item) => Execute(new YardInstall(item));
 
     /// <summary>Runs a winter task by the console words the sim names it with.</summary>
     public CommandResult RunLayupTask(string command) => command switch

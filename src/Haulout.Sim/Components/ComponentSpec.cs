@@ -40,7 +40,8 @@ public sealed record ComponentSpec(
     RemovablePart? RemovablePart = null,
     bool BelowWaterline = false,
     string? ReplaceText = null,
-    bool NeedsDry = false)
+    bool NeedsDry = false,
+    bool Stocked = true)
 {
     public static ComponentSpec Default { get; } = new(
         Subsystem.Engine, "", [], [], "", null, null, 0, 0, new Dictionary<string, double>());

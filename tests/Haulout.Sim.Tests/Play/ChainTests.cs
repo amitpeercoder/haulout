@@ -25,9 +25,9 @@ public class ChainTests
     private const string PumpName = "Burnt-out bilge pump";
     private const string StarterSoaked = "Starter soaked in bilge water";
 
-    private static Game NewGame(WeatherSeries weather, out Boat boat)
+    private static Game NewGame(WeatherSeries weather, out Boat boat, bool calendar = true)
     {
-        boat = BoatLoader.LoadSloop28();
+        boat = BoatLoader.LoadSloop28(withCalendar: calendar);
         return new Game(boat, 75, new FixedRandom(0.99), Game.DefaultSeed, weather);
     }
 
@@ -285,7 +285,7 @@ public class ChainTests
     public void A_weeping_seacock_and_rain_through_rusted_drains_raise_the_bilge_burn_the_pump_and_soak_the_starter()
     {
         // Steady, very heavy rain so the whole chain plays out in a couple of weeks of waiting.
-        var g = NewGame(WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 100, 6, 3)), out var boat);
+        var g = NewGame(WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 100, 6, 3)), out var boat, calendar: false);
         var results = new List<CommandResult>();
         Walk.ToPlace(g, "cockpit");
         results.Add(Ok(g.Execute(new Refit("hatch")))); // only the drains let rain in

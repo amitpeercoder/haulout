@@ -12,11 +12,17 @@ public sealed record MonthClimate(
     double RainMeanMm,
     double WindMeanForce,
     double GaleChance,
-    IReadOnlyList<string> Prevailing);
+    IReadOnlyList<string> Prevailing,
+    double DaylightHours = 12,
+    double FogChance = 0);
 
 /// <summary>Twelve monthly curves, index 0 = January.</summary>
-public sealed record Climate(string Placeholders, IReadOnlyList<MonthClimate> Months)
+public sealed record Climate(
+    string Placeholders, IReadOnlyList<MonthClimate> Months, double FogAllDayFraction = 0.25, IReadOnlyList<int>? FogLiftsHour = null)
 {
+    /// <summary>The whole hours the morning fog may lift at, lo and hi (design note 010).</summary>
+    public (int Lo, int Hi) FogLifts => FogLiftsHour is { Count: >= 2 } l ? (l[0], Math.Max(l[0], l[1])) : (9, 13);
+
     private const string ResourceName = "Haulout.Sim.Data.weather.json";
     private static readonly Lazy<Climate> Embedded = new(() => Load(ReadEmbedded()));
 

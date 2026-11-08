@@ -29,14 +29,15 @@ public sealed partial class Game
     private readonly AlertState _alerts = new();
 
     /// <summary>Raises an alert unless its kind was already raised today.</summary>
-    private void Raise(string kind, string text)
+    private void Raise(string kind, string text, int costNok = 0, bool onPassage = true)
     {
         int day = Day;
         if (_alerts.LastRaised.TryGetValue(kind, out var last) && last == day) return;
         _alerts.LastRaised[kind] = day;
         var alert = new Alert(day, TimeOfDay, text);
         _alerts.Items.Add((alert, false));
-        _log.Add(new LogEntry(day, alert.TimeOfDay, text, Alert: true));
+        _log.Add(new LogEntry(day, alert.TimeOfDay, text, costNok, Alert: true));
+        if (!onPassage) return;
         _passage?.Failures.Add(text);
         MarkTrack(text);
     }

@@ -140,7 +140,8 @@ public class LeakTests
         var g = NewGame();
         var wait = Ok(g.Execute(new WaitDays(45)));
         Assert.StartsWith("You leave her for 45 days.", wait.Narrative[0]);
-        Assert.Equal(2, wait.Narrative.Count); // the leaving and the weather
+        Assert.Equal(3, wait.Narrative.Count); // the leaving, the weather and the week line (pay and bills fell due on the way: design note 010)
+        Assert.StartsWith("While you were away: payday 6000 NOK", wait.Narrative[2]);
         Assert.Empty(wait.NewlyDiscovered);
     }
 }

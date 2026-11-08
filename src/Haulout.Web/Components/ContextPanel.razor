@@ -33,6 +33,7 @@
         <button class="@(Session.Tab == PanelTab.Readiness ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(PanelTab.Readiness)">Readiness @if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
         <button class="@(Session.Tab == PanelTab.Trip ? "on" : "")" data-tab="trip" @onclick="() => Session.ShowTab(PanelTab.Trip)">Trip</button>
         <button class="@(Session.Tab == PanelTab.Season ? "on" : "")" data-tab="season" @onclick="() => Session.ShowTab(PanelTab.Season)">Season</button>
+        <button class="@(Session.Tab == PanelTab.Calendar ? "on" : "")" data-tab="calendar" @onclick="() => Session.ShowTab(PanelTab.Calendar)">Calendar</button>
     </nav>
 
     @if (Session.Tab == PanelTab.Season)
@@ -57,6 +58,37 @@
                 </section>
             }
             <p data-season-text>@se.Text</p>
+            @if (se.Reputation is { Length: > 0 } rep) { <p class="faint" data-reputation>@rep</p> }
+            @if (Session.SeasonPage is { Season: > 0 } sp)
+            {
+                <h3>The page of season @sp.Season</h3>
+                <article class="letter" data-season-page>
+                    @foreach (var line in sp.Lines) { <p>@line</p> }
+                </article>
+            }
+            @if (se.Upgrades is { Count: > 0 } ups)
+            {
+                <h3>Upgrades</h3>
+                @foreach (var u in ups)
+                {
+                    <div class="task" data-upgrade="@u.Name">
+                        <p><strong>@u.Name</strong> · <span data-upgrade-status>@u.Status</span></p>
+                        <p class="faint">@u.PriceNok NOK · @Duration(u.InstallMinutes) of your own work@(u.YardNok is { } yn ? $" · yard {yn} NOK, {u.YardDays} {(u.YardDays == 1 ? "day" : "days")}" : "") · adds about @u.ValueNok NOK to her value</p>
+                        <p class="faint">@u.Opens</p>
+                        <div class="row">
+                            @if (u.Status == "not aboard")
+                            {
+                                <button data-action="order" @onclick="() => Session.Order(u.Name)">Order</button>
+                            }
+                            @if (u.Status == "aboard, not fitted")
+                            {
+                                <button data-action="install" @onclick="() => Session.Install(u.Name)">Install</button>
+                                @if (u.YardNok is not null) { <button data-action="yard-install" @onclick="() => Session.YardInstall(u.Name)">Yard install</button> }
+                            }
+                        </div>
+                    </div>
+                }
+            }
 
             @if (!sale.Sold)
             {
@@ -157,6 +189,64 @@
                 {
                     <div class="options">
                         <div class="option"><button data-action="keep" @onclick="() => Session.Keep()">Keep<span class="meta">carry her into next season</span></button></div>
+                    </div>
+                }
+            }
+        </section>
+    }
+    else if (Session.Tab == PanelTab.Calendar)
+    {
+        var cal = Session.Calendar;
+        <section class="season calendar">
+            @if (Session.LastResult is { } cr)
+            {
+                <section class="result @(cr.Accepted ? "" : "refused")">
+                    @foreach (var line in cr.Narrative) { <p>@line</p> }
+                    @if (cr.Accepted && (cr.MinutesTaken > 0 || cr.CostNok > 0)) { <p class="cost">@Cost(cr)</p> }
+                </section>
+            }
+            <p data-calendar-week>@cal.Week</p>
+            <p>Vacation: @cal.VacationDaysLeft of @cal.VacationDaysPerYear days left, @cal.VacationDaysUsed used@(cal.UnpaidDays > 0 ? $", {cal.UnpaidDays} unpaid" : "").</p>
+            <p>@MoneyWords.Balance(cal.BalanceNok) The bank lets you owe up to @cal.OverdraftLimitNok NOK.</p>
+            @if (cal.NextPaydayDay >= 0) { <p>Next payday: day @cal.NextPaydayDay, @cal.PayNok NOK.</p> }
+            @if (cal.Reputation is { Length: > 0 } crep) { <p class="faint">@crep</p> }
+            <div class="row">
+                <button data-action="next-weekend" @onclick="() => Session.NextWeekend()">Next weekend</button>
+                <button data-action="wait-week" @onclick="() => Session.WaitWeek()">Wait a week</button>
+            </div>
+
+            @if (cal.Ahead.Count > 0)
+            {
+                <h3>Ahead</h3>
+                @foreach (var a in cal.Ahead)
+                {
+                    <p class="faint" data-ahead>Day @a.Day, @a.Weekday: @a.Text@(a.Nok != 0 ? $" ({(a.Nok > 0 ? "+" : "")}{a.Nok} NOK)" : "")</p>
+                }
+            }
+            @if (cal.Orders.Count > 0)
+            {
+                <h3>On order</h3>
+                @foreach (var o in cal.Orders) { <p class="faint">@o.Part: @o.Status, due day @o.DueDay</p> }
+            }
+            @if (cal.Events is { Count: > 0 } events)
+            {
+                <h3>Events</h3>
+                @foreach (var ev in events)
+                {
+                    <div class="task" data-event="@ev.Name">
+                        <p><strong>@ev.Name</strong> @(ev.Place.Length > 0 && !ev.Name.Contains(ev.Place, StringComparison.Ordinal) ? "at " + ev.Place : "") · @ev.When · <span class="done">@ev.Status</span></p>
+                        @foreach (var rq in ev.Requirements)
+                        {
+                            <p class="faint">@(rq.Met switch { true => "met", false => "not met", _ => "unknown" }): @rq.Text (@rq.Note)</p>
+                        }
+                        @if (ev.Story.Length > 0) { <p class="faint">@ev.Story</p> }
+                        @if (ev.When.StartsWith("a week of your choice", StringComparison.Ordinal) && ev.Status == "ahead" && cal.Day <= ev.ToDay)
+                        {
+                            <div class="row">
+                                <input type="number" data-input="friend-day" placeholder="day @ev.FromDay to @ev.ToDay" @bind="_friendDay" />
+                                <button data-action="invite-friend" disabled="@(_friendDay is null)" @onclick="InviteClicked">Invite</button>
+                            </div>
+                        }
                     </div>
                 }
             }
@@ -400,6 +490,12 @@
 @code {
     private int? _bookDay;
     private int? _ask;
+    private int? _friendDay;
+
+    private void InviteClicked()
+    {
+        if (_friendDay is { } d) Session.InviteFriend(d);
+    }
 
     /// <summary>The season action the sim would accept now (it gives the same refusal the command does); everything else stays hidden.</summary>
     private static bool Offered(SeasonView se, string verb) => se.Actions is null || se.Actions.Any(a => a.Verb == verb && a.Available);

@@ -22,7 +22,7 @@ public sealed partial class Game
     }
 
     /// <summary>A finished passage, kept for the chart: "this season" is the clock year it left in.</summary>
-    internal sealed record PastPassage(string From, string To, int Year, int Day, string Outcome, IReadOnlyList<TrackFix> Track);
+    internal sealed record PastPassage(string From, string To, int Year, int Day, string Outcome, IReadOnlyList<TrackFix> Track, double Nm = 0);
 
     private readonly List<PastPassage> _pastPassages = [];
 
@@ -69,7 +69,7 @@ public sealed partial class Game
 
     /// <summary>The passage ends: it moves to the season's memory with its outcome.</summary>
     private void ArchivePassage(Passage p, string outcome) =>
-        _pastPassages.Add(new PastPassage(PortName(p.OriginPortId), PortName(BoundFor(p)), p.Year, DayAt(p.DepartClockMinutes), outcome, p.Track.ToList()));
+        _pastPassages.Add(new PastPassage(PortName(p.OriginPortId), PortName(BoundFor(p)), p.Year, DayAt(p.DepartClockMinutes), outcome, p.Track.ToList(), p.CoveredNm));
 
     /// <summary>The port the passage was first bound for (a turn back reverses the route, so it is then the route's From).</summary>
     private static string BoundFor(Passage p) => p.TurnedBack ? p.Route.From : p.Route.To;

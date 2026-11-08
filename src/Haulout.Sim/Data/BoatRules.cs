@@ -108,6 +108,10 @@ public sealed record ChandleryItem
     public bool Tool { get; init; }
     public string? ForComponent { get; init; }
     public string? LogText { get; init; }
+    /// <summary>false: the yard chandlery does not keep it on the shelf; it is ordered and arrives in days (design note 010).</summary>
+    public bool Stocked { get; init; } = true;
+    /// <summary>The id of the upgrade component this item fits (design note 010, step 3); null: an ordinary spare or tool.</summary>
+    public string? Upgrade { get; init; }
 }
 
 /// <summary>A point on the chart: nautical miles east and north of the home port, which is (0, 0). PLACEHOLDER (design note 009).</summary>
@@ -138,6 +142,8 @@ public sealed record Port
     public bool Sells(ChandleryItem item) => Shop && (Stock is null || Stock.Contains(item.Id));
     public int PriceOf(ChandleryItem item) => (int)Math.Round(item.PriceNok * PriceFactor, MidpointRounding.AwayFromZero);
     public IReadOnlyList<string> ArrivalLines { get; init; } = [];
+    /// <summary>The arrival lines of an anchorage when the anchor chain is seized (design note 010): she lies to a line ashore instead. Null: the same lines.</summary>
+    public IReadOnlyList<string>? ArrivalLinesAnchorJammed { get; init; }
 }
 
 /// <summary>A place to get out of the weather, AtNm along the route from its From port.</summary>
@@ -386,4 +392,196 @@ public sealed record SaleRules
 public static class WaterDefaults
 {
     public const string HarbourmasterText = "The harbourmaster rang: she's sitting low on her mooring. Worth getting down there.";
+}
+
+/// <summary>A standing cost that comes due on the calendar whether or not the player is there (design note 010).</summary>
+public sealed record BillRule
+{
+    public string Id { get; init; } = "";
+    /// <summary>"Berth and mooring at Skjærvik, the quarter": the invoice in words, told with the amount.</summary>
+    public string Text { get; init; } = "";
+    /// <summary>How the week line names it: "the berth invoice".</summary>
+    public string Short { get; init; } = "";
+    public int Nok { get; init; }
+    /// <summary>Falls due at 00:00 on every absolute day from <see cref="FromDay"/> whose day of year is in this list.</summary>
+    public IReadOnlyList<int> DaysOfYear { get; init; } = [];
+    public int FromDay { get; init; }
+}
+
+/// <summary>
+/// The week and the money (design note 010, step 1). The defaults are off where they move money or time: no pay, no bills, no vacation
+/// limit, no overdraft, so a boat built without data behaves as before. All numbers in the shipped data are PLACEHOLDERS for Amit.
+/// </summary>
+public sealed record CalendarRules
+{
+    /// <summary>Aboard on a weekday up to this many minutes is an evening after work, free. int.MaxValue: the days are never charged.</summary>
+    public int EveningMinutes { get; init; } = int.MaxValue;
+    public int VacationDaysPerYear { get; init; } = int.MaxValue;
+    public int UnpaidLeaveNok { get; init; }
+    /// <summary>Lands at 00:00 on the first day of every month (day of year divisible by 30).</summary>
+    public int PayNok { get; init; }
+    public int OverdraftLimitNok { get; init; }
+    public double InterestPerMonth { get; init; }
+    public IReadOnlyList<BillRule> Bills { get; init; } = [];
+    /// <summary>How far ahead the Calendar query looks, in days.</summary>
+    public int AheadDays { get; init; } = 42;
+    /// <summary>The calendar of wants (design note 010, step 2). Default: none.</summary>
+    public IReadOnlyList<EventRule> Events { get; init; } = [];
+
+    /// <summary>Weekdays aboard are charged (a vacation day or unpaid leave).</summary>
+    public bool ChargesDays => VacationDaysPerYear < int.MaxValue;
+
+    public static CalendarRules Default { get; } = new();
+}
+
+/// <summary>Parts that are not on the chandlery's shelf are ordered (design note 010). Lead time in whole days, inclusive. Default: 0 to 0, nothing is ever out of stock.</summary>
+public sealed record OrderRules
+{
+    public IReadOnlyList<int> LeadDays { get; init; } = [0, 0];
+    /// <summary>The port id the yard chandlery delivers to.</summary>
+    public string DeliverTo { get; init; } = "";
+    public int PhoneMinutes { get; init; } = 5;
+
+    public int LeadLo => LeadDays.Count >= 2 ? LeadDays[0] : 0;
+    public int LeadHi => LeadDays.Count >= 2 ? Math.Max(LeadDays[0], LeadDays[1]) : 0;
+    /// <summary>Orders exist at all: a part flagged not stocked is only out of stock when they do.</summary>
+    public bool Enabled => LeadHi > 0;
+
+    public static OrderRules Default { get; } = new();
+}
+
+/// <summary>
+/// Fuel (design note 010, step 2). The default burns nothing, so a boat built without data runs as before. All numbers in the shipped data
+/// are PLACEHOLDERS for Amit; the burn is UNVERIFIED against a real 20 hp diesel.
+/// </summary>
+public sealed record FuelRules
+{
+    /// <summary>Litres an hour while motoring under way.</summary>
+    public double MotorLitresPerHour { get; init; }
+    /// <summary>Litres an hour with the engine running and the boat going nowhere (in port, hove-to, on the yard hose, charging).</summary>
+    public double IdleLitresPerHour { get; init; }
+    /// <summary>The gauge reads to this many litres.</summary>
+    public int GaugeStepLitres { get; init; } = 5;
+    /// <summary>Below this the tank is empty: the fuel supply is fully restricted.</summary>
+    public double EmptyBelowLitres { get; init; } = 0.5;
+    /// <summary>The gauge in words, by the fraction of a full tank.</summary>
+    public IReadOnlyList<Band> GaugeWords { get; init; } = [];
+
+    public bool Burns => MotorLitresPerHour > 0 || IdleLitresPerHour > 0;
+
+    public static FuelRules Default { get; } = new();
+}
+
+/// <summary>
+/// Night and fog at sea (design note 010, step 2). The default has no fine and no fog cap. All numbers in the shipped data are PLACEHOLDERS;
+/// the harbourmaster's fog rule and the patrol are UNVERIFIED.
+/// </summary>
+public sealed record NightRules
+{
+    /// <summary>An hour is dark when it is more than half the day's length from this hour.</summary>
+    public double SolarNoonHour { get; init; } = 13;
+    /// <summary>The harbour patrol's fine for running dark without a working bow light. 0: no patrol.</summary>
+    public int NoLightsFineNok { get; init; }
+    /// <summary>Knots in fog without a working chartplotter or radar. 0: fog does not slow her and the harbour does not hold her.</summary>
+    public double FogKnots { get; init; }
+    /// <summary>Knots in fog with a working chartplotter only (radar: no cap).</summary>
+    public double FogKnotsWithPlotter { get; init; }
+
+    public bool FogMatters => FogKnots > 0;
+
+    public static NightRules Default { get; } = new();
+}
+
+/// <summary>
+/// What an event of the calendar of wants asks of the boat (design note 010, step 2). Kind: fitted (an upgrade, fitted and without a present
+/// fault), working (a component without a present fault), dryBunks (the cushions fitted and no water over the sole in the last Days days),
+/// warm (met when the component is fitted, or the day is at least BelowC degrees). Text is the requirement in the player's words.
+/// </summary>
+public sealed record RequirementRule
+{
+    public string Kind { get; init; } = "";
+    public string Component { get; init; } = "";
+    public string Text { get; init; } = "";
+    public int Days { get; init; }
+    public double BelowC { get; init; }
+}
+
+/// <summary>The window in which the player picks the week of an event, and how much notice it needs.</summary>
+public sealed record EventPick
+{
+    public int FromDayOfYear { get; init; }
+    public int ToDayOfYear { get; init; }
+    public int NoticeDays { get; init; } = 1;
+}
+
+/// <summary>
+/// One event of the calendar of wants (design note 010, step 2): a window, a place, requirements and a story. The window of a fixed event
+/// in year y starts on the first day on or after y x 360 + FromDayOfYear whose weekday is Weekday (none: that day) and lasts Days days.
+/// Overnight: she must be there at the midnight that ends the first day. Pick: the player picks the week (the friend's week).
+/// </summary>
+public sealed record EventRule
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Port { get; init; } = "";
+    public int FromDayOfYear { get; init; }
+    public string? Weekday { get; init; }
+    public int Days { get; init; } = 1;
+    public bool Overnight { get; init; }
+    public EventPick? Pick { get; init; }
+    public IReadOnlyList<RequirementRule> Requires { get; init; } = [];
+    public IReadOnlyList<string> MadeLines { get; init; } = [];
+    /// <summary>What shows when a requirement fails, by the component id of the requirement.</summary>
+    public IReadOnlyDictionary<string, string> FailedLines { get; init; } = new Dictionary<string, string>();
+    public string MissedText { get; init; } = "";
+}
+
+/// <summary>
+/// A part the boat can be given (design note 010, step 3): a full component that is not aboard until it is fitted, and how it is fitted.
+/// The chandlery item that carries it names it in <see cref="ChandleryItem.Upgrade"/>. Every number PLACEHOLDER for Amit.
+/// </summary>
+public sealed record UpgradeRule
+{
+    /// <summary>The component it becomes. Built by the loader like any component; kept out of the boat's components until it is fitted.</summary>
+    public required Haulout.Sim.Components.Component Component { get; init; }
+    /// <summary>The place the player must stand to fit it.</summary>
+    public string PlaceId { get; init; } = "";
+    /// <summary>The player's own work.</summary>
+    public int InstallMinutes { get; init; }
+    /// <summary>The yard's labour. Null (with <see cref="YardDays"/>): the yard does not do this job.</summary>
+    public int? YardNok { get; init; }
+    public int? YardDays { get; init; }
+    /// <summary>What the broker adds for it, at condition 1.</summary>
+    public int ValueNok { get; init; }
+    /// <summary>What it makes possible, in the player's words.</summary>
+    public string Opens { get; init; } = "";
+    /// <summary>The narrative of fitting it.</summary>
+    public string InstallText { get; init; } = "";
+}
+
+/// <summary>
+/// Reputation at the yard and the harbour (design note 010, step 4), read from counters the game already keeps and never shown as a number.
+/// The default weighs nothing and moves nothing, so a boat built without data behaves as before. All numbers in the shipped data are PLACEHOLDERS.
+/// </summary>
+public sealed record ReputationRules
+{
+    /// <summary>One point for every this many standing bills paid within the bank's limit. 0: bills do not count.</summary>
+    public int OnTimeBillsPerPoint { get; init; }
+    /// <summary>Points for a haulout on the booked day, a tow, a parted mooring, a forfeited slot, a bill that left the balance past the limit, a patrol fine.</summary>
+    public int SlotKept { get; init; }
+    public int Tow { get; init; }
+    public int MooringParted { get; init; }
+    public int SlotMissed { get; init; }
+    public int BillPastLimit { get; init; }
+    public int PatrolFine { get; init; }
+    public int Min { get; init; } = -5;
+    public int Max { get; init; } = 5;
+    /// <summary>Each point takes this share off the tow (a negative point adds it).</summary>
+    public double TowFactorPerPoint { get; init; }
+    /// <summary>Each point brings the yard's first free slot this many days nearer (a negative point pushes it later).</summary>
+    public int SlotDaysPerPoint { get; init; }
+    /// <summary>The sentence for a score: the first band whose Under exceeds it.</summary>
+    public IReadOnlyList<Band> Words { get; init; } = [];
+
+    public static ReputationRules Default { get; } = new();
 }

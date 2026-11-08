@@ -122,7 +122,8 @@ public class AdapterQueryTests
     [Fact]
     public void Options_know_what_can_be_reached_from_where_the_player_stands()
     {
-        var g = Game.NewFirstFault();
+        // The first game without the calendar: the heat exchanger is not on the yard's shelf there, and this test is about reach, not orders.
+        var g = new Game(BoatLoader.LoadSloop28(withCalendar: false), 75, new Haulout.Sim.SeededRandom(Game.DefaultSeed), Game.DefaultSeed);
         Walk.Near(g, "battery");
         Assert.All(Actions(g, "negative terminal").Options.Where(o => o.Verb != "measure"), o => Assert.True(o.Available, o.Verb));
 

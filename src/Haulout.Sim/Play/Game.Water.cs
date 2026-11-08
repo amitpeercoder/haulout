@@ -22,6 +22,8 @@ public sealed partial class Game
     private bool _watchingBilge;
     private bool _bilgePassedToday;
     private LossView? _loss;
+    /// <summary>The last day the water stood over the sole (design note 010: dry bunks). Far in the past until it does.</summary>
+    private int _lastOverSoleDay = int.MinValue / 2;
 
     /// <summary>For tests only (not on the facade: a player cannot read the bilge in litres).</summary>
     internal double BilgeLitres
@@ -38,6 +40,7 @@ public sealed partial class Game
     {
         // The step ends at the clock; a step that ends at midnight belongs to the day before.
         int day = _startDay + (StartMinuteOfDay + ClockMinutes - minutes) / 1440;
+        BurnFuel(minutes);
         ElectricalStep(minutes);
         _cooling.Step(minutes, _running, _running ? EngineInputsBuilder.Build(_boat).Cooling.RawWaterFlow : 1.0);
         _cooling.Publish(_values);
@@ -45,6 +48,7 @@ public sealed partial class Game
         _water.Step(new WaterSystem.Inputs(minutes, Afloat, UnderWinterCover ? 0 : _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
             AtSea ? Sea.SeaState(_boat.SeaRules, _weather[day].WindForce) : 0));
         _water.Publish(_values);
+        if (_water.Level > _boat.Water.SoleLitres) _lastOverSoleDay = day;
         if (_watchingBilge && _water.Level > _boat.Water.HarbourmasterLitres) _bilgePassedToday = true;
         if (Afloat && _water.Level >= _boat.Water.SinkLitres) Sink(day);
     }

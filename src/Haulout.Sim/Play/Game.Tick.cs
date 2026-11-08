@@ -37,6 +37,7 @@ public sealed partial class Game
         int left = minutes;
         while (left > 0)
         {
+            int stepDay = Day;
             int toMidnight = 1440 - (StartMinuteOfDay + ClockMinutes) % 1440;
             int step = Math.Min(left, Math.Min(MaxStepMinutes, toMidnight));
             _time.Advance(step, aboard);
@@ -46,11 +47,14 @@ public sealed partial class Game
                 if (_running) _engineMinutesToday += step;
             }
             bool atSea = AtSea;
+            // A weekday at sea is always the player's day; aboard in port, more than an evening's work makes it one.
+            if (atSea) ChargeDay(t, stepDay, atSea: true);
+            else if (aboard && _workMinutesToday > _boat.Calendar.EveningMinutes) ChargeDay(t, stepDay, atSea: false);
             if (atSea) SeaBefore(step);
             SystemsStep(step);
             if (_sunk) return; // she is on the bottom: the rest of the time does not pass
             Spawn(aboard);
-            if (atSea) SeaAfter(step);
+            if (atSea) SeaAfter(t, step);
             if (aboard) PresentAlerts(step, atSea);
             if (aboard)
             {
@@ -83,7 +87,9 @@ public sealed partial class Game
             if (f.Escalation is not null && f.Progress >= _boat.Rates.Threshold) Escalate(t, f, present, withCause: true);
         }
 
+        CalendarDaily(day);
         SeasonDaily(t, day, present);
+        EventsDaily(t, day);
 
         _workMinutesToday = 0;
         _engineMinutesToday = 0;

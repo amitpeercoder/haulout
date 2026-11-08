@@ -11,6 +11,9 @@ public sealed class GameSession
     private readonly string? _tracePath;
     private readonly object _lock = new();
     private int _seq;
+    /// <summary>Vacation days used in earlier calendar years of this run (the game's own count starts again every new year), and the last count seen.</summary>
+    private int _vacationBefore;
+    private int _vacationLast;
     /// <summary>How much of each result the trace keeps: enough for an arrival, tow or sinking card to show.</summary>
     private const int TraceResultChars = 300;
 
@@ -53,6 +56,12 @@ public sealed class GameSession
         {
             var status = (StatusView)_game.Ask(new Status());
             var argMap = args.ToDictionary(a => a.Name, a => a.Value);
+            // The wants (design note 010): everything here is something a player can count in their own logbook and calendar.
+            var calendar = (CalendarView)_game.Ask(new Calendar());
+            var season = (SeasonView)_game.Ask(new Season());
+            var upgrades = (UpgradesView)_game.Ask(new Upgrades());
+            if (calendar.VacationDaysUsed < _vacationLast) _vacationBefore += _vacationLast;
+            _vacationLast = calendar.VacationDaysUsed;
             var line = JsonSerializer.Serialize(new
             {
                 seq = ++_seq,
@@ -71,6 +80,13 @@ public sealed class GameSession
                 atSea = status.AtSea,
                 sunk = status.Sunk,
                 sold = status.Sold,
+                vacationDaysUsed = _vacationBefore + calendar.VacationDaysUsed,
+                unpaidDays = calendar.UnpaidDays,
+                paydays = calendar.PaydaysSeen,
+                eventsMade = calendar.EventsMade,
+                eventsMissed = calendar.EventsMissed,
+                upgradesFitted = upgrades.Items.Count(i => i.Status.StartsWith("fitted", StringComparison.Ordinal)),
+                kept = season.Kept,
             });
             using var w = new StreamWriter(_tracePath, append: true);
             w.WriteLine(line);

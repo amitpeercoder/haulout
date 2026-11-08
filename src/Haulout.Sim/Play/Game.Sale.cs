@@ -65,8 +65,9 @@ public sealed partial class Game
     {
         if (p.TurnedBack) return;
         _trips++;
-        if (port.Id != _boat.Trips?.Home)
-            _firstAwayLine ??= $"Day {DayAt(p.EndClockMinutes)}: Arrived at {port.Name}.";
+        if (port.Id == _boat.Trips?.Home) return;
+        _arrivals.Add((DayAt(p.EndClockMinutes), port.Name));
+        _firstAwayLine ??= $"Day {DayAt(p.EndClockMinutes)}: Arrived at {port.Name}.";
     }
 
     private void CountTow(string text)
@@ -111,6 +112,7 @@ public sealed partial class Game
     {
         var rules = _boat.Sale;
         var lines = new List<ValuationLine> { new("Base value of a 28-footer of her kind", rules.BaseNok) };
+        lines.AddRange(UpgradeLines());
         foreach (var f in findings) lines.Add(new ValuationLine(f.Line, -f.Nok));
 
         int years = UndocumentedYears();
@@ -295,7 +297,7 @@ public sealed partial class Game
             : open.OrderByDescending(v => v.OfferNok).ThenByDescending(v => v.Number).First();
 
         ShutDownEngine(t);
-        _incomeNok += chosen.OfferNok;
+        Earn(chosen.OfferNok, "The sale of the boat.");
         _sold = true;
         WithdrawListing();
         var card = ClosingCard(chosen);
@@ -343,10 +345,19 @@ public sealed partial class Game
         int deadline = Day - Day % GameClock.DaysPerYear + doy;
         if (deadline <= Day) deadline += GameClock.DaysPerYear;
         _launchDeadlineDay = deadline;
+        bool pageWritten = _seasonPages.Any(p => p.Season == _seasonIndex + 1);
+        int keptSeason = _seasonIndex + 1;
         _seasonIndex++;
+        _ledgerFrom = _ledger.Count;
         _maintenanceEntries = 0;
         _kept = true;
+        // A new season begins: its page counts from today (design note 010, step 4).
+        _seasonFromDay = Day;
+        _seasonWorkBase = _time.WorkMinutes;
+        _nightsAway = 0;
         t.Narrative.Add($"You keep her. The yard has her down for launch on day {deadline}.");
+        if (NextSeasonLine() is { } ahead) t.Narrative.Add(ahead);
+        if (pageWritten) t.Narrative.Add($"The page of season {keptSeason} is in the logbook.");
         return Accept(t, action, 0, 0, null, $"Kept her for another season. Launch is set for day {deadline}.", work: false);
     }
 

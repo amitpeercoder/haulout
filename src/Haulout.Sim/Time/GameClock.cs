@@ -8,10 +8,20 @@ public readonly record struct GameClock(int Day)
 {
     public const int DaysPerYear = 360;
     public const int DaysPerMonth = 30;
+    /// <summary>Day 0 is a Monday (design note 010). 360 is not a multiple of 7, so a day of the year falls on a different weekday each year.</summary>
+    public const int DaysPerWeek = 7;
 
     public int Year => Day / DaysPerYear;
     public int DayOfYear => Day % DaysPerYear;
     public int Month => DayOfYear / DaysPerMonth; // 0 = January
+
+    /// <summary>0 Monday to 6 Sunday.</summary>
+    public int Weekday => Day % DaysPerWeek;
+    /// <summary>Saturday and Sunday: the boat days.</summary>
+    public bool IsWeekend => Weekday >= 5;
+
+    private static readonly string[] WeekdayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    public string WeekdayName => WeekdayNames[Weekday];
 
     private static readonly string[] MonthNames =
         ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

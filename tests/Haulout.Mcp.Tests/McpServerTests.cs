@@ -16,6 +16,8 @@ public class McpServerTests
         "season", "book_haulout", "haul_out", "scrub", "yard_wash",
         "winterise_engine", "fill_tank", "battery_ashore", "battery_aboard", "winter_charger", "fit_winter_cover", "wait_until_spring",
         "list_for_sale", "accept_offer", "keep", "sale",
+        "calendar", "next_weekend", "wait_week", "order", "invite_friend",
+        "install", "yard_install", "upgrades", "season_page",
     ];
 
     private static string RepoRoot()
@@ -71,7 +73,7 @@ public class McpServerTests
     {
         using var doc = SloopData();
         var ids = new List<string>();
-        foreach (var section in new[] { "compartments", "places", "covers", "positions", "components" })
+        foreach (var section in new[] { "compartments", "places", "covers", "positions", "components", "upgrades" })
         {
             if (!doc.RootElement.TryGetProperty(section, out var el)) continue;
             if (el.ValueKind == JsonValueKind.Object)
@@ -82,6 +84,8 @@ public class McpServerTests
                     if (item.ValueKind == JsonValueKind.String) ids.Add(item.GetString()!);
                     if (item.ValueKind != JsonValueKind.Object) continue;
                     if (item.TryGetProperty("id", out var id)) ids.Add(id.GetString()!);
+                    // An upgrade carries its component (design note 010, step 3).
+                    if (item.TryGetProperty("component", out var up) && up.ValueKind == JsonValueKind.Object && up.TryGetProperty("id", out var uid)) ids.Add(uid.GetString()!);
                     if (item.TryGetProperty("faults", out var faults))
                         foreach (var f in faults.EnumerateArray())
                             if (f.TryGetProperty("id", out var fid)) ids.Add(fid.GetString()!);
@@ -116,7 +120,7 @@ public class McpServerTests
     public async Task Emergency_lift_tool_description_quotes_the_data_numbers()
     {
         var eco = Haulout.Sim.Data.BoatLoader.LoadSloop28().Economy;
-        Assert.Equal(60, ExpectedTools.Length);
+        Assert.Equal(69, ExpectedTools.Length);
         await using var client = await Connect();
         var tool = (await client.ListToolsAsync()).Single(t => t.Name == "emergency_lift");
         Assert.Contains($"{eco.EmergencyLiftNok} NOK", tool.Description);
@@ -152,6 +156,17 @@ public class McpServerTests
             ("chart", []),
             ("chart", new() { ["destination"] = "Hestholmen" }),
             ("trip", []),
+            ("calendar", []),
+            ("order", new() { ["item"] = "starter motor" }),
+            ("order", new() { ["item"] = "marine heads" }),
+            ("upgrades", []),
+            ("season_page", []),
+            ("install", new() { ["item"] = "marine heads" }),
+            ("yard_install", new() { ["item"] = "bunk cushions" }),
+            ("next_weekend", []),
+            ("wait_week", []),
+            ("invite_friend", new() { ["day"] = 190 }),
+            ("calendar", []),
             ("depart", []),
             ("continue", []),
             ("call_tow", []),
@@ -166,6 +181,7 @@ public class McpServerTests
             ("list_for_sale", new() { ["ask_nok"] = 150000 }),
             ("sale", []),
             ("accept_offer", []),
+            ("season_page", new() { ["season"] = 1 }),
         };
         foreach (var (tool, args) in calls)
         {
@@ -221,6 +237,20 @@ public class McpServerTests
     }
 
     [Fact]
+    public async Task The_season_page_tool_says_there_is_none_yet_and_the_help_and_keep_descriptions_name_it()
+    {
+        await using var client = await Connect();
+        Assert.Contains("No season page yet", TextOf(await Call(client, "season_page", [])));
+        Assert.Contains("There is no page for season 2.", TextOf(await Call(client, "season_page", new() { ["season"] = 2 })));
+        Assert.Contains("season page = season_page", TextOf(await Call(client, "help", [])));
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("calendar repeats", tools["keep"]);
+        Assert.Contains("autumn haulout", tools["season_page"]);
+        var briefing = TextOf(await Call(client, "briefing", []));
+        Assert.Contains("sell her or keep her for another year", briefing);
+    }
+
+    [Fact]
     public async Task Layup_tools_refuse_in_plain_words_off_the_hard_and_their_descriptions_quote_the_data()
     {
         var rules = Haulout.Sim.Data.BoatLoader.LoadSloop28().Layup;
@@ -237,7 +267,7 @@ public class McpServerTests
         Assert.Contains("The battery is aboard already.", TextOf(await Call(client, "battery_aboard", [])));
         Assert.Contains("from on deck", TextOf(await Call(client, "fit_winter_cover", [])));
         Assert.Contains("battery", TextOf(await Call(client, "battery_ashore", [])), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("484 NOK", TextOf(await Call(client, "fill_tank", [])));
+        Assert.Contains("726 NOK", TextOf(await Call(client, "fill_tank", []))); // 33 litres of the 60 litre tank at 22 NOK (design note 010)
         Assert.Contains("The tank is full.", TextOf(await Call(client, "fill_tank", [])));
         var help = TextOf(await Call(client, "help", []));
         Assert.Contains("wait until spring = wait_until_spring", help);
@@ -347,6 +377,12 @@ public class McpServerTests
             Assert.Equal(3, go.GetProperty("minutesSpent").GetInt32());
             Assert.False(JsonDocument.Parse(lines[3]).RootElement.GetProperty("accepted").GetBoolean());
             Assert.True(JsonDocument.Parse(lines[2]).RootElement.GetProperty("accepted").GetBoolean());
+
+            // The wants (design note 010, step 4a): what score.py reads, all of it countable in the player's own logbook.
+            var last = JsonDocument.Parse(lines[3]).RootElement;
+            foreach (var number in new[] { "vacationDaysUsed", "unpaidDays", "paydays", "eventsMade", "eventsMissed", "upgradesFitted" })
+                Assert.Equal(0, last.GetProperty(number).GetInt32());
+            Assert.Equal(JsonValueKind.False, last.GetProperty("kept").ValueKind);
         }
         finally { File.Delete(path); }
     }

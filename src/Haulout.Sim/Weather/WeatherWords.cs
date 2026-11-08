@@ -24,7 +24,18 @@ public static class WeatherWords
 
     public static bool IsGale(WeatherDay d, int atLeastForce = 7) => d.WindForce >= atLeastForce;
 
-    public static string Describe(WeatherDay d)
+    /// <summary>Fog lies over the water at this hour of the day (0 to 24, fractional): the morning fog has not lifted yet.</summary>
+    public static bool IsFoggy(WeatherDay d, double hourOfDay) => hourOfDay < d.FogUntilHour;
+
+    /// <summary>The fog of the day in words, for a forecast: "morning fog" or "fog all day"; empty when there is none.</summary>
+    public static string FogWord(WeatherDay d) => d.FogUntilHour <= 0 ? "" : d.FogUntilHour >= 24 ? "fog all day" : "morning fog";
+
+    /// <summary>Is the hour dark? More than half the day's length from solar noon (a day of 24 hours is never dark).</summary>
+    public static bool IsDark(WeatherDay d, double hourOfDay, double solarNoonHour) =>
+        d.DaylightHours < 24 && Math.Abs(hourOfDay - solarNoonHour) > d.DaylightHours / 2;
+
+    /// <param name="hourOfDay">The hour it is now, when it matters: the fog is told only while it has not lifted. Null: the day alone, no fog line.</param>
+    public static string Describe(WeatherDay d, double? hourOfDay = null)
     {
         var sky = d.RainMm <= 0
             ? (d.WindForce <= 3 && d.TempC >= 8 ? "Bright" : "Dry")
@@ -37,7 +48,8 @@ public static class WeatherWords
         if (d.RainMm > 0) parts.Add(RainWord(d));
         parts.Add(WindPhrase(d));
         if (d.NightC < 0) parts.Add("frost overnight");
-        return string.Join(", ", parts) + ".";
+        var text = string.Join(", ", parts) + ".";
+        return hourOfDay is { } h && IsFoggy(d, h) ? text + " Fog over the water." : text;
     }
 
     /// <summary>"drizzle", "rain on and off" or "heavy rain"; empty when it is dry.</summary>

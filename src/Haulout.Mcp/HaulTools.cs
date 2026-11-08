@@ -127,7 +127,8 @@ public sealed class HaulTools(GameSession session)
 
     [McpServerTool(Name = "plan_trip", ReadOnly = true), Description(
         "Plan a trip from the port she lies at: distance and course, expected hours, the forecast for the departure day and the day after (it can be wrong, and is not known far ahead), " +
-        "the problems you have found that matter at sea and whether you carry the spare for each, shelter on the way, your money and what a tow would cost. Costs no time. " +
+        "the problems you have found that matter at sea and whether you carry the spare for each, shelter on the way, your money and what a tow would cost, " +
+        "the fuel the gauge shows against what the passage needs, whether she would arrive after dark, fog, the vacation days it costs, and any event waiting at the other end. Costs no time. " +
         "Leave the destination out for the one route out of this port; depart_day defaults to today.")]
     public string PlanTrip(
         [Description("Where to, e.g. Hestholmen. Optional.")] string? destination = null,
@@ -151,7 +152,7 @@ public sealed class HaulTools(GameSession session)
 
     [McpServerTool(Name = "depart"), Description(
         "Cast off for another port. Takes 10 minutes, free. Only from the cockpit, afloat at a port, with the engine already running (you motor off the mooring) and not in a gale; " +
-        "refused otherwise, and the engine must have run this season. Leave the destination out for the one route out of this port. Then use continue and the other at-sea tools, an hour at a time.")]
+        "refused otherwise (also in fog without a chartplotter or radar), and the engine must have run this season. Leave the destination out for the one route out of this port. Then use continue and the other at-sea tools, an hour at a time.")]
     public string Depart([Description("Where to, e.g. Hestholmen. Optional.")] string? destination = null) =>
         session.Do("depart", new Depart(destination), ("destination", destination ?? ""));
 
@@ -173,7 +174,7 @@ public sealed class HaulTools(GameSession session)
     public string HeaveTo() => session.Do("heave_to", new HeaveTo());
 
     [McpServerTool(Name = "anchor"), Description(
-        "At sea: let the anchor go. Takes 15 minutes. Only within a mile of a port or a named anchorage; otherwise refused and the result says where the nearest is.")]
+        "At sea: let the anchor go. Takes 15 minutes. Only within a mile of a port or a named anchorage; otherwise refused and the result says where the nearest is. Refused too if the anchor chain won't run out.")]
     public string Anchor() => session.Do("anchor", new Anchor());
 
     [McpServerTool(Name = "turn_back"), Description(
@@ -187,6 +188,13 @@ public sealed class HaulTools(GameSession session)
     [McpServerTool(Name = "season", ReadOnly = true), Description(
         "The season and the yard's calendar: the lifting window, the slot you hold, the first free slot (it moves later every week you wait past the end of summer, and the yard fills up), and what a lift, winter storage, changing a booking and the emergency lift cost. Costs no time.")]
     public string Season() => session.Ask("season", new Season());
+
+    [McpServerTool(Name = "season_page", ReadOnly = true), Description(
+        "The page the logbook writes at the autumn haulout, once a season and with no grade: the miles sailed, the nights away from home, the places reached, the events of the calendar made and missed, " +
+        "the hours of your own work and the vacation days, what she cost you and what the broker would put her at, and how the yard and the harbour think of you, in words. " +
+        "Optionally a season number; the latest by default. Costs no time. The same page is in the logbook.")]
+    public string SeasonPage([Description("The season number, as the page names it. Optional; defaults to the latest.")] int? season = null) =>
+        session.Ask("season_page", new SeasonPage(season));
 
     [McpServerTool(Name = "book_haulout"), Description(
         "Ring the yard and book the crane for a day, to be lifted out of the water. Free and takes no time, from any port (refused at sea). Changing an existing booking costs 500 NOK. " +
@@ -257,12 +265,55 @@ public sealed class HaulTools(GameSession session)
 
     [McpServerTool(Name = "keep"), Description(
         "Keep her for another season instead of selling: takes her off the market, moves the launch deadline to the next day 96 of the year, and starts the logbook's maintenance count and the engine-service count again for the next sale. Free, no time. " +
+        "The year ahead is told: the calendar repeats with the boat as she is, upgrades and all, and the vacation days renew at the new year. " +
         "Nothing else is reset: the clock, what the winter did to her and the money carry on. Refused once already since you last launched.")]
     public string Keep() => session.Do("keep", new Keep());
 
     [McpServerTool(Name = "sale", ReadOnly = true), Description(
         "The broker's valuation letter as it stands now (only what you know of her), whether she is listed and at what ask, and every viewing so far with what the buyer's surveyor found, what they offer and whether the offer is still open. Costs no time.")]
     public string Sale() => session.Ask("sale", new Sale());
+
+    [McpServerTool(Name = "calendar", ReadOnly = true), Description(
+        "The week: today's weekday and whether it is a boat day, how much of a weekday evening you have left before it costs a vacation day, the vacation days left this year, the balance and the bank's overdraft limit, " +
+        "the paydays, bills, deliveries and your haulout slot coming up, what is on order, and the money of this season. Costs no time.")]
+    public string Calendar() => session.Ask("calendar", new Calendar());
+
+    [McpServerTool(Name = "next_weekend"), Description(
+        "Go back to work and come back aboard at eight on the next Saturday (from a Saturday or Sunday, the Saturday after). Not at sea. Takes no vacation days. Afloat, you come back early if the boat has something to tell you; " +
+        "you also come back on the morning of a booked haulout slot or a delivery at the yard. The result says what came in meanwhile: pay, bills, parts.")]
+    public string NextWeekend() => session.Do("next_weekend", new NextWeekend());
+
+    [McpServerTool(Name = "wait_week"), Description(
+        "Go back to work and come back aboard at eight, a week on. Not at sea. Takes no vacation days. Stops early like next_weekend. The result says what came in meanwhile.")]
+    public string WaitWeek() => session.Do("wait_week", new WaitWeek());
+
+    [McpServerTool(Name = "order"), Description(
+        "Ring the yard chandlery and order a part it does not keep on the shelf: a part you have found, such as the starter motor. Five minutes on the phone, from anywhere but at sea, never a vacation day. " +
+        "The price is paid at once and the part arrives at the yard in a few days (3 to 10); you are told the day. replace says when a part has to be ordered.")]
+    public string Order([Description("Name of the part, as you would say it, e.g. starter motor.")] string item) =>
+        session.Do("order", new Order(item), ("item", item));
+
+    [McpServerTool(Name = "invite_friend"), Description(
+        "Ring a friend and ask them aboard for a week starting on a game day: once a year, a week starting in July (days 180 to 203 of the year), at least three days ahead. Five minutes on the phone, from anywhere but at sea. " +
+        "On the first day the friend comes if the boat has a heads, a stove, dry bunks and, if the week is cold, a heater; the week then takes a vacation day for every weekday, and the friend pays for the diesel. calendar shows the week and what it asks.")]
+    public string InviteFriend([Description("The first day of the week, as a game day number, e.g. 183.")] int day) =>
+        session.Do("invite_friend", new InviteFriend(day), ("day", day.ToString()));
+
+    [McpServerTool(Name = "install"), Description(
+        "Fit an upgrade you have aboard (a diesel heater, marine heads, a two-burner stove, a chart plotter, a marine radar, bunk cushions, varnish and brushes), yourself: go to the place it goes first. " +
+        "It takes your own work, from half an hour to ten hours (a long job on a weekday is a vacation day), not at sea, and varnish needs a dry day. Order the item first (order); upgrades lists them with their status.")]
+    public string Install([Description("Name of the upgrade, as you would say it, e.g. diesel heater.")] string item) =>
+        session.Do("install", new Install(item), ("item", item));
+
+    [McpServerTool(Name = "yard_install"), Description(
+        "At the yard, afloat or ashore: the yard fits an upgrade for its labour and days (away time, no work of yours). The part must be aboard first (order it): the yard fits it when you bring it, for the labour only. " +
+        "Not every job is the yard's (cushions and varnish are yours). upgrades shows the yard's price and days.")]
+    public string YardInstall([Description("Name of the upgrade, as you would say it, e.g. marine radar.")] string item) =>
+        session.Do("yard_install", new YardInstall(item), ("item", item));
+
+    [McpServerTool(Name = "upgrades", ReadOnly = true), Description(
+        "The upgrades you could give her: for each the chandlery price, your install hours, the yard's labour and days (if the yard does it), what the broker adds, what it makes possible, and whether it is aboard, on order or fitted. Costs no time.")]
+    public string Upgrades() => session.Ask("upgrades", new Upgrades());
 
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
@@ -291,8 +342,8 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer. " +
-        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, next weekend = next_weekend, wait week = wait_week, invite friend = invite_friend, yard install = yard_install, season page = season_page, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer. " +
+        "There is no quit; also available: status, aboard (what you have found so far), calendar (the week and the money), readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

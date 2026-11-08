@@ -1,0 +1,214 @@
+look
+go companionway
+go quarter berth
+remove battery-box lid
+inspect negative terminal
+clean negative terminal
+go companionway
+go saloon
+remove saloon floorboards
+look
+inspect raw-water seacock
+replace raw-water seacock
+go companionway
+go cockpit
+remove cockpit-locker lid
+inspect cockpit drain hoses
+buy hose clamps
+replace cockpit drain hoses
+buy alternator belt
+buy impeller
+buy primary filter element
+buy secondary filter element
+buy engine oil
+go companionway
+remove companionway steps
+inspect alternator belt
+replace alternator belt
+inspect raw-water impeller
+replace raw-water impeller
+inspect raw-water impeller
+buy impeller
+replace raw-water impeller
+inspect raw-water impeller
+go quarter berth
+charge start battery
+go companionway
+go cockpit
+start
+stop
+season
+book haulout 264
+start
+launch
+order marine heads
+order two-burner stove
+order bunk cushions
+go on deck
+inspect anchor chain
+replace anchor chain
+inspect anchor chain
+replace anchor chain
+inspect anchor chain
+wait week
+wait week
+next weekend
+go cockpit
+go companionway
+install two-burner stove
+go saloon
+install bunk cushions
+go forepeak
+install marine heads
+go saloon
+look
+inspect bilge
+inspect bilge pump
+go companionway
+go cockpit
+go on deck
+inspect mooring lines
+buy mooring lines
+replace mooring lines
+wait week
+wait week
+wait week
+wait week
+wait week
+wait week
+wait week
+calendar
+wait week
+go cockpit
+start
+fill tank
+wait week
+start
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+motor
+status
+calendar
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+wait week
+go cockpit
+start
+fill tank
+wait week
+wait 7
+status
+start
+plan trip storholmen
+depart storholmen
+motor
+motor
+motor
+motor
+motor
+motor
+status
+calendar
+wait 1
+log
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+motor
+motor
+motor
+invite friend 187
+wait week
+wait week
+calendar
+wait week
+calendar
+start
+check flow
+stop
+buy impeller
+go companionway
+replace raw-water impeller
+inspect raw-water impeller
+go cockpit
+start
+check flow
+stop
+wait week
+wait week
+wait week
+start
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+motor
+motor
+start
+plan trip kvitnes
+depart kvitnes
+motor
+motor
+motor
+status
+calendar
+wait 1
+start
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+motor
+motor
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+motor
+calendar
+next weekend
+scrub
+wait week
+wait week
+wait week
+wait week
+wait week
+season
+wait week
+start
+haul out
+season
+go on deck
+look
+go beside the hull
+look
+inspect hull
+clean hull
+look
+inspect antifouling
+inventory
+go on deck
+fit cover
+go cockpit
+fill tank
+go companionway
+winterise
+replace engine oil
+go quarter berth
+battery ashore
+season page
+calendar
+keep
+status
+quit

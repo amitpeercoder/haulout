@@ -17,15 +17,19 @@ public static class BoatLoader
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
-    public static Boat LoadSloop28()
+    /// <param name="withCalendar">
+    /// false: the boat as it was before design note 010. No pay, no bills, no vacation days, no overdraft limit, and every part on the
+    /// yard's shelf (no orders). For tests whose subject is not the week or the money.
+    /// </param>
+    public static Boat LoadSloop28(bool withCalendar = true)
     {
         using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream(Sloop28Resource)
             ?? throw new InvalidOperationException($"Embedded resource '{Sloop28Resource}' not found.");
         using var reader = new StreamReader(stream);
-        return Load(reader.ReadToEnd());
+        return Load(reader.ReadToEnd(), withCalendar);
     }
 
-    public static Boat Load(string json)
+    public static Boat Load(string json, bool withCalendar = true)
     {
         var dto = JsonSerializer.Deserialize<BoatDto>(json, Options)
             ?? throw new InvalidOperationException("Boat JSON is empty.");
@@ -40,11 +44,12 @@ public static class BoatLoader
 
         var chandlery = dto.Chandlery ?? [];
         var kinds = BuildKinds(dto.Kinds);
-        var components = dto.Components.Select(c =>
+        Component BuildComponent(ComponentDto c)
         {
             // Decision 007/1: a part the chandlery sells costs what the chandlery charges. The price lives on the shop item;
             // the component's replace price and the parts of a DIY fix by replacing it are taken from it.
-            var part = chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == c.Id);
+            // An upgrade's replace price is the price of the item that fits it (design note 010, step 3).
+            var part = chandlery.FirstOrDefault(i => !i.Tool && (i.ForComponent == c.Id || i.Upgrade == c.Id));
             int replaceCostNok = PartPrice(part, c.ReplaceCostNok, $"component '{c.Id}' replaceCostNok");
             var kind = ResolveKind(c, kinds, replaceCostNok);
             var spec = new ComponentSpec(
@@ -54,7 +59,7 @@ public static class BoatLoader
                 c.SeriesOhms, kind, replaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
-                c.BelowWaterline, c.ReplaceText, c.NeedsDry);
+                c.BelowWaterline, c.ReplaceText, c.NeedsDry, c.Stocked);
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
             var faults = (c.Faults ?? []).Select(f => new Fault(
                 f.Id, f.Name, c.Id, f.Effect ?? new FaultEffect(FaultEffectKind.None, 0),
@@ -74,7 +79,25 @@ public static class BoatLoader
                 f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text,
                 f.AtSea is { } asp ? new AtSeaSpec(asp.Text, asp.Spare) : null));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
-        });
+        }
+        var components = dto.Components.Select(BuildComponent).ToList();
+
+        var upgrades = (dto.Upgrades ?? []).Select(u =>
+        {
+            var comp = BuildComponent(u.Component ?? throw new InvalidOperationException("An upgrade needs a component."));
+            if (!chandlery.Any(i => i.Upgrade == comp.Id))
+                throw new InvalidOperationException($"Upgrade '{comp.Id}' has no chandlery item that fits it.");
+            if (chandlery.Count(i => i.Upgrade == comp.Id) > 1)
+                throw new InvalidOperationException($"Upgrade '{comp.Id}' has more than one chandlery item.");
+            return new UpgradeRule
+            {
+                Component = comp, PlaceId = u.Place, InstallMinutes = u.InstallMinutes, YardNok = u.YardNok, YardDays = u.YardDays,
+                ValueNok = u.ValueNok, Opens = u.Opens ?? "", InstallText = u.InstallText ?? "",
+            };
+        }).ToList();
+        foreach (var item in chandlery.Where(i => i.Upgrade is not null))
+            if (upgrades.All(u => u.Component.Id != item.Upgrade))
+                throw new InvalidOperationException($"Chandlery item '{item.Id}' fits '{item.Upgrade}', which is not an upgrade.");
 
         var economy = dto.Economy is { } ec
             ? new Economy(ec.StartingBalanceNok, ec.LaunchDeadlineDay, ec.EmergencyLiftNok, ec.LaunchMinutes, ec.EmergencyLiftDays)
@@ -127,9 +150,28 @@ public static class BoatLoader
                 tr.Home, tr.Ports ?? [], DeriveRoutes(tr.Ports ?? [], tr.Routes ?? []), tr.Tow ?? new TowRules())
             : null;
 
+        var calendar = withCalendar ? dto.Calendar : null;
+        foreach (var e in calendar?.Events ?? [])
+        {
+            if (trips?.FindPort(e.Port) is null)
+                throw new InvalidOperationException($"Event '{e.Id}' is at port '{e.Port}', which is not in the trips.");
+            if (e.Weekday is { Length: > 0 } wd && !new[] { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" }.Contains(wd.ToLowerInvariant()))
+                throw new InvalidOperationException($"Event '{e.Id}' has the weekday '{wd}'.");
+            foreach (var r in e.Requires)
+            {
+                if (r.Kind is not ("fitted" or "working" or "dryBunks" or "warm"))
+                    throw new InvalidOperationException($"Event '{e.Id}' has a requirement of the kind '{r.Kind}'.");
+                // A requirement names a component the boat has from the start, or an upgrade it can be given (design note 010, step 3).
+                if (r.Kind == "working" && dto.Components.All(c => c.Id != r.Component))
+                    throw new InvalidOperationException($"Event '{e.Id}' needs '{r.Component}' to work, which is not a component.");
+                if (dto.Components.All(c => c.Id != r.Component) && upgrades.All(u => u.Component.Id != r.Component))
+                    throw new InvalidOperationException($"Event '{e.Id}' needs '{r.Component}', which is neither a component nor an upgrade.");
+            }
+        }
+        var orders = withCalendar ? dto.Orders : null;
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
-            chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale);
+            chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale, calendar, orders, dto.Fuel, dto.Night, upgrades, withCalendar ? dto.Reputation : null);
     }
 
     private static Dictionary<string, ComponentKind> BuildKinds(List<KindDto>? dtos)
@@ -259,6 +301,24 @@ public static class BoatLoader
         public MooringRules? Mooring { get; set; }
         public LayupRules? Layup { get; set; }
         public SaleRules? Sale { get; set; }
+        public CalendarRules? Calendar { get; set; }
+        public OrderRules? Orders { get; set; }
+        public FuelRules? Fuel { get; set; }
+        public NightRules? Night { get; set; }
+        public ReputationRules? Reputation { get; set; }
+        public List<UpgradeDto>? Upgrades { get; set; }
+    }
+
+    private sealed class UpgradeDto
+    {
+        public ComponentDto? Component { get; set; }
+        public string Place { get; set; } = "";
+        public int InstallMinutes { get; set; }
+        public int? YardNok { get; set; }
+        public int? YardDays { get; set; }
+        public int ValueNok { get; set; }
+        public string? Opens { get; set; }
+        public string? InstallText { get; set; }
     }
 
     private sealed class RouteDto
@@ -498,6 +558,7 @@ public static class BoatLoader
         public bool BelowWaterline { get; set; }
         public string? ReplaceText { get; set; }
         public bool NeedsDry { get; set; }
+        public bool Stocked { get; set; } = true;
     }
 
     private sealed class KindDto

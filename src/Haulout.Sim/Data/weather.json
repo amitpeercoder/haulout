@@ -1,17 +1,19 @@
 {
-  "placeholders": "Every number in this file is a placeholder for Amit: western-Norway-ish guesses, not measurements. Months are GameClock months (30 days), index 0 = January.",
+  "placeholders": "Every number in this file is a placeholder for Amit: western-Norway-ish guesses, not measurements. Months are GameClock months (30 days), index 0 = January. UNVERIFIED (design note 010): daylightHours (the length of the day, interpolated between month centres, dark when an hour is more than half of it from solar noon) and fogChance (the chance of a foggy morning), a quarter of fogs lasting all day and the rest lifting between 09:00 and 13:00, are western-Norway-ish guesses around 60 N, not measurements.",
+  "fogAllDayFraction": 0.25,
+  "fogLiftsHour": [9, 13],
   "months": [
-    { "tempC": [-4, 2],  "nightDropC": 4, "rainChance": 0.40, "rainAfterRainChance": 0.65, "rainMeanMm": 4.0, "windMeanForce": 4.0, "galeChance": 0.035, "prevailing": ["southwest", "west", "south"] },
-    { "tempC": [-3, 3],  "nightDropC": 4, "rainChance": 0.38, "rainAfterRainChance": 0.63, "rainMeanMm": 3.8, "windMeanForce": 4.0, "galeChance": 0.030, "prevailing": ["southwest", "west", "northeast"] },
-    { "tempC": [2, 8],   "nightDropC": 5, "rainChance": 0.38, "rainAfterRainChance": 0.62, "rainMeanMm": 3.5, "windMeanForce": 3.8, "galeChance": 0.030, "prevailing": ["southwest", "west", "northwest"] },
-    { "tempC": [3, 11],  "nightDropC": 6, "rainChance": 0.32, "rainAfterRainChance": 0.55, "rainMeanMm": 3.0, "windMeanForce": 3.4, "galeChance": 0.015, "prevailing": ["southwest", "northwest", "west"] },
-    { "tempC": [7, 15],  "nightDropC": 6, "rainChance": 0.26, "rainAfterRainChance": 0.48, "rainMeanMm": 2.6, "windMeanForce": 3.0, "galeChance": 0.008, "prevailing": ["northwest", "southwest", "north"] },
-    { "tempC": [11, 19], "nightDropC": 6, "rainChance": 0.24, "rainAfterRainChance": 0.45, "rainMeanMm": 2.8, "windMeanForce": 2.8, "galeChance": 0.004, "prevailing": ["northwest", "southwest", "west"] },
-    { "tempC": [13, 21], "nightDropC": 6, "rainChance": 0.26, "rainAfterRainChance": 0.46, "rainMeanMm": 3.2, "windMeanForce": 2.6, "galeChance": 0.004, "prevailing": ["southwest", "west", "northwest"] },
-    { "tempC": [12, 20], "nightDropC": 6, "rainChance": 0.30, "rainAfterRainChance": 0.52, "rainMeanMm": 3.6, "windMeanForce": 2.9, "galeChance": 0.008, "prevailing": ["southwest", "west", "south"] },
-    { "tempC": [8, 15],  "nightDropC": 5, "rainChance": 0.38, "rainAfterRainChance": 0.62, "rainMeanMm": 4.2, "windMeanForce": 3.6, "galeChance": 0.020, "prevailing": ["southwest", "west", "south"] },
-    { "tempC": [4, 10],  "nightDropC": 5, "rainChance": 0.45, "rainAfterRainChance": 0.68, "rainMeanMm": 4.8, "windMeanForce": 4.0, "galeChance": 0.035, "prevailing": ["southwest", "south", "west"] },
-    { "tempC": [1, 6],   "nightDropC": 4, "rainChance": 0.45, "rainAfterRainChance": 0.68, "rainMeanMm": 4.5, "windMeanForce": 4.2, "galeChance": 0.040, "prevailing": ["southwest", "south", "west"] },
-    { "tempC": [-2, 3],  "nightDropC": 4, "rainChance": 0.42, "rainAfterRainChance": 0.66, "rainMeanMm": 4.2, "windMeanForce": 4.1, "galeChance": 0.040, "prevailing": ["southwest", "west", "south"] }
+    { "tempC": [-4, 2],  "nightDropC": 4, "rainChance": 0.40, "rainAfterRainChance": 0.65, "rainMeanMm": 4.0, "windMeanForce": 4.0, "galeChance": 0.035, "prevailing": ["southwest", "west", "south"], "daylightHours": 6.5, "fogChance": 0.03 },
+    { "tempC": [-3, 3],  "nightDropC": 4, "rainChance": 0.38, "rainAfterRainChance": 0.63, "rainMeanMm": 3.8, "windMeanForce": 4.0, "galeChance": 0.030, "prevailing": ["southwest", "west", "northeast"], "daylightHours": 9, "fogChance": 0.03 },
+    { "tempC": [2, 8],   "nightDropC": 5, "rainChance": 0.38, "rainAfterRainChance": 0.62, "rainMeanMm": 3.5, "windMeanForce": 3.8, "galeChance": 0.030, "prevailing": ["southwest", "west", "northwest"], "daylightHours": 11.5, "fogChance": 0.05 },
+    { "tempC": [3, 11],  "nightDropC": 6, "rainChance": 0.32, "rainAfterRainChance": 0.55, "rainMeanMm": 3.0, "windMeanForce": 3.4, "galeChance": 0.015, "prevailing": ["southwest", "northwest", "west"], "daylightHours": 14.5, "fogChance": 0.08 },
+    { "tempC": [7, 15],  "nightDropC": 6, "rainChance": 0.26, "rainAfterRainChance": 0.48, "rainMeanMm": 2.6, "windMeanForce": 3.0, "galeChance": 0.008, "prevailing": ["northwest", "southwest", "north"], "daylightHours": 17, "fogChance": 0.10 },
+    { "tempC": [11, 19], "nightDropC": 6, "rainChance": 0.24, "rainAfterRainChance": 0.45, "rainMeanMm": 2.8, "windMeanForce": 2.8, "galeChance": 0.004, "prevailing": ["northwest", "southwest", "west"], "daylightHours": 19, "fogChance": 0.08 },
+    { "tempC": [13, 21], "nightDropC": 6, "rainChance": 0.26, "rainAfterRainChance": 0.46, "rainMeanMm": 3.2, "windMeanForce": 2.6, "galeChance": 0.004, "prevailing": ["southwest", "west", "northwest"], "daylightHours": 18.5, "fogChance": 0.06 },
+    { "tempC": [12, 20], "nightDropC": 6, "rainChance": 0.30, "rainAfterRainChance": 0.52, "rainMeanMm": 3.6, "windMeanForce": 2.9, "galeChance": 0.008, "prevailing": ["southwest", "west", "south"], "daylightHours": 15.5, "fogChance": 0.05 },
+    { "tempC": [8, 15],  "nightDropC": 5, "rainChance": 0.38, "rainAfterRainChance": 0.62, "rainMeanMm": 4.2, "windMeanForce": 3.6, "galeChance": 0.020, "prevailing": ["southwest", "west", "south"], "daylightHours": 12.5, "fogChance": 0.05 },
+    { "tempC": [4, 10],  "nightDropC": 5, "rainChance": 0.45, "rainAfterRainChance": 0.68, "rainMeanMm": 4.8, "windMeanForce": 4.0, "galeChance": 0.035, "prevailing": ["southwest", "south", "west"], "daylightHours": 10, "fogChance": 0.04 },
+    { "tempC": [1, 6],   "nightDropC": 4, "rainChance": 0.45, "rainAfterRainChance": 0.68, "rainMeanMm": 4.5, "windMeanForce": 4.2, "galeChance": 0.040, "prevailing": ["southwest", "south", "west"], "daylightHours": 7.5, "fogChance": 0.04 },
+    { "tempC": [-2, 3],  "nightDropC": 4, "rainChance": 0.42, "rainAfterRainChance": 0.66, "rainMeanMm": 4.2, "windMeanForce": 4.1, "galeChance": 0.040, "prevailing": ["southwest", "west", "south"], "daylightHours": 6, "fogChance": 0.03 }
   ]
 }

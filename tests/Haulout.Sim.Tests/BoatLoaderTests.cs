@@ -18,10 +18,10 @@ public class BoatLoaderTests
     ];
 
     [Fact]
-    public void Sloop_has_47_components_7_places_and_7_covers()
+    public void Sloop_has_48_components_7_places_and_7_covers()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(47, boat.Components.Count);
+        Assert.Equal(48, boat.Components.Count); // the anchor gear was appended (design note 010)
         Assert.Equal(7, boat.Places.Count);
         Assert.Equal(7, boat.Covers.Count);
     }
@@ -80,7 +80,7 @@ public class BoatLoaderTests
     public void Every_fault_can_be_discovered()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(25, boat.AllFaults.Count());
+        Assert.Equal(26, boat.AllFaults.Count()); // plus the seized anchor chain (design note 010)
         Assert.All(boat.AllFaults, f => Assert.Contains(f.Reveals, r => r.Discovers));
     }
 

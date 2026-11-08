@@ -49,6 +49,12 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(ListForSale), "list-for-sale")]
 [JsonDerivedType(typeof(AcceptOffer), "accept-offer")]
 [JsonDerivedType(typeof(Keep), "keep")]
+[JsonDerivedType(typeof(NextWeekend), "next-weekend")]
+[JsonDerivedType(typeof(WaitWeek), "wait-week")]
+[JsonDerivedType(typeof(Order), "order")]
+[JsonDerivedType(typeof(InviteFriend), "invite-friend")]
+[JsonDerivedType(typeof(Install), "install")]
+[JsonDerivedType(typeof(YardInstall), "yard-install")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -139,6 +145,31 @@ public sealed record ListForSale(int AskNok) : Command;
 public sealed record AcceptOffer(int? Offer = null) : Command;
 public sealed record Keep() : Command;
 
+/// <summary>Not at sea: go back to work and come back aboard at 08:00 on the next Saturday (from a Saturday or Sunday, the Saturday after). Design note 010.</summary>
+public sealed record NextWeekend() : Command;
+/// <summary>Not at sea: go back to work and come back aboard at 08:00 seven days on. Design note 010.</summary>
+public sealed record WaitWeek() : Command;
+/// <summary>
+/// Ring the yard chandlery from anywhere not at sea and order a part it does not keep on the shelf: a chandlery item or a part you have found.
+/// It is paid for at once and arrives at the yard in days. Design note 010.
+/// </summary>
+public sealed record Order(string Item) : Command;
+/// <summary>
+/// Ring a friend from anywhere not at sea, once a year, and ask them for a week aboard starting on this absolute day (in the window of July,
+/// at least a few days ahead). Design note 010, step 2.
+/// </summary>
+public sealed record InviteFriend(int Day) : Command;
+
+/// <summary>
+/// Fit an upgrade you have aboard (bought or delivered): at the place it goes, not at sea, on a dry day if the job needs one. Its minutes
+/// are your own work. Design note 010, step 3.
+/// </summary>
+public sealed record Install(string Item) : Command;
+/// <summary>
+/// At the yard, afloat or ashore: the yard fits an upgrade for labour and days, supplying the part if you have none aboard. Design note 010, step 3.
+/// </summary>
+public sealed record YardInstall(string Item) : Command;
+
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(Briefing), "briefing")]
@@ -157,6 +188,9 @@ public sealed record Keep() : Command;
 [JsonDerivedType(typeof(Season), "season")]
 [JsonDerivedType(typeof(Sale), "sale")]
 [JsonDerivedType(typeof(Chart), "chart")]
+[JsonDerivedType(typeof(Calendar), "calendar")]
+[JsonDerivedType(typeof(Upgrades), "upgrades")]
+[JsonDerivedType(typeof(SeasonPage), "season-page")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -196,3 +230,12 @@ public sealed record Sale() : Query;
 /// today's wind. Planned: the destination the adapter has planned (the game does not remember a plan); null: none. Costs no time.
 /// </summary>
 public sealed record Chart(string? Planned = null) : Query;
+
+/// <summary>The week (design note 010): today, the evening and vacation days left, the bills, payday and deliveries ahead, what is on order, the money. Costs no time.</summary>
+public sealed record Calendar() : Query;
+
+/// <summary>The upgrades (design note 010, step 3): each with its status, price, install hours, the yard's price and days, what it adds to her value and what it opens. Costs no time.</summary>
+public sealed record Upgrades() : Query;
+
+/// <summary>The page the logbook wrote at the autumn lift (design note 010, step 4): miles, nights away, places, events, hours, money, what she is worth. Season null: the latest. Costs no time.</summary>
+public sealed record SeasonPage(int? Season = null) : Query;
