@@ -1,6 +1,6 @@
 # 011 — The ladder: boats you cannot afford yet
 
-Status: proposed 2026-11-08, from Amit's idea. Not built. Build after 010's second pass.
+Status: proposed 2026-11-08 from Amit's idea; approved by Amit 2026-11-08 as the round after 010's second pass, in this order: the tickets ladder and the club noticeboard (with the broker's window as a card on it, crewing places, courses), then the logbook gate, then the deal at Kvitnes, then the 32-footer as data and her region, then her art. Not built.
 
 ## Question
 
