@@ -187,7 +187,8 @@ public class GameScenarioTests
     public void Every_fault_is_discoverable_through_the_facade()
     {
         var reference = BoatLoader.LoadSloop28();
-        foreach (var fault in reference.AllFaults)
+        // Dormant faults are inert successors: nothing the player does finds one before its predecessor escalates.
+        foreach (var fault in reference.AllFaults.Where(f => !f.Dormant))
         {
             var reveal = fault.Reveals.First(r => r.Discovers);
             var g = WithButton(new Game(BoatLoader.LoadSloop28()));
@@ -298,15 +299,17 @@ public class GameScenarioTests
     }
 
     [Fact]
-    public void Uncover_is_offered_for_the_terminals_only()
+    public void Uncover_is_offered_for_the_terminals_and_the_pump_cover_only()
     {
         var g = NewGame();
         Walk.Near(g, "negative terminal");
         g.Execute(new Look());
+        Walk.Near(g, "impeller");
+        g.Execute(new Look());
         var withPart = new List<string>();
         foreach (var f in ((AboardView)g.Ask(new Aboard())).Components)
             if (((ComponentActionsView)g.Ask(new ComponentActions(f.Name))).Options.Any(o => o.Verb == "uncover")) withPart.Add(f.Name);
-        Assert.Equal(["Negative terminal", "Positive terminal"], withPart.Order().ToList());
+        Assert.Equal(["Negative terminal", "Positive terminal", "Raw-water impeller"], withPart.Order().ToList());
     }
 
     private static List<string> PlayThrough(Game g)

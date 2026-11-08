@@ -18,6 +18,12 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(Buy), "buy")]
 [JsonDerivedType(typeof(CheckFilterBowl), "check-filter-bowl")]
 [JsonDerivedType(typeof(CheckRawWaterFlow), "check-raw-water-flow")]
+[JsonDerivedType(typeof(Defer), "defer")]
+[JsonDerivedType(typeof(Undefer), "undefer")]
+[JsonDerivedType(typeof(FixByYard), "yard-fix")]
+[JsonDerivedType(typeof(OrderSurvey), "order-survey")]
+[JsonDerivedType(typeof(WaitDays), "wait")]
+[JsonDerivedType(typeof(Launch), "launch")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -38,6 +44,18 @@ public sealed record Charge(string Component) : Command;
 public sealed record Buy(string Item) : Command;
 public sealed record CheckFilterBowl() : Command;
 public sealed record CheckRawWaterFlow() : Command;
+/// <summary>Leave a discovered problem for later, on purpose. It keeps ageing. Fault: the problem's name or its part's name.</summary>
+public sealed record Defer(string Fault) : Command;
+/// <summary>Take a deferred problem back onto the list. Fault: the problem's name or its part's name.</summary>
+public sealed record Undefer(string Fault) : Command;
+/// <summary>Pay the yard to fix a discovered problem: their price, their lead time in days, done properly.</summary>
+public sealed record FixByYard(string Fault) : Command;
+/// <summary>Hire the surveyor. Costs money per foot and a day; the report arrives as a document.</summary>
+public sealed record OrderSurvey() : Command;
+/// <summary>Let time pass, e.g. waiting for a part. Days: 1 or more.</summary>
+public sealed record WaitDays(int Days) : Command;
+/// <summary>Put her in the water. Allowed any time; the choice is recorded.</summary>
+public sealed record Launch() : Command;
 
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
@@ -47,6 +65,8 @@ public sealed record CheckRawWaterFlow() : Command;
 [JsonDerivedType(typeof(Commands), "commands")]
 [JsonDerivedType(typeof(Aboard), "aboard")]
 [JsonDerivedType(typeof(ComponentActions), "component-actions")]
+[JsonDerivedType(typeof(SurveyReport), "survey-report")]
+[JsonDerivedType(typeof(Readiness), "readiness")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -57,3 +77,7 @@ public sealed record Commands() : Query;
 public sealed record Aboard() : Query;
 /// <summary>The verbs that make sense on a component the player has found, with time, cost and why one is unavailable.</summary>
 public sealed record ComponentActions(string Component) : Query;
+/// <summary>The surveyor's report, once ordered. Before that, Ordered is false and Items is empty.</summary>
+public sealed record SurveyReport() : Query;
+/// <summary>The launch picture: every discovered open problem with its price now and later, the deadline, the money. Never anything undiscovered.</summary>
+public sealed record Readiness() : Query;

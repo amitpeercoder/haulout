@@ -18,10 +18,10 @@ public class BoatLoaderTests
     ];
 
     [Fact]
-    public void Sloop_has_40_components_7_places_and_5_covers()
+    public void Sloop_has_43_components_7_places_and_5_covers()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(40, boat.Components.Count);
+        Assert.Equal(43, boat.Components.Count);
         Assert.Equal(7, boat.Places.Count);
         Assert.Equal(5, boat.Covers.Count);
     }
@@ -80,7 +80,7 @@ public class BoatLoaderTests
     public void Every_fault_can_be_discovered()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(4, boat.AllFaults.Count());
+        Assert.Equal(12, boat.AllFaults.Count());
         Assert.All(boat.AllFaults, f => Assert.Contains(f.Reveals, r => r.Discovers));
     }
 

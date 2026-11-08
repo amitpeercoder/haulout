@@ -30,10 +30,39 @@ public sealed class GameSession
     /// <summary>Map (overview cutaway) or the close-up of the place the player is in.</summary>
     public ViewLevel Level { get; private set; } = ViewLevel.Map;
 
+    /// <summary>Which tab of the context panel is showing: the part and place ("Here") or the launch picture ("Readiness").</summary>
+    public bool ReadinessTab { get; private set; }
+
+    /// <summary>The survey letter is open in the Readiness tab.</summary>
+    public bool SurveyOpen { get; private set; }
+
+    public void ShowTab(bool readiness)
+    {
+        ReadinessTab = readiness;
+        Changed?.Invoke();
+    }
+
+    public void ToggleSurvey()
+    {
+        SurveyOpen = !SurveyOpen;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Opens the Readiness tab with the survey letter showing.</summary>
+    public void ShowSurvey()
+    {
+        ReadinessTab = true;
+        SurveyOpen = true;
+        Changed?.Invoke();
+    }
+
     public bool Finished => Status.Finished;
 
     /// <summary>The narrative of the start attempt that finished the slice; kept so the closing stays readable.</summary>
     public IReadOnlyList<string>? ClosingNarrative { get; private set; }
+
+    /// <summary>The lines of the launch card, kept so the closing stays readable.</summary>
+    public IReadOnlyList<string>? LaunchNarrative { get; private set; }
 
     // ------------------------------------------------------------- queries
 
@@ -42,6 +71,8 @@ public sealed class GameSession
     public BriefingView Briefing => Ask<BriefingView>(new Briefing());
     public StatusView Status => Ask<StatusView>(new Status());
     public LogView Log => Ask<LogView>(new Logbook());
+    public ReadinessView Readiness => Ask<ReadinessView>(new Readiness());
+    public SurveyReportView Survey => Ask<SurveyReportView>(new SurveyReport());
     public AboardView Aboard => Ask<AboardView>(new Aboard());
 
     public ComponentActionsView ActionsFor(string componentName) =>
@@ -76,6 +107,7 @@ public sealed class GameSession
         if (result.Finished && ClosingNarrative is null && command is StartEngine) ClosingNarrative = result.Narrative;
         if (result.Accepted)
         {
+            if (command is Launch && result.Observation is LaunchView lv) LaunchNarrative = lv.Lines;
             switch (command, result.Observation)
             {
                 case (Inspect c, InspectionView v): _lastInspect[c.Component] = v.Text; break;
@@ -146,7 +178,7 @@ public sealed class GameSession
     private static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Runs a verb from <see cref="ComponentActionsView"/> on a component.</summary>
-    public CommandResult RunVerb(string verb, string componentName) => Execute(verb switch
+    public CommandResult RunVerb(string verb, string componentName, string? target = null) => Execute(verb switch
     {
         "inspect" => new Inspect(componentName),
         "measure" => new Measure(componentName),
@@ -156,8 +188,21 @@ public sealed class GameSession
         "charge" => new Charge(componentName),
         "check-filter-bowl" => new CheckFilterBowl(),
         "check-raw-water-flow" => new CheckRawWaterFlow(),
+        "defer" => new Defer(target ?? componentName),
+        "undefer" => new Undefer(target ?? componentName),
+        "yard-fix" => new FixByYard(target ?? componentName),
         _ => throw new ArgumentException($"Unknown verb '{verb}'.", nameof(verb)),
     });
+
+    public CommandResult OrderSurvey() => Execute(new OrderSurvey());
+
+    public CommandResult Launch() => Execute(new Launch());
+
+    public CommandResult Wait(int days) => Execute(new WaitDays(days));
+
+    public CommandResult Defer(string problem) => Execute(new Defer(problem));
+
+    public CommandResult Undefer(string problem) => Execute(new Undefer(problem));
 
     public CommandResult TryStart() => Execute(new StartEngine());
 

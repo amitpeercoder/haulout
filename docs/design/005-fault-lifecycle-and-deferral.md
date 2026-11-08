@@ -55,3 +55,73 @@ A failure at sea must come from a fault the player saw or could have seen. No un
 - Realistic ratio of emergency lift to planned haulout cost? Default: 3×.
 - Does the surveyor's fee scale with boat length (common) or flat? Default: per foot.
 - Which spares does a sensible 28-footer carry? Default: impeller, belts, fuel filters, oil, hose clamps, fuses.
+
+## Implementation notes
+
+**Date:** 2026-11-08. Order of work step 1 (the pre-launch slice) is done in the sim, console, MCP and a minimal web panel.
+
+### Facade
+- Commands: `Defer(fault)`, `Undefer(fault)`, `FixByYard(fault)`, `OrderSurvey()`, `WaitDays(n)` (1 to 60), `Launch()`. A fault is named by its name or its part's name; an undiscovered fault gets the same refusal as a made-up name.
+- Queries: `SurveyReport()` (a letter; `Ordered=false` before the survey) and `Readiness()` (open discovered problems with state, cost now and later, later note, on-the-hard-only, consequence and the DIY and yard routes; surveyor pointers still to look into; names of fixed or ruled-out problems; day, deadline, money, launched).
+- `StatusView` carries the balance, the deadline and whether she is launched. `FoundComponent.Flagged` marks a part a surveyor pointed at. `ActionOption.Target` names the problem for the defer, undefer and yard-fix verbs. `LogEntry.Document` marks the survey report. `KnownFault.Id` is in-process only and never serialised.
+- `Finished` still means "the engine has run once". The game no longer ends there; the console runs until quit.
+
+### Lifecycle
+- `FaultState`: Latent, Symptomatic, Discovered, Deferred, Fixed.
+  - A hint (a reveal that does not discover, or a survey "investigate" item) makes a fault Symptomatic.
+  - A discovering reveal, a survey "cause" item or a cleaning that fixes it makes it Discovered.
+  - Deferred records the day. A harmless fault (the red herring) goes to Fixed as soon as it is discovered and is logged "Ruled out".
+- Escalation is in data: `escalation {to, afterDeferredDays, onLaunch, text}`. The successor is a dormant fault on the same part. It wakes Discovered if the player knew of the predecessor, and silently Latent if not. The predecessor stops being present but keeps its state.
+- DIY quality is in `diyQuality {startSkill 0, threshold 2, poorJobChance 0.25, poorJobs per subsystem}`.
+  - After a Clean or Replace on a subsystem whose skill is below the threshold, there is a chance (through `IRandom`) of a latent poor-job fault: effect none, found by inspecting, fixed by a redo. Skill then rises by one.
+  - The default seed is 4: seed 1's first draw is 0.249, which would spoil the first cleaning.
+- Water in the fuel, DIY: drains on three distinct days (`properties.diyDrainDays`), then a new primary filter.
+
+### Data shapes (sloop28.json)
+- Top level: `economy`, `survey`, `diyQuality`, `placeholders`.
+- Component: `belowWaterline`, `replaceText`.
+- Removable part: `uncoverText`, `refitText`. The impeller now has a raw-water pump cover.
+- Fault: `effect.kind: none`, `onHardOnly`, `harmless`, `dormant`, `consequence`, `costLaterNok`, `laterNote`, `diy {how, partsNok, minutes}`, `yard {how, nok, leadDays}`, `escalation`, `properties`.
+- 43 components (new: navigation lights, cockpit drain hoses, lifelines) and 12 faults.
+
+### The twelve survey items
+1. Hull: blistering at the bow, possibly osmotic. Attention, investigate. Red herring: it is old paint, ruled out by inspecting.
+2. Antifouling thin. Attention, cause.
+3. Raw-water seacock weeping. Before launch, cause.
+4. Cockpit drain hose clamps rusted. Attention, cause.
+5. Lifeline terminals pitted. Attention, cause.
+6. Bicolour lens cracked. Attention, cause.
+7. Standing rig: nothing seen from deck, rigger in two seasons. Note.
+8. Start battery dated, load test. Attention, investigate (the 60 % charge).
+9. Starter clicked, investigate the starter circuit. Before launch, investigate (the corroded terminal; the starter motor is the part flagged).
+10. Fuel sample shows water. Before launch, cause.
+11. Primary filter element overdue. Attention, cause.
+12. Exhaust elbow light rust, monitor. Note.
+
+An item whose fault is no longer there when the survey is ordered is left out.
+
+### Placeholders for Amit (all in data)
+- Money: 25 000 NOK starting balance; survey 200 NOK per foot (5 600 NOK), 1 day; emergency lift 9 000 NOK; launch takes 2 h and costs 0 NOK.
+- Deadline: day 96. Seacock seizes after 20 deferred days, or on launch.
+- DIY quality: threshold 2 jobs, poor-job chance 25 %.
+- Costs now / later (NOK):
+
+  | Problem | Now | Later |
+  |---|---|---|
+  | Weeping seacock | 1 200 | 12 800 |
+  | Seized seacock | 1 400 | 13 800 |
+  | Impeller | 350 | 4 500 |
+  | Water in the fuel | 180 | 4 200 |
+  | Antifouling | 1 600 | 3 500 |
+  | Navigation light lens | 250 | 900 |
+  | Drain clamps | 120 | 600 |
+  | Lifeline terminals | 900 | 1 800 |
+
+- Yard prices and lead times: 1 to 5 days, about 3× the DIY parts.
+
+### Open questions
+- Should a discovered but undeferred fault age and escalate too, or only a deferred one? Now: only a deferred one, plus every fault on launch.
+- Should the emergency lift be a command afloat, at 9 000 NOK and a yard slot? It is cut from this round.
+- Does a seized seacock still pass cooling water, so the engine still runs? Now: yes.
+- Can you change cockpit drain hose clamps afloat? Now: yes.
+- Does the surveyor's fee scale per foot? Now: per foot.

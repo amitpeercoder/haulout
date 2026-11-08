@@ -26,7 +26,7 @@ public static class Prose
     {
         var sb = new StringBuilder();
         foreach (var line in result.Narrative) sb.AppendLine(line);
-        if (!result.Accepted || result.Finished) return sb.ToString();
+        if (!result.Accepted) return sb.ToString();
 
         foreach (var fault in result.NewlyDiscovered)
             sb.AppendLine($"  Noted in the log: {fault.Name}.");
@@ -50,7 +50,8 @@ public static class Prose
                 sb.AppendLine("The logbook is empty.");
                 break;
             case LogView log:
-                foreach (var e in log.Entries) sb.AppendLine($"Day {e.Day} {e.TimeOfDay}  {e.Text}");
+                foreach (var e in log.Entries)
+                    sb.AppendLine($"Day {e.Day} {e.TimeOfDay}  {e.Text}{(e.Document is null ? "" : " (read survey)")}");
                 break;
             case CommandList list:
                 foreach (var c in list.Commands)
@@ -60,14 +61,23 @@ public static class Prose
                 }
                 break;
             case StatusView s:
-                sb.AppendLine($"Day {s.Day}, {s.TimeOfDay}. Time spent: {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min. Money spent: {s.MoneySpentNok} NOK.");
-                sb.AppendLine($"You're in the {Lower(s.Place)}.");
+                sb.AppendLine($"Day {s.Day}, {s.TimeOfDay} · worked {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min · money spent {s.MoneySpentNok} NOK.");
+                if (s.LaunchDeadlineDay > 0)
+                    sb.AppendLine($"Money left: {s.BalanceNok} NOK. Launch deadline: day {s.LaunchDeadlineDay}.");
+                sb.AppendLine($"You're {PlacePhrase(s.Place)}.");
+                if (s.Launched) sb.AppendLine("She's in the water.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) sb.AppendLine($"  Known: {f.Name} ({f.ComponentName})");
                 break;
             case AboardView a:
                 sb.Append(Aboard(a));
+                break;
+            case SurveyReportView r:
+                sb.Append(Survey(r));
+                break;
+            case ReadinessView r:
+                sb.Append(Readiness(r));
                 break;
         }
         return sb.ToString();
@@ -77,7 +87,7 @@ public static class Prose
     public static string Aboard(AboardView view)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"You're in the {Lower(view.Place)}.");
+        sb.AppendLine($"You're {PlacePhrase(view.Place)}.");
         sb.AppendLine("Places:");
         foreach (var p in view.Places)
         {
@@ -109,8 +119,79 @@ public static class Prose
         return sb.ToString();
     }
 
+    /// <summary>The surveyor's report as a letter.</summary>
+    public static string Survey(SurveyReportView r)
+    {
+        var sb = new StringBuilder();
+        if (!r.Ordered)
+        {
+            sb.AppendLine("No survey yet. 'order survey' hires the surveyor.");
+            return sb.ToString();
+        }
+        sb.AppendLine(r.Surveyor);
+        sb.AppendLine($"Survey of {r.BoatName}, day {r.Day}. Fee: {r.FeeNok} NOK.");
+        sb.AppendLine();
+        foreach (var l in r.Opening) sb.AppendLine(l);
+        sb.AppendLine();
+        foreach (var i in r.Items) sb.AppendLine($"{i.Number}. {i.Component} [{i.Severity}]: {i.Text}");
+        sb.AppendLine();
+        foreach (var l in r.Closing) sb.AppendLine(l);
+        return sb.ToString();
+    }
+
+    /// <summary>The launch picture: open problems with prices now and later, what to look into, what is done.</summary>
+    public static string Readiness(ReadinessView v)
+    {
+        var sb = new StringBuilder();
+        var deadline = v.DaysToDeadline switch
+        {
+            0 => "that is today",
+            1 => "1 day to go",
+            -1 => "1 day past",
+            > 1 => $"{v.DaysToDeadline} days to go",
+            _ => $"{-v.DaysToDeadline} days past",
+        };
+        sb.AppendLine($"Day {v.Day}. Launch deadline: day {v.LaunchDeadlineDay} ({deadline}). Money left: {v.BalanceNok} NOK. " +
+                      (v.Launched ? "She's in the water." : "She's ashore."));
+        if (v.Open.Count == 0 && v.ToInvestigate.Count == 0 && v.Fixed.Count == 0)
+        {
+            sb.AppendLine("No known problems.");
+            return sb.ToString();
+        }
+        foreach (var item in v.Open)
+        {
+            var state = item.State.Equals("Deferred", StringComparison.OrdinalIgnoreCase) ? " - deferred" : "";
+            sb.AppendLine($"{item.Problem} ({item.Component}){state}");
+            var later = $"Later: {item.CostLaterNok} NOK" + (string.IsNullOrEmpty(item.LaterNote) ? "" : $", {item.LaterNote}");
+            sb.AppendLine($"  Now: {item.CostNowNok} NOK. {later}.{(item.OnHardOnly ? " On the hard only." : "")}");
+            sb.AppendLine($"  If left: {item.Consequence}");
+            foreach (var r in item.Routes)
+            {
+                var detail = r.Route.Equals("Yard", StringComparison.OrdinalIgnoreCase)
+                    ? $"{r.How}, {r.CostNok} NOK, {r.LeadDays} {(r.LeadDays == 1 ? "day" : "days")}"
+                    : $"{r.How}, {r.CostNok} NOK, {Duration(r.Minutes)}";
+                var note = r.Available ? "" : $" (not available: {r.UnavailableReason})";
+                sb.AppendLine($"  {r.Route}: {detail}{note}");
+            }
+        }
+        if (v.ToInvestigate.Count > 0)
+        {
+            sb.AppendLine("To look into:");
+            foreach (var i in v.ToInvestigate) sb.AppendLine($"  {i.Component}: {i.Note}");
+        }
+        if (v.Fixed.Count > 0)
+            sb.AppendLine("Done: " + string.Join(", ", v.Fixed) + ".");
+        return sb.ToString();
+    }
+
+    /// <summary>"in the quarter berth", but "on deck" and "beside the hull".</summary>
+    private static string PlacePhrase(string place) =>
+        place.StartsWith("On ", StringComparison.Ordinal) || place.StartsWith("Beside ", StringComparison.Ordinal)
+            ? Lower(place) : $"in the {Lower(place)}";
+
     private static string Lower(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     private static string Duration(int minutes) =>
+        minutes >= 1440 && minutes % 1440 == 0 ? (minutes == 1440 ? "1 day" : $"{minutes / 1440} days") :
         minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes} min";
 }

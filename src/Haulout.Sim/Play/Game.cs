@@ -10,7 +10,7 @@ namespace Haulout.Sim.Play;
 /// The player-facing facade. Commands change the world, queries only look.
 /// Results carry only what the player could perceive.
 /// </summary>
-public sealed class Game
+public sealed partial class Game
 {
     private const int StartMinuteOfDay = 8 * 60;
 
@@ -28,14 +28,17 @@ public sealed class Game
     /// <summary>Component ids whose removable part (boot, cap) is pulled back.</summary>
     private readonly HashSet<string> _uncovered = [];
     /// <summary>She is on the hard for the whole slice; the ground beside the hull is only there then.</summary>
-    private readonly bool _onTheHard = true;
+    private bool _onTheHard = true;
     private readonly Reach _reach;
     private const string StartPlaceId = "cockpit";
     /// <summary>Where the exhaust outlet (the transom) can be seen from.</summary>
     private static readonly string[] ExhaustOutletPlaces = ["cockpit", "on-deck", "beside-the-hull"];
     private const string NoOutletMessage = "You can't see the exhaust outlet from down here.";
     private const string KeyMessage = "The key is on the panel in the cockpit.";
+    /// <summary>Work minutes: the player's own actions.</summary>
     private int _minutes;
+    /// <summary>Calendar time that is not work: waiting, the survey, the yard's lead days.</summary>
+    private int _idleMinutes;
     private int _money;
     private bool _running;
     private bool _finished;
@@ -43,14 +46,21 @@ public sealed class Game
     private readonly List<string> _tools = [];
     private StartOutcome? _lastStart;
 
-    public Game(Boat boat, int startDay = 75)
+    private readonly IRandom _random;
+
+    public Game(Boat boat, int startDay = 75, IRandom? random = null)
     {
         _boat = boat ?? throw new ArgumentNullException(nameof(boat));
         _startDay = startDay;
+        _random = random ?? new SeededRandom(DefaultSeed);
         _reach = new Reach(boat, _removed);
+        InitSkills();
     }
 
-    public static Game NewFirstFault() => new(BoatLoader.LoadSloop28(), 75);
+    /// <summary>The seed of the shipped first game: it decides the poor-job rolls.</summary>
+    public const int DefaultSeed = 4;
+
+    public static Game NewFirstFault(int seed = DefaultSeed) => new(BoatLoader.LoadSloop28(), 75, new SeededRandom(seed));
 
     // ---------------------------------------------------------------- queries
 
@@ -65,13 +75,17 @@ public sealed class Game
                 "She stands on the hard in her cradle, grey light and a cold wind off the water.",
                 "The yard hose is rigged to the raw-water intake, so the engine can run ashore.",
                 "You're standing in the cockpit, the companionway hatch slid open.",
+                $"The yard has her down for launch on day {_boat.Economy.LaunchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
             ]),
             Status => new StatusView(
-                Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.ToList(), _tools.ToList(), CurrentPlace.Name),
+                Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true }).ToList(), _tools.ToList(), CurrentPlace.Name,
+                Balance, _boat.Economy.LaunchDeadlineDay, _launched),
             Logbook => new LogView(_log.ToList()),
             Commands => new CommandList(CommandCatalogue),
             Aboard => AboardSnapshot(),
             ComponentActions q => ActionsFor(q.Component),
+            SurveyReport => SurveyReportSnapshot(),
+            Readiness => ReadinessSnapshot(),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -90,6 +104,14 @@ public sealed class Game
         new("replace", "component", "Fit a new part"),
         new("buy", "item", "Buy a tool at the yard chandlery"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
+        new("order survey", null, "Hire the surveyor to go over her (costs money and a day)"),
+        new("read survey", null, "Read the surveyor's report"),
+        new("readiness", null, "See the open problems, their price now and later, the deadline and the money"),
+        new("defer", "problem", "Leave a known problem for later, on purpose"),
+        new("undefer", "problem", "Take a deferred problem back onto the list"),
+        new("yard fix", "problem", "Pay the yard to fix a known problem"),
+        new("wait", "days", "Let some days pass"),
+        new("launch", null, "Put her in the water"),
         new("check filter", null, "Look in the fuel filter bowl"),
         new("check flow", null, "Look at the cooling water at the exhaust (engine running)"),
         new("log", null, "Read the logbook"),
@@ -107,7 +129,7 @@ public sealed class Game
         var found = _boat.Components.Where(c => _seen.Contains(c.Id))
             .Select(c => new FoundComponent(
                 c.Name, _boat.GetPosition(c.PositionId).Label, c.Faults.Any(f => f.Discovered && f.Present),
-                _reach.Visible(c, _placeId), _reach.Reachable(c, _placeId)))
+                _reach.Visible(c, _placeId), _reach.Reachable(c, _placeId), IsFlagged(c)))
             .ToList();
         return new AboardView(here.Name, places, covers, found);
     }
@@ -136,8 +158,9 @@ public sealed class Game
         else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
             Add("measure", "Measure", touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
 
-        if (c.Cleanable) Add("clean", "Clean", touch, 30, 0);
-        if (c.ReplaceCostNok > 0) Add("replace", "Replace", touch, c.ReplaceMinutes, c.ReplaceCostNok);
+        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", AfloatRefusal(c) ?? touch, 30, 0);
+        if (c.ReplaceCostNok > 0)
+            Add("replace", "Replace", AfloatRefusal(c) ?? touch ?? MoneyRefusal(c.ReplaceCostNok), c.ReplaceMinutes, c.ReplaceCostNok);
         if (c.Id == "start-battery") Add("charge", "Charge", touch, 480, 0);
         if (c.Id == "primary-filter") Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
         if (RawWaterParts.Contains(c.Id))
@@ -145,6 +168,7 @@ public sealed class Game
                 !ExhaustOutletPlaces.Contains(_placeId) ? NoOutletMessage
                 : _running ? null : "Only tells you anything with the engine running.", 5, 0);
 
+        AddProblemOptions(c, options);
         return new ComponentActionsView(name, true, c.Name, options);
     }
 
@@ -174,6 +198,12 @@ public sealed class Game
             Buy c => DoBuy(turn, c.Item),
             CheckFilterBowl => DoCheckFilterBowl(turn),
             CheckRawWaterFlow => DoCheckFlow(turn),
+            Defer c => DoDefer(turn, c.Fault),
+            Undefer c => DoUndefer(turn, c.Fault),
+            FixByYard c => DoYardFix(turn, c.Fault),
+            OrderSurvey => DoOrderSurvey(turn),
+            WaitDays c => DoWait(turn, c.Days),
+            Launch => DoLaunch(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -182,6 +212,8 @@ public sealed class Game
     {
         public List<string> Narrative { get; } = [];
         public List<KnownFault> Newly { get; } = [];
+        /// <summary>Ids of faults found and ruled out in the same breath (red herrings).</summary>
+        public HashSet<string> RuledOut { get; } = [];
     }
 
     private Place CurrentPlace => _boat.GetPlace(_placeId);
@@ -273,10 +305,10 @@ public sealed class Game
         var newlyVisible = remove
             ? _reach.VisibleAt(_placeId).Where(c => !before.Contains(c.Id)).Select(c => c.Name).ToList()
             : [];
-        MarkSeen(t);
 
         t.Narrative.Add(remove ? cover.RemoveText : cover.RefitText);
         if (newlyVisible.Count > 0) t.Narrative.Add("Behind it: " + string.Join(", ", newlyVisible) + ".");
+        MarkSeen(t);
         return Accept(t, action, remove ? cover.RemoveMinutes : cover.RefitMinutes, 0,
             new CoverView(cover.Name, coverPlace.Name, remove, newlyVisible),
             remove ? $"Took off the {label}." : $"Put back the {label}.");
@@ -292,7 +324,7 @@ public sealed class Game
         foreach (var f in c.ActiveFaults.ToList())
         {
             Reveal(t, f, PlayerAction.Inspect, uncovered: off);
-            if (f.Discovered) t.Narrative.Add($"You know what this is: {f.Name}.");
+            if (f.Discovered && f.Present) t.Narrative.Add($"You know what this is: {f.Name}.");
         }
         var view = new InspectionView(c.Name, string.Join(" ", t.Narrative));
         return Accept(t, "inspect", 5, 0, view, $"Inspected the {c.Name.ToLowerInvariant()}.");
@@ -391,7 +423,7 @@ public sealed class Game
         {
             _finished = true;
             int total = _minutes + minutes;
-            t.Narrative.Add("She'll do. Launch is in three weeks.");
+            t.Narrative.Add($"She'll do. {LaunchIn()}");
             t.Narrative.Add($"Time spent: {total / 60} h {total % 60} min. Money spent: {_money} NOK.");
         }
         return Accept(t, "start", minutes, 0, new StartAttemptView(result.Outcome.ToString(), result.Description, result.LabouredCrank),
@@ -406,15 +438,16 @@ public sealed class Game
         if (c.RemovablePart is not { } part) return Reject("uncover", $"There's nothing to pull back on the {c.Name.ToLowerInvariant()}.");
         if (!_uncovered.Add(c.Id)) return Reject("uncover", AlreadyUncovered(part));
 
-        t.Narrative.Add($"You peel the {part.Name} back off the clamp.");
+        t.Narrative.Add(part.UncoverText ?? $"You peel the {part.Name} back off the clamp.");
         if (part.UncoveredText.Length > 0) t.Narrative.Add(part.UncoveredText);
         return Accept(t, "uncover", 2, 0, null, $"Pulled back the {part.Name} on the {c.Name.ToLowerInvariant()}.");
     }
 
     private CommandResult DoClean(Turn t, string name)
     {
-        if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected)) return rejected!;
-        if (!c.Cleanable) return Reject("clean", "Nothing to clean there.");
+        if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected,
+                pre: x => x.Cleanable || CanRedoByClean(x) ? AfloatRefusal(x) : null)) return rejected!;
+        if (!c.Cleanable && !CanRedoByClean(c)) return Reject("clean", "Nothing to clean there.");
 
         StopEngine(t);
         bool bootWasOff = _uncovered.Remove(c.Id);
@@ -437,23 +470,32 @@ public sealed class Game
         }
         if (bootWasOff && c.RemovablePart is { } part)
         {
-            var refit = $"You push the {part.Name} back over the clamp.";
+            var refit = part.RefitText ?? $"You push the {part.Name} back over the clamp.";
             t.Narrative.Add(refit);
             text += " " + refit;
         }
+        MaybePoorJob(c);
         return Accept(t, "clean", 30, 0, new RepairView(c.Name, text), $"Cleaned the {c.Name.ToLowerInvariant()}.");
     }
 
     private CommandResult DoReplace(Turn t, string name)
     {
-        if (!ResolveComponent("replace", name, needTouch: true, out var c, out var rejected)) return rejected!;
+        if (!ResolveComponent("replace", name, needTouch: true, out var c, out var rejected,
+                pre: x => x.ReplaceCostNok > 0 ? AfloatRefusal(x) : null)) return rejected!;
         if (c.ReplaceCostNok <= 0) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
+        if (MoneyRefusal(c.ReplaceCostNok) is { } broke) return Reject("replace", broke);
 
         StopEngine(t);
         c.Replace();
         _uncovered.Remove(c.Id);
-        var text = $"You fit a new {c.Name.ToLowerInvariant()}.";
+        var text = c.ReplaceText ?? $"You fit a new {c.Name.ToLowerInvariant()}.";
         t.Narrative.Add(text);
+        if (c.Id == "primary-filter" && FixDrainedWater() is { } runsClean)
+        {
+            t.Narrative.Add(runsClean);
+            text += " " + runsClean;
+        }
+        MaybePoorJob(c);
         return Accept(t, "replace", c.ReplaceMinutes, c.ReplaceCostNok, new RepairView(c.Name, text),
             $"Replaced the {c.Name.ToLowerInvariant()}.");
     }
@@ -479,6 +521,8 @@ public sealed class Game
         if (shopItem is null) return Reject("buy", $"The chandlery doesn't have '{item.Trim()}'.");
         if (_tools.Contains(shopItem.Name)) return Reject("buy", "You already have one.");
 
+        if (MoneyRefusal(shopItem.CostNok) is { } broke) return Reject("buy", broke);
+
         _tools.Add(shopItem.Name);
         t.Narrative.Add($"You walk over to the yard chandlery and buy a {shopItem.Name}.");
         return Accept(t, "buy", shopItem.Minutes, shopItem.CostNok, null, shopItem.LogText);
@@ -490,7 +534,8 @@ public sealed class Game
         if (!_seen.Contains(filter.Id)) return Reject("check-filter-bowl", "You haven't found a fuel filter yet.");
         if (_reach.Refusal(filter, _placeId, needTouch: true) is { } refusal) return Reject("check-filter-bowl", refusal);
         var before = t.Narrative.Count;
-        foreach (var f in filter.ActiveFaults.ToList()) Reveal(t, f, PlayerAction.CheckFilterBowl);
+        // Water in the fuel lives on the tank, but it is the filter bowl that shows it.
+        foreach (var f in filter.ActiveFaults.Concat(_boat.Get("fuel-tank").ActiveFaults).ToList()) BowlCheck(t, f);
         if (t.Narrative.Count == before) t.Narrative.Add("Clear, pale diesel. No water at the bottom.");
         return Accept(t, "check-filter-bowl", 10, 0, new FilterBowlView(string.Join(" ", t.Narrative)), "Checked the fuel filter bowl.");
     }
@@ -515,8 +560,9 @@ public sealed class Game
 
     // ---------------------------------------------------------------- helpers
 
-    private int Day => _startDay + (StartMinuteOfDay + _minutes) / 1440;
-    private string TimeOfDay => FormatTime(_minutes);
+    private int ClockMinutes => _minutes + _idleMinutes;
+    private int Day => _startDay + (StartMinuteOfDay + ClockMinutes) / 1440;
+    private string TimeOfDay => FormatTime(ClockMinutes);
 
     private static string FormatTime(int minutesSpent)
     {
@@ -542,19 +588,26 @@ public sealed class Game
     {
         var reveal = f.RevealFor(action, uncovered);
         if (reveal is not null) t.Narrative.Add(reveal.Text);
+        if (reveal is { Discovers: false }) f.MarkSymptomatic();
         if ((reveal?.Discovers ?? false) || forceDiscover) Discover(t, f);
     }
 
     private void Discover(Turn t, Fault f)
     {
-        if (f.Discovered) return;
+        if (f.Discovered || f.Dormant) return;
         f.Discover();
         var known = new KnownFault(f.Id, f.Name, _boat.Get(f.ComponentId).Name);
         _discovered.Add(known);
         t.Newly.Add(known);
+        if (!f.Harmless) return;
+        f.Clear();
+        t.RuledOut.Add(f.Id);
+        t.Narrative.Add($"Ruled out: {f.Name}.");
     }
 
-    private bool ResolveComponent(string action, string name, bool needTouch, out Component component, out CommandResult? rejected)
+    private bool ResolveComponent(
+        string action, string name, bool needTouch, out Component component, out CommandResult? rejected,
+        Func<Component, string?>? pre = null)
     {
         // Only components the player has seen are nameable, so a refusal never confirms an unseen part exists.
         var seen = _boat.Components.Where(c => _seen.Contains(c.Id));
@@ -567,7 +620,7 @@ public sealed class Game
                 : Reject(action, $"You haven't found anything called '{name.Trim()}' yet.");
             return false;
         }
-        var refusal = _reach.Refusal(r.Match, _placeId, needTouch);
+        var refusal = pre?.Invoke(r.Match) ?? _reach.Refusal(r.Match, _placeId, needTouch);
         rejected = refusal is null ? null : Reject(action, refusal);
         return refusal is null;
     }
@@ -580,14 +633,17 @@ public sealed class Game
     private CommandResult Reject(string action, string message) =>
         new(false, action, [message], 0, 0, null, [], _running, _finished);
 
-    private CommandResult Accept(Turn t, string action, int minutes, int costNok, Observation? obs, string logText)
+    private CommandResult Accept(Turn t, string action, int minutes, int costNok, Observation? obs, string logText, bool work = true)
     {
-        var stamp = FormatTime(_minutes);
+        var stamp = TimeOfDay;
         int day = Day;
         _log.Add(new LogEntry(day, stamp, logText, costNok));
-        foreach (var k in t.Newly) _log.Add(new LogEntry(day, stamp, $"Found: {k.Name}."));
-        _minutes += minutes;
+        LogFound(t, 0, day, stamp);
+        int already = t.Newly.Count;
+        if (work) _minutes += minutes; else _idleMinutes += minutes;
         _money += costNok;
+        RunClockEscalations(t);
+        LogFound(t, already, Day, TimeOfDay);
         return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished);
     }
 }

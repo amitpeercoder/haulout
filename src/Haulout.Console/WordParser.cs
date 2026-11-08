@@ -41,6 +41,17 @@ public static class WordParser
             "buy" => WithArg(arg, "buy <item>", a => new Buy(a)),
             "charge" => new RunCommand(new Charge(arg.Length == 0 ? "start battery" : arg)),
             "check" => ParseCheck(arg),
+            "defer" => WithArg(arg, "defer <problem>", a => new Defer(a)),
+            "undefer" => WithArg(arg, "undefer <problem>", a => new Undefer(a)),
+            "yard" => ParseYard(arg),
+            "order" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunCommand(new OrderSurvey()),
+            "order" => new Problem("Usage: order survey"),
+            "read" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunQuery(new SurveyReport()),
+            "read" => new Problem("Usage: read survey"),
+            "survey" => new RunQuery(new SurveyReport()),
+            "readiness" or "ready" => new RunQuery(new Readiness()),
+            "wait" => ParseWait(arg),
+            "launch" => new RunCommand(new Launch()),
             "log" => new RunQuery(new Logbook()),
             "status" => new RunQuery(new Status()),
             "help" => new RunQuery(new Commands()),
@@ -71,6 +82,26 @@ public static class WordParser
 
     private static string StripTo(string arg) =>
         arg.StartsWith("to ", StringComparison.OrdinalIgnoreCase) ? arg[3..].Trim() : arg;
+
+    private static Parsed ParseYard(string arg)
+    {
+        if (arg.StartsWith("fix", StringComparison.OrdinalIgnoreCase) && (arg.Length == 3 || arg[3] == ' ' || arg[3] == '\t'))
+            arg = arg[3..].Trim();
+        return WithArg(arg, "yard fix <problem>", a => new FixByYard(a));
+    }
+
+    /// <summary>"wait 3", "wait 3 days", "wait a day".</summary>
+    private static Parsed ParseWait(string arg)
+    {
+        const string usage = "Usage: wait <days>";
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count == 0 || words.Count > 2) return new Problem(usage);
+        if (words.Count == 2 && !words[1].Equals("day", StringComparison.OrdinalIgnoreCase) && !words[1].Equals("days", StringComparison.OrdinalIgnoreCase))
+            return new Problem(usage);
+        if (words[0].Equals("a", StringComparison.OrdinalIgnoreCase) || words[0].Equals("one", StringComparison.OrdinalIgnoreCase))
+            return new RunCommand(new WaitDays(1));
+        return int.TryParse(words[0], out var n) && n >= 1 ? new RunCommand(new WaitDays(n)) : new Problem(usage);
+    }
 
     private static Parsed ParseCheck(string arg) => arg.ToLowerInvariant() switch
     {

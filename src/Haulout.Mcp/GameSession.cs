@@ -60,6 +60,8 @@ public sealed class GameSession
                 result = text.Length <= 80 ? text : text[..80],
                 minutesSpent = status.MinutesSpent,
                 moneySpentNok = status.MoneySpentNok,
+                balanceNok = status.BalanceNok,
+                launched = status.Launched,
                 engineRunning = status.EngineRunning,
                 finished = status.Finished,
             });

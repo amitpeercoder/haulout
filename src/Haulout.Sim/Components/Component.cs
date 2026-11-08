@@ -44,9 +44,19 @@ public sealed class Component
     public int ReplaceMinutes => Spec.ReplaceMinutes;
     public IReadOnlyDictionary<string, double> Properties => Spec.Properties;
     public RemovablePart? RemovablePart => Spec.RemovablePart;
+    public bool BelowWaterline => Spec.BelowWaterline;
+    /// <summary>The narrative of Replace; null: the default "You fit a new {name}."</summary>
+    public string? ReplaceText => Spec.ReplaceText;
 
     public IReadOnlyList<Fault> Faults => _faults;
     public IEnumerable<Fault> ActiveFaults => _faults.Where(f => f.Present);
+
+    /// <summary>Adds a fault that arises during play (poor work of the player's own).</summary>
+    internal void AddFault(Fault fault)
+    {
+        if (fault.ComponentId != Id) throw new ArgumentException($"Fault '{fault.Id}' belongs to '{fault.ComponentId}', not '{Id}'.", nameof(fault));
+        _faults.Add(fault);
+    }
 
     /// <summary>Advance wear by elapsed calendar days and engine/use hours.</summary>
     public void Age(int days, double useHours)
@@ -57,7 +67,7 @@ public sealed class Component
 
     public void Replace()
     {
-        foreach (var fault in _faults) fault.Clear();
+        foreach (var fault in _faults.Where(f => f.Present).ToList()) fault.Clear();
         Condition = 1;
     }
 }

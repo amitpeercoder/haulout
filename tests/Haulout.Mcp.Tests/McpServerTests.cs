@@ -10,6 +10,7 @@ public class McpServerTests
     [
         "look", "go", "remove", "refit", "inspect", "uncover", "measure", "clean", "replace", "charge", "buy",
         "check_filter", "check_flow", "start_engine",
+        "order_survey", "survey", "readiness", "defer", "undefer", "yard_fix", "wait", "launch",
         "status", "logbook", "aboard", "help", "briefing",
     ];
 
@@ -99,7 +100,7 @@ public class McpServerTests
     }
 
     [Fact]
-    public async Task Lists_all_nineteen_tools()
+    public async Task Lists_all_tools()
     {
         await using var client = await Connect();
         var names = (await client.ListToolsAsync()).Select(t => t.Name).ToHashSet();

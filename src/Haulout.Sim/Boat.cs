@@ -1,4 +1,5 @@
 using Haulout.Sim.Components;
+using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
 
 namespace Haulout.Sim;
@@ -34,8 +35,12 @@ public sealed class Boat
 
     public Boat(
         string name, IEnumerable<Place> places, IEnumerable<Cover> covers,
-        IEnumerable<Position> positions, IEnumerable<Component> components)
+        IEnumerable<Position> positions, IEnumerable<Component> components,
+        Economy? economy = null, SurveyData? survey = null, DiyQuality? diyQuality = null)
     {
+        Economy = economy ?? new Economy(0, 0, 0, 0);
+        Survey = survey;
+        DiyQuality = diyQuality;
         Name = name;
         Places = places.ToList();
         Covers = covers.ToList();
@@ -85,6 +90,11 @@ public sealed class Boat
     }
 
     public string Name { get; }
+    public Economy Economy { get; }
+    /// <summary>Null: this boat has no surveyor.</summary>
+    public SurveyData? Survey { get; }
+    /// <summary>Null: no poor-job rule.</summary>
+    public DiyQuality? DiyQuality { get; }
     public IReadOnlyList<Component> Components { get; }
     public IReadOnlyList<Place> Places { get; }
     public IReadOnlyList<Cover> Covers { get; }

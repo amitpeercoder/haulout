@@ -282,7 +282,21 @@
           "fixedBy": [
             "charge",
             "replace"
-          ]
+          ],
+          "onHardOnly": false,
+          "consequence": "Slow cranking, and a flat battery after a few starts.",
+          "costLaterNok": 1900,
+          "laterNote": null,
+          "diy": {
+            "how": "Charge it on shore power",
+            "partsNok": 0,
+            "minutes": 480
+          },
+          "yard": {
+            "how": "The yard fits a new battery",
+            "nok": 2600,
+            "leadDays": 1
+          }
         }
       ]
     },
@@ -343,7 +357,9 @@
       "description": "A lead clamp under a red rubber boot, bolt snug.",
       "removablePart": {
         "name": "rubber boot",
-        "aliases": ["boot"],
+        "aliases": [
+          "boot"
+        ],
         "uncoveredText": "Under the boot the lead is clean and bright."
       },
       "condition": 0.7,
@@ -402,7 +418,9 @@
       "description": "A lead clamp under a black rubber boot, greasy from some earlier owner's smear of vaseline.",
       "removablePart": {
         "name": "rubber boot",
-        "aliases": ["boot"],
+        "aliases": [
+          "boot"
+        ],
         "uncoveredText": ""
       },
       "condition": 0.5,
@@ -440,7 +458,21 @@
           "fixedBy": [
             "clean",
             "replace"
-          ]
+          ],
+          "onHardOnly": false,
+          "consequence": "The engine won't start.",
+          "costLaterNok": 900,
+          "laterNote": null,
+          "diy": {
+            "how": "Clean the post and clamp, and tighten it",
+            "partsNok": 0,
+            "minutes": 30
+          },
+          "yard": {
+            "how": "The yard electrician cleans and re-terminates the battery cables",
+            "nok": 900,
+            "leadDays": 1
+          }
         }
       ]
     },
@@ -604,7 +636,42 @@
       "replaceMinutes": 360,
       "properties": {
         "litres": 40
-      }
+      },
+      "faults": [
+        {
+          "id": "water-in-fuel",
+          "name": "Water in the fuel tank",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "checkFilterBowl",
+              "text": "Under the diesel a clear line of water sits in the bottom of the bowl, two fingers deep, a wobbling skin where they meet. You drain it off into a jar.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [],
+          "properties": {
+            "diyDrainDays": 3
+          },
+          "onHardOnly": false,
+          "consequence": "In a seaway the water is stirred up into the filter: the engine fires and dies when you need it.",
+          "costLaterNok": 4200,
+          "laterNote": "a tow if she stops in the wrong place",
+          "diy": {
+            "how": "Drain the filter bowl on three separate days, then fit a new primary filter element",
+            "partsNok": 180,
+            "minutes": 75
+          },
+          "yard": {
+            "how": "The yard drains and polishes the tank and changes the filters",
+            "nok": 2800,
+            "leadDays": 2
+          }
+        }
+      ]
     },
     {
       "id": "fuel-shutoff",
@@ -706,7 +773,7 @@
           "reveals": [
             {
               "action": "checkFilterBowl",
-              "text": "You open the drain and look in the bowl: dark diesel, a finger of water at the bottom and black sludge on the walls.",
+              "text": "You open the drain and look in the bowl: dark diesel, and black sludge clinging to the walls.",
               "discovers": true
             },
             {
@@ -717,7 +784,21 @@
           ],
           "fixedBy": [
             "replace"
-          ]
+          ],
+          "onHardOnly": false,
+          "consequence": "Fuel starvation when the sea stirs the tank up: she runs rough or stops.",
+          "costLaterNok": 700,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new filter element",
+            "partsNok": 180,
+            "minutes": 45
+          },
+          "yard": {
+            "how": "The yard changes the fuel filters",
+            "nok": 700,
+            "leadDays": 1
+          }
         }
       ]
     },
@@ -875,7 +956,7 @@
         "sea cock",
         "intake"
       ],
-      "description": "A bronze ball valve on a through-hull, green with age, handle moving freely.",
+      "description": "A bronze ball valve on a through-hull, green with age, the handle stiff.",
       "condition": 0.6,
       "wearYears": 25,
       "seriesOhms": null,
@@ -884,7 +965,87 @@
       "replaceMinutes": 180,
       "properties": {
         "open": 1
-      }
+      },
+      "belowWaterline": true,
+      "replaceText": "You knock out the old seacock, bed a new through-hull and ball valve, and double-clamp the hose.",
+      "faults": [
+        {
+          "id": "seacock-weeping",
+          "name": "Weeping raw-water seacock",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "look",
+              "text": "There's a damp patch in the bilge under the seacock, rimmed with white salt crust.",
+              "discovers": false
+            },
+            {
+              "action": "inspect",
+              "text": "Salt crust round the valve stem and a bead of water hanging under it: the seacock is weeping at the stem.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "escalation": {
+            "to": "seacock-seized",
+            "afterDeferredDays": 20,
+            "onLaunch": true,
+            "text": "The raw-water seacock has seized: the salt has crusted the stem solid and the handle won't move."
+          },
+          "onHardOnly": true,
+          "consequence": "It weeps now and will seize; a seized seacock can't be shut if a hose lets go.",
+          "costLaterNok": 12800,
+          "laterNote": "afloat: needs an emergency lift",
+          "diy": {
+            "how": "Replace the seacock and through-hull",
+            "partsNok": 1200,
+            "minutes": 180
+          },
+          "yard": {
+            "how": "The yard replaces the seacock and through-hull",
+            "nok": 3800,
+            "leadDays": 4
+          }
+        },
+        {
+          "id": "seacock-seized",
+          "name": "Seized raw-water seacock",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "dormant": true,
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "You lean on the seacock handle. It doesn't move at all: seized solid in the salt.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": true,
+          "consequence": "It can't be closed: if the hose lets go at sea you can't stop the water. A tow and an emergency lift.",
+          "costLaterNok": 13800,
+          "laterNote": "afloat: needs an emergency lift",
+          "diy": {
+            "how": "Cut out and replace the seacock and through-hull",
+            "partsNok": 1400,
+            "minutes": 300
+          },
+          "yard": {
+            "how": "The yard cuts out and replaces the seacock",
+            "nok": 4800,
+            "leadDays": 5
+          }
+        }
+      ]
     },
     {
       "id": "raw-water-strainer",
@@ -973,8 +1134,9 @@
           "reveals": [
             {
               "action": "inspect",
-              "text": "With the cover off, the vanes have taken a set in a curve and two of them are cracked at the root.",
-              "discovers": true
+              "text": "With the pump cover off, the vanes have taken a set in a curve and two of them are cracked at the root.",
+              "discovers": true,
+              "needsUncovered": true
             },
             {
               "action": "checkRawWaterFlow",
@@ -984,9 +1146,33 @@
           ],
           "fixedBy": [
             "replace"
-          ]
+          ],
+          "onHardOnly": false,
+          "consequence": "The engine will overheat under load at sea: you'll lose cooling when you need it most.",
+          "costLaterNok": 4500,
+          "laterNote": "a tow home if it sheds its vanes",
+          "diy": {
+            "how": "Fit a new impeller",
+            "partsNok": 350,
+            "minutes": 60
+          },
+          "yard": {
+            "how": "The yard mechanic fits a new impeller",
+            "nok": 1400,
+            "leadDays": 2
+          }
         }
-      ]
+      ],
+      "removablePart": {
+        "name": "raw-water pump cover",
+        "aliases": [
+          "pump cover",
+          "cover"
+        ],
+        "uncoveredText": "",
+        "uncoverText": "You undo the six screws and lift off the raw-water pump cover.",
+        "refitText": "You put the pump cover back with a new gasket and do up the six screws."
+      }
     },
     {
       "id": "heat-exchanger",
@@ -1344,7 +1530,33 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 0,
-      "replaceMinutes": 0
+      "replaceMinutes": 0,
+      "belowWaterline": true,
+      "faults": [
+        {
+          "id": "hull-old-paint-blisters",
+          "name": "Blistered old paint at the bow",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "harmless": true,
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "You press a blister at the bow with a thumbnail. It is old paint lifting off older paint, dry and hollow; the gelcoat underneath is hard and sound. Not osmosis.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [],
+          "onHardOnly": false,
+          "consequence": "Nothing: old paint lifting, the laminate is sound.",
+          "costLaterNok": 0,
+          "laterNote": null,
+          "diy": null,
+          "yard": null
+        }
+      ]
     },
     {
       "id": "keel",
@@ -1369,7 +1581,8 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 0,
-      "replaceMinutes": 0
+      "replaceMinutes": 0,
+      "belowWaterline": true
     },
     {
       "id": "rudder",
@@ -1394,7 +1607,8 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 0,
-      "replaceMinutes": 0
+      "replaceMinutes": 0,
+      "belowWaterline": true
     },
     {
       "id": "standing-rig",
@@ -1458,8 +1672,436 @@
       "wearYears": 2,
       "seriesOhms": null,
       "cleanable": false,
-      "replaceCostNok": 0,
-      "replaceMinutes": 0
+      "replaceCostNok": 1600,
+      "replaceMinutes": 480,
+      "belowWaterline": true,
+      "replaceText": "You sand, wipe down and roll on two fresh coats of antifouling.",
+      "faults": [
+        {
+          "id": "antifouling-thin",
+          "name": "Thin antifouling",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The paint is worn through to the old primer along the waterline and on the leading edge of the keel.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": true,
+          "consequence": "Weed and barnacles by midsummer: a knot slower, and a scrub that needs a lift.",
+          "costLaterNok": 3500,
+          "laterNote": "afloat: needs a lift and a scrub",
+          "diy": {
+            "how": "Sand and roll on two coats of antifouling",
+            "partsNok": 1600,
+            "minutes": 480
+          },
+          "yard": {
+            "how": "The yard paints the bottom",
+            "nok": 4200,
+            "leadDays": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "nav-lights",
+      "name": "Navigation lights",
+      "subsystem": "electrical",
+      "position": "deck",
+      "reach": [
+        {
+          "place": "on-deck",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "nav lights",
+        "navigation light",
+        "bow light",
+        "bicolour light",
+        "stern light"
+      ],
+      "description": "A bicolour light on the pulpit and a white stern light, the wiring taped where it runs down the stanchion.",
+      "condition": 0.6,
+      "wearYears": 10,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 250,
+      "replaceMinutes": 30,
+      "replaceText": "You fit a new lens on the bicolour light and seal the gasket.",
+      "faults": [
+        {
+          "id": "nav-lens-cracked",
+          "name": "Cracked navigation light lens",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The bicolour lens has a crack through the red side, and there's a bead of water inside.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "Water gets into the fitting and the bow light fails at night.",
+          "costLaterNok": 900,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new lens",
+            "partsNok": 250,
+            "minutes": 30
+          },
+          "yard": {
+            "how": "The yard electrician fits a new lens",
+            "nok": 700,
+            "leadDays": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "cockpit-drains",
+      "name": "Cockpit drain hoses",
+      "subsystem": "hull",
+      "position": "under-cockpit-locker",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": "cockpit-locker-lid",
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "cockpit drains",
+        "drain hoses",
+        "drains",
+        "hose clamps",
+        "drain clamps"
+      ],
+      "description": "Two reinforced hoses from the cockpit drains down to their through-hulls, each held by a pair of hose clamps.",
+      "condition": 0.5,
+      "wearYears": 12,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 120,
+      "replaceMinutes": 40,
+      "replaceText": "You fit new stainless hose clamps, two to each hose tail.",
+      "faults": [
+        {
+          "id": "drain-clamps-rusted",
+          "name": "Rusted cockpit drain hose clamps",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The clamps are rusted through at the screw housing; one crumbles when you press it with a thumb.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "A clamp that lets go floods the boat through the drain through-hull.",
+          "costLaterNok": 600,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit new hose clamps, doubled",
+            "partsNok": 120,
+            "minutes": 40
+          },
+          "yard": {
+            "how": "The yard renews the clamps",
+            "nok": 600,
+            "leadDays": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "lifelines",
+      "name": "Lifelines",
+      "subsystem": "hull",
+      "position": "deck",
+      "reach": [
+        {
+          "place": "on-deck",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        },
+        {
+          "place": "cockpit",
+          "cover": null,
+          "visible": true,
+          "reachable": false
+        }
+      ],
+      "aliases": [
+        "lifelines",
+        "guardrails",
+        "guard wires",
+        "lifeline terminals"
+      ],
+      "description": "Plastic-coated wire lifelines on four stanchions each side, swaged terminals at the pulpit and pushpit.",
+      "condition": 0.5,
+      "wearYears": 15,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 900,
+      "replaceMinutes": 120,
+      "replaceText": "You fit new lifeline terminals and tension the wires.",
+      "faults": [
+        {
+          "id": "lifeline-terminals-pitted",
+          "name": "Pitted lifeline terminals",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "Under the plastic the swaged terminals at the pushpit are pitted, rust weeping where the wire goes in.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "A terminal that lets go when someone falls against it.",
+          "costLaterNok": 1800,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit new lifeline terminals",
+            "partsNok": 900,
+            "minutes": 120
+          },
+          "yard": {
+            "how": "The yard rigger renews the terminals",
+            "nok": 1800,
+            "leadDays": 3
+          }
+        }
+      ]
     }
+  ],
+  "economy": {
+    "startingBalanceNok": 25000,
+    "launchDeadlineDay": 96,
+    "emergencyLiftNok": 9000,
+    "launchMinutes": 120
+  },
+  "survey": {
+    "nokPerFoot": 200,
+    "lengthFeet": 28,
+    "days": 1,
+    "surveyor": "Hallvard Brekke, marine surveyor, Skjærvik",
+    "opening": [
+      "Dear owner,",
+      "As instructed I surveyed your 28-foot sloop ashore in her cradle at the yard. The hull was sounded and viewed from the ground, the deck and rig from deck level, the machinery as found. The engine was tried. I did not go aloft or strip any machinery.",
+      "My findings, in the order I made them:"
+    ],
+    "closing": [
+      "Items marked Before launch should be attended to before she goes in. The rest can be planned over the season.",
+      "Yours faithfully,",
+      "H. Brekke"
+    ],
+    "items": [
+      {
+        "component": "hull",
+        "severity": "attention",
+        "fault": "hull-old-paint-blisters",
+        "finding": "investigate",
+        "text": "Blistering noted at the bow below the waterline, possibly osmotic. Recommend moisture readings and a closer inspection."
+      },
+      {
+        "component": "antifouling",
+        "severity": "attention",
+        "fault": "antifouling-thin",
+        "finding": "cause",
+        "text": "Thin, worn to primer at the waterline and on the keel's leading edge. Recommend a fresh coat before launch."
+      },
+      {
+        "component": "raw-water-seacock",
+        "severity": "beforeLaunch",
+        "fault": "seacock-weeping",
+        "finding": "cause",
+        "text": "Weeping at the stem, with salt crust in the bilge below. Recommend service or replacement before launch."
+      },
+      {
+        "component": "cockpit-drains",
+        "severity": "attention",
+        "fault": "drain-clamps-rusted",
+        "finding": "cause",
+        "text": "Hose clamps rusted, one failing. Recommend renewal, doubled."
+      },
+      {
+        "component": "lifelines",
+        "severity": "attention",
+        "fault": "lifeline-terminals-pitted",
+        "finding": "cause",
+        "text": "Terminals pitted, rust weeping at the swages aft. Recommend replacement."
+      },
+      {
+        "component": "nav-lights",
+        "severity": "attention",
+        "fault": "nav-lens-cracked",
+        "finding": "cause",
+        "text": "Bicolour lens cracked, water inside. Recommend replacement."
+      },
+      {
+        "component": "standing-rig",
+        "severity": "note",
+        "fault": null,
+        "finding": "none",
+        "text": "No defects visible from deck level. A rigger's inspection aloft is recommended within two seasons."
+      },
+      {
+        "component": "start-battery",
+        "severity": "attention",
+        "fault": "battery-low-charge",
+        "finding": "investigate",
+        "text": "Dated three seasons back, history unknown. Recommend a load test, and replacement if it does not hold up."
+      },
+      {
+        "component": "starter-motor",
+        "severity": "beforeLaunch",
+        "fault": "neg-terminal-corrosion",
+        "finding": "investigate",
+        "text": "On a trial start the starter clicked once and did not turn the engine. Poor cranking; recommend investigation of the starter circuit."
+      },
+      {
+        "component": "fuel-tank",
+        "severity": "beforeLaunch",
+        "fault": "water-in-fuel",
+        "finding": "cause",
+        "text": "A sample drawn from the bottom of the tank shows free water. Recommend draining and polishing the tank, and new filters, before launch."
+      },
+      {
+        "component": "primary-filter",
+        "severity": "attention",
+        "fault": "primary-filter-clogged",
+        "finding": "cause",
+        "text": "Element marked with a date well past its service interval. Recommend a new element."
+      },
+      {
+        "component": "exhaust-elbow",
+        "severity": "note",
+        "fault": null,
+        "finding": "none",
+        "text": "Light external rust at the flange, no weeping. Serviceable; monitor."
+      }
+    ]
+  },
+  "diyQuality": {
+    "startSkill": 0,
+    "threshold": 2,
+    "poorJobChance": 0.25,
+    "poorJobs": {
+      "electrical": {
+        "name": "Connection not done up tight (your own work)",
+        "reveal": "Looking again at your own work, the connection moves when you wiggle it: not done up tight.",
+        "consequence": "It can work loose under way and leave you without power.",
+        "costLaterNok": 900,
+        "diy": {
+          "how": "Redo it and tighten it properly",
+          "partsNok": 0,
+          "minutes": 30
+        },
+        "yard": {
+          "how": "The yard electrician redoes it",
+          "nok": 600,
+          "leadDays": 1
+        }
+      },
+      "cooling": {
+        "name": "Hose clamp not seated (your own work)",
+        "reveal": "A bead of water hangs under the hose clamp you fitted: it isn't seated square.",
+        "consequence": "A slow weep that grows into a leak under way.",
+        "costLaterNok": 1500,
+        "diy": {
+          "how": "Redo the clamp",
+          "partsNok": 0,
+          "minutes": 30
+        },
+        "yard": {
+          "how": "The yard redoes the job",
+          "nok": 800,
+          "leadDays": 1
+        }
+      },
+      "fuel": {
+        "name": "Fuel union not tightened (your own work)",
+        "reveal": "A smell of diesel, and a wet ring round the union you did up.",
+        "consequence": "Air gets in under way and the engine stops.",
+        "costLaterNok": 1500,
+        "diy": {
+          "how": "Redo the union",
+          "partsNok": 0,
+          "minutes": 30
+        },
+        "yard": {
+          "how": "The yard mechanic redoes it",
+          "nok": 800,
+          "leadDays": 1
+        }
+      },
+      "engine": {
+        "name": "Part not seated right (your own work)",
+        "reveal": "What you fitted isn't sitting right: it shifts when you push it.",
+        "consequence": "It works loose with the vibration under way.",
+        "costLaterNok": 1500,
+        "diy": {
+          "how": "Redo it",
+          "partsNok": 0,
+          "minutes": 30
+        },
+        "yard": {
+          "how": "The yard mechanic redoes it",
+          "nok": 800,
+          "leadDays": 1
+        }
+      },
+      "hull": {
+        "name": "Patchy work (your own)",
+        "reveal": "Your work has thin patches and a run or two.",
+        "consequence": "It won't last the season.",
+        "costLaterNok": 1500,
+        "diy": {
+          "how": "Redo it",
+          "partsNok": 0,
+          "minutes": 60
+        },
+        "yard": {
+          "how": "The yard redoes it",
+          "nok": 1200,
+          "leadDays": 2
+        }
+      }
+    }
+  },
+  "placeholders": [
+    "PLACEHOLDER (design note 005): every price, hour, lead time, timer and chance in economy, survey, diyQuality and in each fault's diy/yard/costLaterNok is a placeholder for Amit to calibrate."
   ]
 }

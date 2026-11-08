@@ -77,6 +77,42 @@ public sealed class HaulTools(GameSession session)
         "Try to start the engine. Takes 2 minutes, free. Only from the cockpit, where the key is. Reports what happens. If she runs properly the game ends.")]
     public string StartEngine() => session.Do("start_engine", new StartEngine());
 
+    [McpServerTool(Name = "order_survey"), Description(
+        "Hire the surveyor to go over the boat. Costs 200 NOK per foot of boat (5600 NOK) and one day. The report arrives in the logbook; read it with survey.")]
+    public string OrderSurvey() => session.Do("order_survey", new OrderSurvey());
+
+    [McpServerTool(Name = "survey", ReadOnly = true), Description(
+        "Read the surveyor's report, once you have ordered the survey. Costs no time.")]
+    public string Survey() => session.Ask("survey", new SurveyReport());
+
+    [McpServerTool(Name = "readiness", ReadOnly = true), Description(
+        "Where you stand before launch: the launch deadline, your money, and every problem you have found that is still open, with what it costs to fix now or later, the routes to fix it (your own time or the yard's price and lead time in days) and what happens if it is left. Costs no time.")]
+    public string Readiness() => session.Ask("readiness", new Readiness());
+
+    [McpServerTool(Name = "defer"), Description(
+        "Leave a problem you have found for later, on purpose. It keeps getting worse meanwhile. Costs no time and no money.")]
+    public string Defer([Description("Name of the problem, or of its part.")] string problem) =>
+        session.Do("defer", new Defer(problem), ("problem", problem));
+
+    [McpServerTool(Name = "undefer"), Description(
+        "Take a problem you deferred back onto your list. Costs no time and no money.")]
+    public string Undefer([Description("Name of the problem, or of its part.")] string problem) =>
+        session.Do("undefer", new Undefer(problem), ("problem", problem));
+
+    [McpServerTool(Name = "yard_fix"), Description(
+        "Pay the yard to fix a problem you have found. The yard's price and lead time in days are shown by readiness; the cost is charged in NOK when you order it.")]
+    public string YardFix([Description("Name of the problem, or of its part.")] string problem) =>
+        session.Do("yard_fix", new FixByYard(problem), ("problem", problem));
+
+    [McpServerTool(Name = "wait"), Description(
+        "Let days pass, e.g. while waiting for the yard. Costs the days, free.")]
+    public string Wait([Description("Number of days, 1 or more.")] int days) =>
+        session.Do("wait", new WaitDays(days), ("days", days.ToString()));
+
+    [McpServerTool(Name = "launch"), Description(
+        "Put her in the water. Takes 2 hours, free; she goes in and stays in, and below-waterline work then needs an emergency lift.")]
+    public string Launch() => session.Do("launch", new Launch());
+
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
     public string Status() => session.Ask("status", new Status());
@@ -96,7 +132,8 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook. There is no quit; also available: status, aboard (what you have found so far), briefing.\n";
+        "check flow = check_flow, log = logbook, order survey = order_survey, read survey = survey, yard fix = yard_fix. " +
+        "There is no quit; also available: status, aboard (what you have found so far), readiness, briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

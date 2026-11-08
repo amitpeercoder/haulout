@@ -26,7 +26,6 @@ while (true)
             var result = game.Execute(c.Command);
             var status = (StatusView)game.Ask(new Status());
             Console.Write(Haulout.Prose.Prose.Result(result, status));
-            if (result.Finished) return 0;
             break;
     }
 }
