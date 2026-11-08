@@ -125,3 +125,10 @@ An item whose fault is no longer there when the survey is ordered is left out.
 - Does a seized seacock still pass cooling water, so the engine still runs? Now: yes.
 - Can you change cockpit drain hose clamps afloat? Now: yes.
 - Does the surveyor's fee scale per foot? Now: per foot.
+
+## Decisions (Amit, 2026-11-08)
+
+1. Known but undeferred faults also escalate over time. Escalation timers run from the day a fault becomes active, whatever its state, until it is fixed.
+2. The emergency lift is a command: afloat only, costs the lift fee and two days, puts her back on the hard.
+3. A seized seacock passes no water: the engine overheats if run.
+4. Cockpit drain hose clamps can be changed afloat.
