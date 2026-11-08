@@ -389,10 +389,11 @@ public class TripTests
     }
 
     [Fact]
-    public void A_tow_costs_6000_and_a_day_and_ends_at_Skjaervik()
+    public void A_tow_past_halfway_costs_6000_and_a_day_and_ends_at_the_nearer_port_Hestholmen()
     {
         var g = WaterInTheFuelAtSea(out _);
         Ok(g.Execute(new Continue()));
+        Assert.Equal(10.0, Trip(g).PositionNm, 1);
         int balance = Status(g).BalanceNok;
         int day = Status(g).Day;
 
@@ -402,7 +403,9 @@ public class TripTests
         Assert.Equal((6 + 18) * 60, r.MinutesTaken);
         Assert.True(card.Towed);
         Assert.False(card.TurnedBack);
-        Assert.Equal("Skjærvik", card.Destination);
+        Assert.Equal("Hestholmen", card.Destination);
+        Assert.Contains("Hestholmen is the nearer port, 4.0 nm off; that's where they take her.", r.Narrative);
+        Assert.Contains(card.Lines, l => l.StartsWith("The towboat brings her on to Hestholmen", StringComparison.Ordinal));
         Assert.Equal(6000, card.MoneySpentNok);
         Assert.Contains(FuelAlert, card.Failures);
         Assert.Equal(2, card.Lines.Count);
@@ -411,11 +414,42 @@ public class TripTests
 
         var s = Status(g);
         Assert.False(s.AtSea);
-        Assert.Equal("Skjærvik", s.Port);
+        Assert.Equal("Hestholmen", s.Port);
         Assert.Equal(balance - 6000, s.BalanceNok);
         Assert.Equal(day + 1, s.Day);
         Assert.False(s.EngineRunning);
         Assert.False(Trip(g).AtSea);
+    }
+
+    [Fact]
+    public void A_tow_short_of_halfway_goes_back_to_the_port_she_left()
+    {
+        var g = WaterInTheFuelAtSea(out _);
+        Assert.Equal(5.0, Trip(g).PositionNm, 1);
+
+        var r = Ok(g.Execute(new CallTow()));
+        var card = Card(r);
+        Assert.True(card.Towed);
+        Assert.Equal("Skjærvik", card.Destination);
+        Assert.Contains("Skjærvik is the nearer port, 5.0 nm off; that's where they take her.", r.Narrative);
+        Assert.Contains(card.Log, e => e.Text == "Called the towboat: 6000 NOK to be towed back to Skjærvik.");
+        Assert.Contains(card.Lines, l => l.StartsWith("The towboat brings her back to Skjærvik", StringComparison.Ordinal));
+        Assert.Equal("Skjærvik", Status(g).Port);
+        Assert.False(Status(g).AtSea);
+    }
+
+    [Fact]
+    public void A_tow_after_turning_back_goes_to_whichever_port_is_nearer()
+    {
+        var g = WaterInTheFuelAtSea(out _);
+        Ok(g.Execute(new Continue()));
+        Walk.ToPlace(g, "cockpit");
+        Ok(g.Execute(new TurnBack()));
+        // 10 nm out, turned for home: Hestholmen is 4 nm off, Skjærvik 10.
+        var card = Card(Ok(g.Execute(new CallTow())));
+        Assert.Equal("Hestholmen", card.Destination);
+        Assert.True(card.TurnedBack);
+        Assert.Equal("Hestholmen", Status(g).Port);
     }
 
     [Fact]
@@ -431,10 +465,53 @@ public class TripTests
         Assert.True(Card(r).Towed);
         Assert.Equal(balance - 6000, Status(g).BalanceNok);
         Assert.True(Status(g).BalanceNok < 0);
-        Assert.False(g.Execute(new Buy("hose")).Accepted);
+        // Ordinary purchases stay refused past zero, and the refusal says it is debt.
+        No(g.Execute(new Buy("hose")), $"That's 250 NOK and you owe {6000 - balance} NOK already.");
+        Assert.Equal($"You owe {6000 - balance} NOK.", MoneyWords.Balance(Status(g).BalanceNok));
         var ready = (ReadinessView)g.Ask(new Readiness());
         Assert.True(ready.BalanceNok < 0);
         Assert.Equal(balance - 6000, ((TripPlanView)g.Ask(new PlanTrip())).BalanceNok);
+    }
+
+    /// <summary>A healthy boat motored to Hestholmen and on her mooring there.</summary>
+    private static Game AtHestholmen()
+    {
+        var g = Afloat(Wind(3, "southwest"), out _, newImpeller: true);
+        Depart(g);
+        for (int i = 0; i < 5 && Trip(g).AtSea; i++) Ok(g.Execute(new Continue()));
+        Assert.Equal("Hestholmen", Status(g).Port);
+        Assert.False(Status(g).AtSea);
+        return g;
+    }
+
+    [Fact]
+    public void The_harbour_shop_at_Hestholmen_sells_filters_and_impellers_at_a_markup()
+    {
+        var g = AtHestholmen();
+        var inv = (InventoryView)g.Ask(new Inventory());
+        Assert.Equal("the harbour shop", inv.Shop);
+        Assert.Equal(
+            [new ShopLine("impeller", 455, 15), new ShopLine("primary filter element", 234, 15), new ShopLine("secondary filter element", 208, 15)],
+            inv.ForSale);
+
+        int spent = Status(g).MoneySpentNok;
+        var r = Ok(g.Execute(new Buy("impeller")));
+        Assert.Equal(455, r.CostNok);
+        Assert.Contains("You walk over to the harbour shop and buy an impeller.", r.Narrative);
+        Assert.Equal(spent + 455, Status(g).MoneySpentNok);
+    }
+
+    [Fact]
+    public void Anything_else_at_the_harbour_shop_is_refused_with_what_it_has()
+    {
+        var g = AtHestholmen();
+        const string has = "It has the impeller, the primary filter element and the secondary filter element.";
+        No(g.Execute(new Buy("alternator belt")), "The harbour shop doesn't stock the alternator belt. " + has);
+        No(g.Execute(new Buy("remote start button")), "The harbour shop doesn't stock the remote start button. " + has);
+        // Replacing a part it doesn't stock is refused the same way; a part it stocks costs its price here.
+        No(Walk.Do(g, "alternator belt", c => new Replace(c)), "The harbour shop doesn't stock the alternator belt. " + has);
+        var impeller = Ok(Walk.Do(g, "impeller", c => new Replace(c)));
+        Assert.Equal(455, impeller.CostNok);
     }
 
     [Fact]

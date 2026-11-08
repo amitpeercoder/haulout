@@ -49,8 +49,8 @@ public sealed partial class Game
             case SeaMode.HoveTo:
             case SeaMode.Drifting: p.DriftNm += rules.HeaveToDriftKnots * h; break;
             case SeaMode.UnderTow:
-                // Towards the port she left: back along the route, or on along it after a turn back.
-                p.PositionNm = Math.Clamp(p.PositionNm + (p.TurnedBack ? 1 : -1) * rules.TowKnots * h, 0, p.Route.DistanceNm);
+                // Towards the nearer port, set when the tow was called: on along the route or back along it.
+                p.PositionNm = Math.Clamp(p.PositionNm + (p.DestinationPortId == p.Route.To ? 1 : -1) * rules.TowKnots * h, 0, p.Route.DistanceNm);
                 break;
         }
 
@@ -343,22 +343,29 @@ public sealed partial class Game
     {
         if (_passage is not { } p) return Reject("call-tow", NotAtSeaMessage);
         var tow = _boat.Trips!.Tow;
-        string home = PortName(p.OriginPortId);
+        // Decision 007/2: the towboat takes her to the nearer port along the route (a tie goes back the way she came).
+        bool onward = p.ProgressNm * 2 > p.Route.DistanceNm;
+        string target = onward ? p.Route.To : p.Route.From;
+        double towNm = onward ? p.Route.DistanceNm - p.ProgressNm : p.ProgressNm;
+        bool back = target == p.OriginPortId;
+        string home = PortName(target);
+        string towed = back ? $"back to {home}" : $"on to {home}";
 
         // The bill is allowed to take the balance below zero: it comes due later.
         _money += tow.Nok;
         _running = false;
         p.Mode = SeaMode.UnderTow;
         p.OverheatMinutes = 0;
+        p.DestinationPortId = target;
         t.Narrative.Add("You call the towboat on the VHF and give your position. It comes alongside, takes your line, and the engine stays silent.");
-        _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {tow.Nok} NOK to be towed back to {home}.", tow.Nok));
+        t.Narrative.Add($"{home} is the nearer port, {towNm.ToString("0.0", CultureInfo.InvariantCulture)} nm off; that's where they take her.");
+        _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {tow.Nok} NOK to be towed {towed}.", tow.Nok));
         int before = ClockMinutes;
 
         Tick(t, tow.Hours * 60, aboard: true);
         if (_sunk) return TowSunk(t, before, tow.Nok);
 
-        p.DestinationPortId = p.OriginPortId;
-        _portId = p.OriginPortId;
+        _portId = target;
         _passage = null;
         _log.Add(new LogEntry(Day, TimeOfDay, $"The towboat left her on her mooring at {home}."));
         Tick(t, tow.LostHours * 60, aboard: false);
@@ -367,7 +374,7 @@ public sealed partial class Game
         p.EndClockMinutes = ClockMinutes;
         string[] lines =
         [
-            $"The towboat brings her back to {home} at a walking pace, the engine silent behind you, and hands you a bill for {tow.Nok} NOK.",
+            $"The towboat brings her {towed} at a walking pace, the engine silent behind you, and hands you a bill for {tow.Nok} NOK.",
             "By the time she is on her mooring the day is gone and the evening with it. Whatever was on goes on without you.",
         ];
         t.Narrative.AddRange(lines);

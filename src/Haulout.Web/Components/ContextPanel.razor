@@ -105,7 +105,7 @@
         var rd = Session.Readiness;
         var sv = Session.Survey;
         <section class="readiness">
-            <p>Day @rd.Day · deadline day @rd.LaunchDeadlineDay (@DaysToGo(rd.DaysToDeadline)) · @rd.BalanceNok NOK left</p>
+            <p>Day @rd.Day · deadline day @rd.LaunchDeadlineDay (@DaysToGo(rd.DaysToDeadline)) · @MoneyWords.BalanceShort(rd.BalanceNok)</p>
             <div class="options">
                 @if (!sv.Ordered)
                 {

@@ -27,7 +27,9 @@ public sealed partial class Game
     private int Balance => _boat.Economy.StartingBalanceNok - _money;
 
     private string? MoneyRefusal(int costNok) =>
-        costNok > Balance ? $"That's {costNok} NOK and you have {Balance} NOK left." : null;
+        costNok <= Balance ? null
+        : Balance < 0 ? $"That's {costNok} NOK and you owe {-Balance} NOK already."
+        : $"That's {costNok} NOK and you have {Balance} NOK left.";
 
     private bool Afloat => !_onTheHard;
 

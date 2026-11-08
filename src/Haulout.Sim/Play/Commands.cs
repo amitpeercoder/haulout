@@ -91,7 +91,7 @@ public sealed record HeaveTo() : Command;
 public sealed record Anchor() : Command;
 /// <summary>At sea: give up the passage and head back to the port she left. Once.</summary>
 public sealed record TurnBack() : Command;
-/// <summary>At sea, anywhere: call the towboat. Costs the tow and the best part of a day; ends the trip at the port she left.</summary>
+/// <summary>At sea, anywhere: call the towboat. Costs the tow and the best part of a day; ends the trip at the nearer port along the route.</summary>
 public sealed record CallTow() : Command;
 
 /// <summary>Something the player asks about. Costs no time.</summary>

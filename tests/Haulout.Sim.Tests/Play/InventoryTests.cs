@@ -40,6 +40,52 @@ public class InventoryTests
     }
 
     [Fact]
+    public void A_part_the_chandlery_sells_costs_the_chandlery_price_to_replace_and_in_the_DIY_route()
+    {
+        // Decision 007/1: one price per part, the chandlery's.
+        var boat = BoatLoader.LoadSloop28();
+        foreach (var item in boat.Chandlery.Where(i => i.ForComponent is not null))
+        {
+            var c = boat.Get(item.ForComponent!);
+            Assert.Equal(item.PriceNok, c.ReplaceCostNok);
+            foreach (var f in c.Faults.Where(f => f.FixedBy.Contains(Haulout.Sim.Faults.PlayerAction.Replace) && f.Diy is not null))
+                Assert.Equal(item.PriceNok, f.Diy!.PartsNok);
+        }
+        Assert.Equal(220, boat.Get("alternator-belt").ReplaceCostNok);
+        Assert.Equal(160, boat.Get("secondary-filter").ReplaceCostNok);
+        Assert.Equal(300, boat.Get("engine-oil").ReplaceCostNok);
+
+        var g = NewGame();
+        var belt = Ok(Walk.Do(g, "alternator belt", c => new Replace(c)));
+        Assert.Equal(220, belt.CostNok);
+    }
+
+    [Fact]
+    public void The_loader_refuses_a_second_price_for_a_part_the_chandlery_sells()
+    {
+        var json = ReadSloop28Json();
+        var broken = json.Replace(
+            "\"id\": \"alternator-belt\", \"name\": \"alternator belt\", \"aliases\": [\"belt\", \"fan belt\", \"spare belt\"], \"priceNok\": 220,",
+            "\"id\": \"alternator-belt\", \"name\": \"alternator belt\", \"aliases\": [\"belt\", \"fan belt\", \"spare belt\"], \"priceNok\": 225,");
+        Assert.NotEqual(json, broken);
+        BoatLoader.Load(json);
+        // Price changed on the shop item only: still one source, loads fine and follows it.
+        Assert.Equal(225, BoatLoader.Load(broken).Get("alternator-belt").ReplaceCostNok);
+
+        var twoPrices = json.Replace("\"id\": \"impeller\",\n", "\"id\": \"impeller\",\n      \"replaceCostNok\": 999,\n");
+        Assert.NotEqual(json, twoPrices);
+        var ex = Assert.Throws<InvalidOperationException>(() => BoatLoader.Load(twoPrices));
+        Assert.Contains("impeller", ex.Message);
+    }
+
+    private static string ReadSloop28Json()
+    {
+        using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream("Haulout.Sim.Data.sloop28.json")!;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    [Fact]
     public void A_tool_twice_is_refused_free()
     {
         var g = NewGame();

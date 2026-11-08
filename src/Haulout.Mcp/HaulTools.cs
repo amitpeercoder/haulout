@@ -174,7 +174,7 @@ public sealed class HaulTools(GameSession session)
     public string TurnBack() => session.Do("turn_back", new TurnBack());
 
     [McpServerTool(Name = "call_tow"), Description(
-        "At sea, anywhere: call the towboat on the VHF. Costs the tow in NOK (plan_trip shows it; it is charged even if you cannot afford it) and the best part of a day. Ends the trip at the port she left.")]
+        "At sea, anywhere: call the towboat on the VHF. Costs the tow in NOK (plan_trip shows it; it is charged even if you cannot afford it) and the best part of a day. Ends the trip at the nearer port along the route (the one she left or the one she was bound for).")]
     public string CallTow() => session.Do("call_tow", new CallTow());
 
     [McpServerTool(Name = "status", ReadOnly = true), Description(

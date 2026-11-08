@@ -141,6 +141,15 @@ public class ProseTests
     }
 
     [Fact]
+    public void Status_shows_a_negative_balance_as_debt()
+    {
+        var view = new StatusView(1, "08:00", 0, 0, null, false, false, [], [], "Cockpit", -2400, 96, true, true);
+        var text = P.Query(view);
+        Assert.Contains("You owe 2400 NOK. Launch deadline: day 96.", text);
+        Assert.DoesNotContain("-2400", text);
+    }
+
+    [Fact]
     public void Log_hints_that_a_document_can_be_reread()
     {
         var text = P.Query(new LogView([new LogEntry(2, "09:00", "Survey report arrived.", 0, "survey report")]));

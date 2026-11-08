@@ -38,13 +38,18 @@ public static class BoatLoader
             c.RemoveLog ?? "", c.RefitLog ?? ""));
         var positions = dto.Positions.Select(p => new Position(p.Id, p.Label));
 
+        var chandlery = dto.Chandlery ?? [];
         var components = dto.Components.Select(c =>
         {
+            // Decision 007/1: a part the chandlery sells costs what the chandlery charges. The price lives on the shop item;
+            // the component's replace price and the parts of a DIY fix by replacing it are taken from it.
+            var part = chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == c.Id);
+            int replaceCostNok = PartPrice(part, c.ReplaceCostNok, $"component '{c.Id}' replaceCostNok");
             var spec = new ComponentSpec(
                 c.Subsystem, c.Position,
                 (c.Reach ?? []).Select(r => new ReachEntry(r.Place, r.Cover, r.Visible, r.Reachable)).ToList(),
                 c.Aliases ?? [], c.Description ?? "",
-                c.SeriesOhms, c.Cleanable, c.ReplaceCostNok, c.ReplaceMinutes,
+                c.SeriesOhms, c.Cleanable, replaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
                 c.BelowWaterline, c.ReplaceText, c.NeedsDry);
@@ -53,7 +58,13 @@ public static class BoatLoader
                 f.Id, f.Name, c.Id, f.Effect ?? new FaultEffect(FaultEffectKind.None, 0),
                 f.Reveals ?? [], f.FixedBy ?? [], f.Present ?? true,
                 f.OnHardOnly, f.Harmless, f.Dormant, f.Consequence ?? "", f.CostLaterNok, f.LaterNote,
-                f.Diy is { } d ? new DiyRoute(d.How, d.PartsNok, d.Minutes) : null,
+                f.Diy is { } d
+                    ? new DiyRoute(d.How,
+                        (f.FixedBy ?? []).Contains(PlayerAction.Replace)
+                            ? PartPrice(part, d.PartsNok, $"fault '{f.Id}' diy partsNok")
+                            : d.PartsNok ?? 0,
+                        d.Minutes)
+                    : null,
                 f.Yard is { } y ? new YardRoute(y.How, y.Nok, y.LeadDays) : null,
                 f.Escalation is { } e ? new Escalation(e.To, e.OnLaunch, e.Text ?? "") : null,
                 f.Properties is null ? null : new Dictionary<string, double>(f.Properties),
@@ -78,7 +89,7 @@ public static class BoatLoader
                     kv => kv.Key,
                     kv => new PoorJobTemplate(
                         kv.Value.Name, kv.Value.Reveal, kv.Value.Consequence, kv.Value.CostLaterNok,
-                        new DiyRoute(kv.Value.Diy.How, kv.Value.Diy.PartsNok, kv.Value.Diy.Minutes),
+                        new DiyRoute(kv.Value.Diy.How, kv.Value.Diy.PartsNok ?? 0, kv.Value.Diy.Minutes),
                         new YardRoute(kv.Value.Yard.How, kv.Value.Yard.Nok, kv.Value.Yard.LeadDays)))
                     .ToDictionary(kv => Enum.Parse<Subsystem>(kv.Key, ignoreCase: true), kv => kv.Value))
             : null;
@@ -103,6 +114,11 @@ public static class BoatLoader
         var electrical = dto.Electrical is { } el ? new ElectricalRules(el.SelfDischargePerDay, el.PumpMinStateOfCharge, el.CrankDraw, el.ChargePerHour, el.RunDrawPerHour) : null;
         var insurance = dto.Insurance is { } ins ? new InsuranceRules(ins.ValueNok, ins.PayoutFraction) : null;
 
+        foreach (var port in dto.Trips?.Ports ?? [])
+            foreach (var id in port.Stock ?? [])
+                if (!chandlery.Any(i => i.Id == id))
+                    throw new InvalidOperationException($"Port '{port.Id}' stocks '{id}', which is not in the chandlery.");
+
         var trips = dto.Trips is { } tr
             ? new TripRules(
                 tr.Home, tr.Ports ?? [], tr.Routes ?? [], tr.Tow ?? new TowRules())
@@ -110,7 +126,20 @@ public static class BoatLoader
 
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
-            dto.Chandlery ?? [], trips, dto.Sea, dto.Forecast);
+            chandlery, trips, dto.Sea, dto.Forecast);
+    }
+
+    /// <summary>
+    /// The price of a part the chandlery sells: the shop item's. A number written in the data as well must agree with it,
+    /// so two prices for one part cannot drift apart again. No shop item: the data's number (0 when absent).
+    /// </summary>
+    private static int PartPrice(ChandleryItem? part, int? dataNok, string what)
+    {
+        if (part is null) return dataNok ?? 0;
+        if (dataNok is { } n && n != 0 && n != part.PriceNok)
+            throw new InvalidOperationException(
+                $"The chandlery sells the {part.Name} at {part.PriceNok} NOK but {what} says {n}. Remove the number: the chandlery price is used.");
+        return part.PriceNok;
     }
 
     /// <summary>"spawn": one rule or a list of rules; any one crossing wakes the fault.</summary>
@@ -262,7 +291,8 @@ public static class BoatLoader
     private sealed class DiyDto
     {
         public string How { get; set; } = "";
-        public int PartsNok { get; set; }
+        /// <summary>Optional when the fix replaces a part the chandlery sells: the chandlery price is used.</summary>
+        public int? PartsNok { get; set; }
         public int Minutes { get; set; }
     }
 
@@ -358,7 +388,8 @@ public static class BoatLoader
         /// <summary>Authoring note, ignored by the sim.</summary>
         public string? Note { get; set; }
         public bool Cleanable { get; set; }
-        public int ReplaceCostNok { get; set; }
+        /// <summary>Omitted when the chandlery sells the part (decision 007/1): the shop item's price is used.</summary>
+        public int? ReplaceCostNok { get; set; }
         public int ReplaceMinutes { get; set; }
         public Dictionary<string, double>? Properties { get; set; }
         public List<FaultDto>? Faults { get; set; }

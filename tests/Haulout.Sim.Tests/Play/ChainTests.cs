@@ -187,7 +187,7 @@ public class ChainTests
         Assert.Contains(inspect.NewlyDiscovered, k => k.Name == BeltName);
         var item = Ready(g).Open.Single(p => p.Problem == BeltName);
         Assert.Contains("go flat", item.Consequence);
-        Assert.Contains(item.Routes, r => r.Route == "DIY" && r.CostNok == 90 && r.Minutes == 20);
+        Assert.Contains(item.Routes, r => r.Route == "DIY" && r.CostNok == 220 && r.Minutes == 20);
         Ok(g.Execute(new Replace("alternator belt")));
         Assert.Equal(1.0, Electrical.ChargeFactor(boat));
         Assert.Contains(BeltName, Ready(g).Fixed);

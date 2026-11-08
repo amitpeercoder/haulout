@@ -109,7 +109,7 @@ public sealed record ChandleryItem
     public string? LogText { get; init; }
 }
 
-/// <summary>A place she can lie. Yard: the yard (repairs, survey, shore power, the crane) is here. ShopName: where Buy happens.</summary>
+/// <summary>A place she can lie. Yard: the yard (repairs, survey, shore power, the crane) is here. ShopName: where Buy happens; Stock and PriceFactor: what it sells and at what markup.</summary>
 public sealed record Port
 {
     public string Id { get; init; } = "";
@@ -117,6 +117,13 @@ public sealed record Port
     public IReadOnlyList<string> Aliases { get; init; } = [];
     public bool Yard { get; init; }
     public string ShopName { get; init; } = "the chandlery";
+    /// <summary>The chandlery ids the shop here sells; null: all of them. PLACEHOLDER stock for Amit.</summary>
+    public IReadOnlyList<string>? Stock { get; init; }
+    /// <summary>What the shop here charges against the chandlery price (1.3 = 30 % markup). PLACEHOLDER.</summary>
+    public double PriceFactor { get; init; } = 1.0;
+
+    public bool Sells(ChandleryItem item) => Stock is null || Stock.Contains(item.Id);
+    public int PriceOf(ChandleryItem item) => (int)Math.Round(item.PriceNok * PriceFactor, MidpointRounding.AwayFromZero);
     public IReadOnlyList<string> ArrivalLines { get; init; } = [];
 }
 

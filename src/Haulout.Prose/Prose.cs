@@ -84,7 +84,7 @@ public static class Prose
                 AppendAlerts(sb, s.Notices);
                 sb.AppendLine($"Day {s.Day}, {s.TimeOfDay} · worked {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min · money spent {s.MoneySpentNok} NOK.");
                 if (s.LaunchDeadlineDay > 0)
-                    sb.AppendLine($"Money left: {s.BalanceNok} NOK. Launch deadline: day {s.LaunchDeadlineDay}.");
+                    sb.AppendLine($"{MoneyWords.Balance(s.BalanceNok)} Launch deadline: day {s.LaunchDeadlineDay}.");
                 if (s.Weather is not null) sb.AppendLine(s.Weather);
                 sb.AppendLine($"You're {PlacePhrase(s.Place)}.");
                 if (s.Sunk) sb.AppendLine(s.AtSea ? "She's on the bottom of the sound." : "She's on the bottom of the harbour.");
@@ -160,7 +160,7 @@ public static class Prose
         if (v.SparesMissing.Count > 0)
             sb.AppendLine("Spares you don't have for the known problems: " + string.Join(", ", v.SparesMissing) + ".");
         if (v.Shelter.Count > 0) sb.AppendLine("Shelter on the way: " + string.Join(", ", v.Shelter) + ".");
-        sb.AppendLine($"Money: {v.BalanceNok} NOK. If it goes wrong, a tow costs {v.TowNok} NOK.");
+        sb.AppendLine($"{MoneyWords.Balance(v.BalanceNok)} If it goes wrong, a tow costs {v.TowNok} NOK.");
         return sb.ToString();
     }
 
@@ -269,7 +269,7 @@ public static class Prose
             > 1 => $"{v.DaysToDeadline} days to go",
             _ => $"{-v.DaysToDeadline} days past",
         };
-        sb.AppendLine($"Day {v.Day}. Launch deadline: day {v.LaunchDeadlineDay} ({deadline}). Money left: {v.BalanceNok} NOK. " +
+        sb.AppendLine($"Day {v.Day}. Launch deadline: day {v.LaunchDeadlineDay} ({deadline}). {MoneyWords.Balance(v.BalanceNok)} " +
                       (v.Afloat ? "She's in the water." : "She's ashore."));
         if (v.Open.Count == 0 && v.ToInvestigate.Count == 0 && v.Fixed.Count == 0)
         {

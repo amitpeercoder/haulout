@@ -252,3 +252,11 @@ Chandlery prices and minutes; Skjærvik–Hestholmen 14 nm on 040°, Lyngskjær 
 7. Default departure day 150 and 14 nm stay.
 8. Tow fee flat at 6 000 NOK for now.
 9. Forecast as a line per day.
+
+### (done) Decisions applied
+
+- 1: a part the chandlery sells has one price, the shop item's. The loader derives the component's `replaceCostNok` and the `diy.partsNok` of faults fixed by replacing it from that item; the data no longer carries those numbers, and a second number that disagrees fails the load. Belt 220, secondary element 160, oil 300, drain-hose-failed DIY parts 120 (was 180).
+- 2: the tow goes to the nearer port by net distance along the route (a tie goes back); the narrative names it and the distance.
+- 6: `Port.stock` (chandlery ids; absent = all) and `Port.priceFactor` (Hestholmen 1.3, placeholder). Buying, or replacing without a spare, a part the shop doesn't stock is refused: "The harbour shop doesn't stock the X. It has …". A stocked part replaced in port costs the marked-up price.
+- 5: purchases past zero are refused with "That's N NOK and you owe M NOK already."; `MoneyWords.Balance` ("You owe M NOK.") is used by Prose and the web header.
+- 7: 14 nm stands. Day 150 is not in the data or code: PlanTrip defaults to today, per the notes. Open for Amit whether the regatta should be a dated event.

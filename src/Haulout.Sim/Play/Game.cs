@@ -220,9 +220,10 @@ public sealed partial class Game
         if (c.ReplaceCostNok > 0)
         {
             bool spare = SpareFor(c.Id) is not null;
+            var (partNok, notStocked) = spare ? (0, null) : ReplacePartHere(c);
             Add("replace", "Replace",
-                ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? (spare ? null : MoneyRefusal(c.ReplaceCostNok)),
-                c.ReplaceMinutes, spare ? 0 : c.ReplaceCostNok);
+                ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? notStocked ?? (spare ? null : MoneyRefusal(partNok)),
+                c.ReplaceMinutes, partNok);
         }
         if (c.Id == "start-battery") Add("charge", "Charge", YardGate() ?? touch, 480, 0);
         if (c.Id == "primary-filter") Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
@@ -578,7 +579,8 @@ public sealed partial class Game
         if (c.ReplaceCostNok <= 0) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
         if (WetRefusal(c) is { } wet) return Reject("replace", wet);
         var spare = SpareFor(c.Id);
-        int cost = spare is null ? c.ReplaceCostNok : 0;
+        var (cost, notStocked) = spare is null ? ReplacePartHere(c) : (0, null);
+        if (notStocked is not null) return Reject("replace", notStocked);
         if (spare is null && MoneyRefusal(cost) is { } broke) return Reject("replace", broke);
 
         ShutDownEngine(t);
