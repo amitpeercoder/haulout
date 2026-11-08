@@ -122,7 +122,7 @@ public class ProseTests
     [Fact]
     public void Status_shows_money_deadline_and_launch()
     {
-        var view = new StatusView(1, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 9000, 96, true);
+        var view = new StatusView(1, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 9000, 96, true, true);
         var text = P.Query(view);
         Assert.Contains("Money left: 9000 NOK. Launch deadline: day 96.", text);
         Assert.Contains("She's in the water.", text);

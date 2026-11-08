@@ -31,7 +31,7 @@ public sealed partial class Game
     private bool Afloat => !_onTheHard;
 
     private string EmergencyLiftLine =>
-        $"She's afloat: that's below the waterline. It needs her lifted out: an emergency lift, about {_boat.Economy.EmergencyLiftNok} NOK and a yard slot.";
+        $"She's afloat: that's below the waterline. It needs her lifted out: an 'emergency lift', {_boat.Economy.EmergencyLiftNok} NOK and {Days(_boat.Economy.EmergencyLiftDays)}.";
 
     /// <summary>Do-it-yourself work on a part that sits below the waterline, or on a known problem that needs her out of the water.</summary>
     private string? AfloatRefusal(Component c) =>
@@ -122,8 +122,8 @@ public sealed partial class Game
     {
         int today = Day;
         var due = _boat.AllFaults.Where(f =>
-            f is { State: FaultState.Deferred, Present: true, DeferredDay: { } since }
-            && f.Escalation is { AfterDeferredDays: { } n } && today - since >= n).ToList();
+            f is { Present: true, ActiveSinceDay: { } since }
+            && f.Escalation is { AfterDays: { } n } && today - since >= n).ToList();
         foreach (var f in due) Escalate(t, f);
     }
 
@@ -135,7 +135,7 @@ public sealed partial class Game
         if (next is null) return;
         bool known = f.State is FaultState.Discovered or FaultState.Deferred;
         f.MarkEscalated();
-        next.Wake();
+        next.Wake(Day);
         if (!known) return; // hidden stays hidden
         if (esc.Text.Length > 0) t.Narrative.Add(esc.Text);
         Discover(t, next);
@@ -154,7 +154,7 @@ public sealed partial class Game
 
     private CommandResult DoLaunch(Turn t)
     {
-        if (_launched) return Reject("launch", "She's already in the water.");
+        if (Afloat) return Reject("launch", "She's already in the water.");
 
         _onTheHard = false;
         _launched = true;
@@ -181,6 +181,21 @@ public sealed partial class Game
         return Accept(t, "launch", _boat.Economy.LaunchMinutes, 0, view, "Launched.");
     }
 
+    // ------------------------------------------------------------------ emergency lift
+
+    private CommandResult DoEmergencyLift(Turn t)
+    {
+        if (!Afloat) return Reject("emergency-lift", "She's already ashore.");
+        var economy = _boat.Economy;
+        if (MoneyRefusal(economy.EmergencyLiftNok) is { } broke) return Reject("emergency-lift", broke);
+
+        StopEngine(t);
+        _onTheHard = true;
+        t.Narrative.Add($"The yard crane lifts her out and sets her back in the cradle. {Days(economy.EmergencyLiftDays)} later she's standing on the hard again.");
+        return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok, null,
+            "Emergency lift: back on the hard.", work: false);
+    }
+
     // ------------------------------------------------------------------ the player's own work
 
     private bool CanRedoByClean(Component c) =>
@@ -197,12 +212,14 @@ public sealed partial class Game
             && !c.ActiveFaults.Any(f => f.Id.StartsWith(PoorJobPrefix, StringComparison.Ordinal))
             && quality.PoorJobs.TryGetValue(c.Subsystem, out var template))
         {
-            c.AddFault(new Fault(
+            var poor = new Fault(
                 $"{PoorJobPrefix}{c.Id}-{++_poorJobs}", template.Name, c.Id, new FaultEffect(FaultEffectKind.None, 0),
                 [new FaultReveal(PlayerAction.Inspect, template.Reveal, true)],
                 [PlayerAction.Clean, PlayerAction.Replace],
                 onHardOnly: c.BelowWaterline, consequence: template.Consequence, costLaterNok: template.CostLaterNok,
-                diy: template.Diy, yard: template.Yard));
+                diy: template.Diy, yard: template.Yard);
+            poor.ActivateOn(Day);
+            c.AddFault(poor);
         }
         _skill[c.Subsystem] = skill + 1;
     }

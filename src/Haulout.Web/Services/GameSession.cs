@@ -198,6 +198,13 @@ public sealed class GameSession
 
     public CommandResult Launch() => Execute(new Launch());
 
+    public CommandResult EmergencyLift()
+    {
+        var result = Execute(new EmergencyLift());
+        if (result.Accepted) LaunchNarrative = null;
+        return result;
+    }
+
     public CommandResult Wait(int days) => Execute(new WaitDays(days));
 
     public CommandResult Defer(string problem) => Execute(new Defer(problem));

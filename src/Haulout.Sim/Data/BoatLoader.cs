@@ -54,13 +54,13 @@ public static class BoatLoader
                 f.OnHardOnly, f.Harmless, f.Dormant, f.Consequence ?? "", f.CostLaterNok, f.LaterNote,
                 f.Diy is { } d ? new DiyRoute(d.How, d.PartsNok, d.Minutes) : null,
                 f.Yard is { } y ? new YardRoute(y.How, y.Nok, y.LeadDays) : null,
-                f.Escalation is { } e ? new Escalation(e.To, e.AfterDeferredDays, e.OnLaunch, e.Text ?? "") : null,
+                f.Escalation is { } e ? new Escalation(e.To, e.AfterDays, e.OnLaunch, e.Text ?? "") : null,
                 f.Properties is null ? null : new Dictionary<string, double>(f.Properties)));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         });
 
         var economy = dto.Economy is { } ec
-            ? new Economy(ec.StartingBalanceNok, ec.LaunchDeadlineDay, ec.EmergencyLiftNok, ec.LaunchMinutes)
+            ? new Economy(ec.StartingBalanceNok, ec.LaunchDeadlineDay, ec.EmergencyLiftNok, ec.LaunchMinutes, ec.EmergencyLiftDays)
             : null;
         var survey = dto.Survey is { } sv
             ? new SurveyData(
@@ -100,6 +100,7 @@ public static class BoatLoader
         public int LaunchDeadlineDay { get; set; }
         public int EmergencyLiftNok { get; set; }
         public int LaunchMinutes { get; set; }
+        public int EmergencyLiftDays { get; set; }
     }
 
     private sealed class SurveyItemDto
@@ -139,7 +140,7 @@ public static class BoatLoader
     private sealed class EscalationDto
     {
         public string To { get; set; } = "";
-        public int? AfterDeferredDays { get; set; }
+        public int? AfterDays { get; set; }
         public bool OnLaunch { get; set; }
         public string? Text { get; set; }
     }

@@ -993,7 +993,7 @@
           ],
           "escalation": {
             "to": "seacock-seized",
-            "afterDeferredDays": 20,
+            "afterDays": 20,
             "onLaunch": true,
             "text": "The raw-water seacock has seized: the salt has crusted the stem solid and the handle won't move."
           },
@@ -1016,7 +1016,7 @@
           "id": "seacock-seized",
           "name": "Seized raw-water seacock",
           "effect": {
-            "kind": "none",
+            "kind": "rawWaterFlowFactor",
             "value": 0
           },
           "dormant": true,
@@ -1031,7 +1031,7 @@
             "replace"
           ],
           "onHardOnly": true,
-          "consequence": "It can't be closed: if the hose lets go at sea you can't stop the water. A tow and an emergency lift.",
+          "consequence": "Seized shut: no cooling water, the engine overheats within minutes.",
           "costLaterNok": 13800,
           "laterNote": "afloat: needs an emergency lift",
           "diy": {
@@ -1801,6 +1801,7 @@
       "cleanable": false,
       "replaceCostNok": 120,
       "replaceMinutes": 40,
+      "belowWaterline": false,
       "replaceText": "You fit new stainless hose clamps, two to each hose tail.",
       "faults": [
         {
@@ -1823,7 +1824,7 @@
           "onHardOnly": false,
           "consequence": "A clamp that lets go floods the boat through the drain through-hull.",
           "costLaterNok": 600,
-          "laterNote": null,
+          "laterNote": "can be done afloat, with the drain seacock shut",
           "diy": {
             "how": "Fit new hose clamps, doubled",
             "partsNok": 120,
@@ -1910,7 +1911,8 @@
     "startingBalanceNok": 25000,
     "launchDeadlineDay": 96,
     "emergencyLiftNok": 9000,
-    "launchMinutes": 120
+    "launchMinutes": 120,
+    "emergencyLiftDays": 2
   },
   "survey": {
     "nokPerFoot": 200,

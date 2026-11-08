@@ -3,7 +3,7 @@ using Haulout.Sim.Faults;
 namespace Haulout.Sim.Data;
 
 /// <summary>The money and the calendar of the spring. All placeholders from the boat's data.</summary>
-public sealed record Economy(int StartingBalanceNok, int LaunchDeadlineDay, int EmergencyLiftNok, int LaunchMinutes);
+public sealed record Economy(int StartingBalanceNok, int LaunchDeadlineDay, int EmergencyLiftNok, int LaunchMinutes, int EmergencyLiftDays = 0);
 
 public enum SurveySeverity { Note, Attention, BeforeLaunch }
 

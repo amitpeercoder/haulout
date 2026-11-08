@@ -79,9 +79,14 @@ public sealed partial class Game
                 routes.Add(new FixRoute("Yard", yard.How, yard.Nok, 0, yard.LeadDays, reason is null, reason));
             }
             int now = f.Diy?.PartsNok ?? f.Yard?.Nok ?? 0;
+            var esc = f.Escalation;
+            bool known = f.State is FaultState.Discovered or FaultState.Deferred;
+            int? inDays = known && esc is { AfterDays: { } n } && f.ActiveSinceDay is { } since
+                ? Math.Max(0, n - (Day - since)) : null;
+            bool onLaunch = known && esc is { OnLaunch: true } && !_launched;
             return new ReadinessItem(
                 f.Name, comp.Name, f.State.ToString(), now, f.CostLaterNok, f.LaterNote,
-                f.OnHardOnly || comp.BelowWaterline, f.Consequence, routes);
+                f.OnHardOnly || comp.BelowWaterline, f.Consequence, routes, inDays, onLaunch);
         }).ToList();
 
         var investigate = _surveyKept.Where(PointsAtUnfoundFault)
@@ -93,6 +98,6 @@ public sealed partial class Game
             .Select(f => f!.Name).ToList();
 
         int deadline = _boat.Economy.LaunchDeadlineDay;
-        return new ReadinessView(Day, deadline, deadline - Day, Balance, _launched, open, investigate, fixedNames);
+        return new ReadinessView(Day, deadline, deadline - Day, Balance, _launched, open, investigate, fixedNames, Afloat, _boat.Economy.EmergencyLiftNok);
     }
 }

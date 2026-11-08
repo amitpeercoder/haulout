@@ -87,7 +87,8 @@ public sealed record StatusView(
     string Place,
     int BalanceNok = 0,
     int LaunchDeadlineDay = 0,
-    bool Launched = false) : QueryResult;
+    bool Launched = false,
+    bool Afloat = false) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 /// <summary>Document: set when the entry is a document the player can read again (e.g. "survey report").</summary>
@@ -151,7 +152,8 @@ public sealed record FixRoute(string Route, string How, int CostNok, int Minutes
 /// </summary>
 public sealed record ReadinessItem(
     string Problem, string Component, string State, int CostNowNok, int CostLaterNok, string? LaterNote,
-    bool OnHardOnly, string Consequence, IReadOnlyList<FixRoute> Routes);
+    bool OnHardOnly, string Consequence, IReadOnlyList<FixRoute> Routes,
+    int? EscalatesInDays = null, bool EscalatesOnLaunch = false);
 
 /// <summary>A surveyor's pointer the player has not run down yet: the part and the surveyor's words. Not a fault.</summary>
 public sealed record InvestigateItem(string Component, string Note);
@@ -162,4 +164,4 @@ public sealed record InvestigateItem(string Component, string Note);
 /// </summary>
 public sealed record ReadinessView(
     int Day, int LaunchDeadlineDay, int DaysToDeadline, int BalanceNok, bool Launched,
-    IReadOnlyList<ReadinessItem> Open, IReadOnlyList<InvestigateItem> ToInvestigate, IReadOnlyList<string> Fixed) : QueryResult;
+    IReadOnlyList<ReadinessItem> Open, IReadOnlyList<InvestigateItem> ToInvestigate, IReadOnlyList<string> Fixed, bool Afloat = false, int EmergencyLiftNok = 0) : QueryResult;

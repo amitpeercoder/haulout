@@ -26,14 +26,18 @@
             <div class="options">
                 @if (!sv.Ordered)
                 {
-                    <div class="option"><button data-action="order-survey" disabled="@rd.Launched" @onclick="() => Session.OrderSurvey()">Order survey@(SurveyFee(sv))</button></div>
+                    <div class="option"><button data-action="order-survey" disabled="@rd.Afloat" @onclick="() => Session.OrderSurvey()">Order survey@(SurveyFee(sv))</button></div>
                 }
                 else
                 {
                     <div class="option"><button data-action="read-survey" @onclick="() => Session.ToggleSurvey()">@(Session.SurveyOpen ? "Close survey" : "Read survey")</button></div>
                 }
                 <div class="option"><button data-action="wait" @onclick="() => Session.Wait(1)">Wait a day</button></div>
-                <div class="option"><button class="primary" data-action="launch" disabled="@rd.Launched" @onclick="() => Session.Launch()">Launch</button></div>
+                @if (rd.Launched && rd.Afloat)
+                {
+                    <div class="option"><button data-action="emergency-lift" @onclick="() => Session.EmergencyLift()">Emergency lift (@rd.EmergencyLiftNok NOK)</button></div>
+                }
+                <div class="option"><button class="primary" data-action="launch" disabled="@rd.Afloat" @onclick="() => Session.Launch()">Launch</button></div>
             </div>
 
             @if (Session.SurveyOpen && sv.Ordered)
@@ -58,6 +62,7 @@
                 <div class="problem">
                     <p><strong>@p.Problem</strong> · @p.Component · @p.State</p>
                     <p>now @p.CostNowNok NOK / later @p.CostLaterNok NOK@(p.LaterNote is { Length: > 0 } ln ? " (" + ln + ")" : "")@(p.OnHardOnly ? " · on the hard only" : "")</p>
+                    @if (Escalates(p) is { } escalates) { <p class="faint">@escalates</p> }
                     <p class="faint">@p.Consequence</p>
                     @if (p.State == "Deferred")
                     {
@@ -186,6 +191,10 @@
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose() => Session.Changed -= OnChanged;
+
+    private static string? Escalates(ReadinessItem p) =>
+        p.EscalatesInDays is { } n ? $"Escalates in {n} {(n == 1 ? "day" : "days")}."
+        : p.EscalatesOnLaunch ? "Escalates on launch." : null;
 
     private static string DaysToGo(int d) =>
         d > 0 ? $"{d} days to go" : d == 0 ? "today" : $"{-d} days past";

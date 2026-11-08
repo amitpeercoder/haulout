@@ -196,12 +196,12 @@ public class PreLaunchTests
     [Fact]
     public void Deferred_seacock_seizes_on_the_twentieth_day_and_the_weeping_one_leaves_the_list()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDeferredDays!.Value;
+        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         Survey(g);
         Ok(g.Execute(new Defer("seacock")));
 
-        var early = Ok(g.Execute(new WaitDays(days - 1)));
+        var early = Ok(g.Execute(new WaitDays(days - 2))); // the survey took the first day
         Assert.Empty(early.NewlyDiscovered);
         Assert.Contains(WeepingSeacock, OpenNames(g));
 
@@ -217,7 +217,7 @@ public class PreLaunchTests
     [Fact]
     public void After_escalation_only_the_seized_seacock_is_known_and_it_is_not_deferred()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDeferredDays!.Value;
+        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         Survey(g);
         Ok(g.Execute(new Defer("seacock")));
@@ -239,7 +239,7 @@ public class PreLaunchTests
     [Fact]
     public void Launch_counts_the_seized_seacock_as_open_until_the_player_defers_it_again()
     {
-        var days = DataFault("seacock-weeping").Escalation!.AfterDeferredDays!.Value;
+        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
         var g = NewGame();
         FindSeacock(g);
         Ok(g.Execute(new Defer("seacock")));
@@ -280,13 +280,140 @@ public class PreLaunchTests
     }
 
     [Fact]
-    public void Waiting_without_deferring_does_not_escalate()
+    public void A_discovered_but_undeferred_seacock_escalates_on_day_95_by_waiting()
+    {
+        var days = DataFault("seacock-weeping").Escalation!.AfterDays!.Value;
+        Assert.Equal(20, days);
+        var g = NewGame();
+        FindSeacock(g);
+        Assert.Equal("Discovered", Ready(g).Open.Single(o => o.Problem == WeepingSeacock).State);
+
+        int toGo = 95 - Status(g).Day;
+        var early = Ok(g.Execute(new WaitDays(toGo - 1)));
+        Assert.Empty(early.NewlyDiscovered);
+        Assert.Contains(WeepingSeacock, OpenNames(g));
+
+        var late = Ok(g.Execute(new WaitDays(1)));
+        Assert.Equal(95, Status(g).Day);
+        Assert.Contains(late.NewlyDiscovered, k => k.Name == SeizedSeacock);
+        Assert.Contains("seized", Text(late));
+        var open = Ready(g).Open.Single(o => o.Problem == SeizedSeacock);
+        Assert.Equal("Discovered", open.State);
+        Assert.DoesNotContain(WeepingSeacock, OpenNames(g));
+    }
+
+    [Fact]
+    public void A_latent_seacock_escalates_silently_by_waiting()
+    {
+        var g = NewGame();
+        var wait = Ok(g.Execute(new WaitDays(20)));
+
+        Assert.Empty(wait.NewlyDiscovered);
+        Assert.DoesNotContain("seacock", Text(wait), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Log(g).Entries.Where(e => e.Text.StartsWith("Found")));
+        Assert.Empty(Ready(g).Open);
+
+        var inspected = Ok(Walk.Do(g, "seacock", n => new Inspect(n)));
+        Assert.Contains(inspected.NewlyDiscovered, k => k.Name == SeizedSeacock);
+        Assert.Contains("seized solid", Text(inspected));
+    }
+
+    [Fact]
+    public void EscalatesInDays_counts_down_for_a_known_fault_and_is_null_for_an_undiscovered_one()
+    {
+        var g = NewGame();
+        Assert.Empty(Ready(g).Open);
+
+        FindSeacock(g);
+        var item = Ready(g).Open.Single(o => o.Problem == WeepingSeacock);
+        int day = Status(g).Day;
+        Assert.Equal(20 - (day - 75), item.EscalatesInDays);
+        Assert.True(item.EscalatesOnLaunch);
+
+        Ok(g.Execute(new WaitDays(5)));
+        Assert.Equal(20 - (day + 5 - 75), Ready(g).Open.Single(o => o.Problem == WeepingSeacock).EscalatesInDays);
+
+        // A fault with no timer reports nothing.
+        Assert.All(Ready(g).Open.Where(o => o.Problem != WeepingSeacock), o => Assert.Null(o.EscalatesInDays));
+    }
+
+    [Fact]
+    public void Seized_seacock_with_the_engine_started_overheats_through_the_cooling_warning()
+    {
+        var g = NewGame();
+        Ok(g.Execute(new WaitDays(20)));
+        Ok(Walk.Do(g, "negative terminal", n => new Clean(n)));
+        var start = Ok(Walk.Start(g));
+
+        Assert.True(start.EngineRunning);
+        Assert.Contains("temperature alarm", Text(start));
+        Assert.False(start.Finished);
+        var flow = Ok(g.Execute(new CheckRawWaterFlow()));
+        Assert.Contains("Almost nothing comes out of the exhaust.", Text(flow));
+        Assert.Equal("Seized shut: no cooling water, the engine overheats within minutes.", DataFault("seacock-seized").Consequence);
+    }
+
+    // ------------------------------------------------------------------ emergency lift
+
+    [Fact]
+    public void Emergency_lift_is_refused_ashore()
+    {
+        var g = NewGame();
+        var r = Refused(g.Execute(new EmergencyLift()));
+        Assert.Equal("She's already ashore.", Text(r));
+        Assert.False(Status(g).Afloat);
+    }
+
+    [Fact]
+    public void Emergency_lift_afloat_costs_the_fee_and_days_then_the_seacock_can_be_replaced_and_she_relaunches_free()
+    {
+        var eco = Data.Economy;
+        Assert.Equal(2, eco.EmergencyLiftDays);
+        var g = NewGame();
+        Survey(g);
+        Ok(g.Execute(new Launch()));
+        Assert.True(Status(g).Afloat);
+        Assert.True(Ready(g).Afloat);
+        int balance = Status(g).BalanceNok, day = Status(g).Day, worked = Status(g).MinutesSpent;
+
+        var lift = Ok(g.Execute(new EmergencyLift()));
+        Assert.Equal(eco.EmergencyLiftNok, lift.CostNok);
+        Assert.Equal(eco.EmergencyLiftDays * 1440, lift.MinutesTaken);
+        Assert.Equal(balance - eco.EmergencyLiftNok, Status(g).BalanceNok);
+        Assert.Equal(day + eco.EmergencyLiftDays, Status(g).Day);
+        Assert.Equal(worked, Status(g).MinutesSpent);
+        Assert.False(Status(g).Afloat);
+        Assert.True(Status(g).Launched);
+        Assert.Contains(Log(g).Entries, e => e.Text.StartsWith("Emergency lift") && e.CostNok == eco.EmergencyLiftNok);
+
+        // Below-waterline work and the ground beside the hull are back.
+        Walk.ToPlace(g, "beside-the-hull");
+        Assert.True(Aboard(g).Places.Single(p => p.Name == "Beside the hull").Available);
+        Ok(Walk.Do(g, "seacock", n => new Replace(n)));
+        Assert.DoesNotContain(SeizedSeacock, OpenNames(g));
+
+        // Back in the water: the existing Launch, no fee, launch time only.
+        var again = Ok(g.Execute(new Launch()));
+        Assert.Equal(0, again.CostNok);
+        Assert.Equal(eco.LaunchMinutes, again.MinutesTaken);
+        Assert.Empty(again.NewlyDiscovered);
+        Assert.True(Status(g).Afloat);
+        Refused(g.Execute(new Launch()));
+    }
+
+    [Fact]
+    public void Rusted_drain_clamps_can_be_replaced_afloat()
     {
         var g = NewGame();
         Survey(g);
-        Ok(g.Execute(new WaitDays(40)));
-        Assert.Contains(WeepingSeacock, OpenNames(g));
-        Assert.DoesNotContain(SeizedSeacock, OpenNames(g));
+        Ok(g.Execute(new Launch()));
+        var item = Ready(g).Open.Single(o => o.Problem == FaultName("drain-clamps-rusted"));
+        Assert.False(item.OnHardOnly);
+        Assert.Equal("can be done afloat, with the drain seacock shut", item.LaterNote);
+        Assert.All(item.Routes, r => Assert.True(r.Available, r.UnavailableReason));
+
+        Ok(Walk.Do(g, "drain clamps", n => new Replace(n)));
+        Assert.DoesNotContain(FaultName("drain-clamps-rusted"), OpenNames(g));
     }
 
     [Fact]

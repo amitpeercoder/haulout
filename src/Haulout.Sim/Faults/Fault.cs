@@ -20,10 +20,10 @@ public sealed record YardRoute(string How, int Nok, int LeadDays);
 
 /// <summary>
 /// What a fault turns into. To: id of a (dormant) fault on the same component.
-/// AfterDeferredDays: escalates that many days after the player deferred it; null: never on the clock.
+/// AfterDays: escalates that many days after the fault became active (whatever its state); null: never on the clock.
 /// OnLaunch: escalates the moment she is launched. Text: what the player reads when it happens.
 /// </summary>
-public sealed record Escalation(string To, int? AfterDeferredDays, bool OnLaunch, string Text);
+public sealed record Escalation(string To, int? AfterDays, bool OnLaunch, string Text);
 
 public sealed class Fault
 {
@@ -87,6 +87,9 @@ public sealed class Fault
     public FaultState State { get; private set; } = FaultState.Latent;
     /// <summary>The day the player deferred it (set while Deferred).</summary>
     public int? DeferredDay { get; private set; }
+    /// <summary>The day the fault became active: the game's start day, or the day a successor or a poor job woke. Null while dormant.</summary>
+    public int? ActiveSinceDay { get; private set; }
+
     /// <summary>It turned into its successor; it no longer counts as present, nor as fixed.</summary>
     internal bool Escalated { get; private set; }
 
@@ -134,7 +137,17 @@ public sealed class Fault
     internal void MarkEscalated() => Escalated = true;
 
     /// <summary>The predecessor escalated: this one is live now, and Latent.</summary>
-    internal void Wake() => Dormant = false;
+    internal void Wake(int day)
+    {
+        Dormant = false;
+        ActiveSinceDay = day;
+    }
+
+    /// <summary>A fault present from the start, or added during play, starts ageing on this day.</summary>
+    internal void ActivateOn(int day)
+    {
+        if (!Dormant) ActiveSinceDay ??= day;
+    }
 
     public FaultReveal? RevealFor(PlayerAction a, bool uncovered = false) =>
         Reveals.FirstOrDefault(r => r.Action == a && (!r.NeedsUncovered || uncovered));

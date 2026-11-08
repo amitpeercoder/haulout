@@ -55,6 +55,7 @@ public sealed partial class Game
         _random = random ?? new SeededRandom(DefaultSeed);
         _reach = new Reach(boat, _removed);
         InitSkills();
+        foreach (var f in boat.AllFaults) f.ActivateOn(startDay);
     }
 
     /// <summary>The seed of the shipped first game: it decides the poor-job rolls.</summary>
@@ -79,7 +80,7 @@ public sealed partial class Game
             ]),
             Status => new StatusView(
                 Day, TimeOfDay, _minutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true }).ToList(), _tools.ToList(), CurrentPlace.Name,
-                Balance, _boat.Economy.LaunchDeadlineDay, _launched),
+                Balance, _boat.Economy.LaunchDeadlineDay, _launched, Afloat),
             Logbook => new LogView(_log.ToList()),
             Commands => new CommandList(CommandCatalogue),
             Aboard => AboardSnapshot(),
@@ -112,6 +113,7 @@ public sealed partial class Game
         new("yard fix", "problem", "Pay the yard to fix a known problem"),
         new("wait", "days", "Let some days pass"),
         new("launch", null, "Put her in the water"),
+        new("emergency lift", null, "Pay the yard to lift her out again, afloat only (costs money and days)"),
         new("check filter", null, "Look in the fuel filter bowl"),
         new("check flow", null, "Look at the cooling water at the exhaust (engine running)"),
         new("log", null, "Read the logbook"),
@@ -204,6 +206,7 @@ public sealed partial class Game
             OrderSurvey => DoOrderSurvey(turn),
             WaitDays c => DoWait(turn, c.Days),
             Launch => DoLaunch(turn),
+            EmergencyLift => DoEmergencyLift(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }

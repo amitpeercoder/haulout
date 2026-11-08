@@ -9,7 +9,7 @@ One fault with one cause is a puzzle. A season is many faults, most of them not 
 ## Decisions
 
 ### 1. A fault has a lifecycle
-`Latent → Symptomatic → Discovered → Fixed | Deferred`. Deferred faults keep ageing and may escalate (a weeping seacock becomes a seized one; a tired impeller sheds vanes). Escalation is on a timer or on use, visible in the sim's rules, never a dice roll the player cannot trace.
+`Latent → Symptomatic → Discovered → Fixed | Deferred`. Every active fault keeps ageing, known or not, and may escalate (a weeping seacock becomes a seized one; a tired impeller sheds vanes). Escalation is on a timer or on use, visible in the sim's rules, never a dice roll the player cannot trace.
 
 ### 2. Four discovery channels
 - **Symptom:** the engine clicks, the bilge pump runs too often, the windlass is sluggish.
@@ -61,7 +61,7 @@ A failure at sea must come from a fault the player saw or could have seen. No un
 **Date:** 2026-11-08. Order of work step 1 (the pre-launch slice) is done in the sim, console, MCP and a minimal web panel.
 
 ### Facade
-- Commands: `Defer(fault)`, `Undefer(fault)`, `FixByYard(fault)`, `OrderSurvey()`, `WaitDays(n)` (1 to 60), `Launch()`. A fault is named by its name or its part's name; an undiscovered fault gets the same refusal as a made-up name.
+- Commands: `Defer(fault)`, `Undefer(fault)`, `FixByYard(fault)`, `OrderSurvey()`, `WaitDays(n)` (1 to 60), `Launch()`, `EmergencyLift()`. A fault is named by its name or its part's name; an undiscovered fault gets the same refusal as a made-up name.
 - Queries: `SurveyReport()` (a letter; `Ordered=false` before the survey) and `Readiness()` (open discovered problems with state, cost now and later, later note, on-the-hard-only, consequence and the DIY and yard routes; surveyor pointers still to look into; names of fixed or ruled-out problems; day, deadline, money, launched).
 - `StatusView` carries the balance, the deadline and whether she is launched. `FoundComponent.Flagged` marks a part a surveyor pointed at. `ActionOption.Target` names the problem for the defer, undefer and yard-fix verbs. `LogEntry.Document` marks the survey report. `KnownFault.Id` is in-process only and never serialised.
 - `Finished` still means "the engine has run once". The game no longer ends there; the console runs until quit.
@@ -71,7 +71,7 @@ A failure at sea must come from a fault the player saw or could have seen. No un
   - A hint (a reveal that does not discover, or a survey "investigate" item) makes a fault Symptomatic.
   - A discovering reveal, a survey "cause" item or a cleaning that fixes it makes it Discovered.
   - Deferred records the day. A harmless fault (the red herring) goes to Fixed as soon as it is discovered and is logged "Ruled out".
-- Escalation is in data: `escalation {to, afterDeferredDays, onLaunch, text}`. The successor is a dormant fault on the same part. It wakes Discovered if the player knew of the predecessor, and silently Latent if not. The predecessor stops being present but keeps its state.
+- Escalation is in data: `escalation {to, afterDays, onLaunch, text}`: it runs from the day the fault became active, in any state. The successor is a dormant fault on the same part. It wakes Discovered if the player knew of the predecessor, and silently Latent if not. The predecessor stops being present but keeps its state.
 - DIY quality is in `diyQuality {startSkill 0, threshold 2, poorJobChance 0.25, poorJobs per subsystem}`.
   - After a Clean or Replace on a subsystem whose skill is below the threshold, there is a chance (through `IRandom`) of a latent poor-job fault: effect none, found by inspecting, fixed by a redo. Skill then rises by one.
   - The default seed is 4: seed 1's first draw is 0.249, which would spoil the first cleaning.
@@ -81,7 +81,7 @@ A failure at sea must come from a fault the player saw or could have seen. No un
 - Top level: `economy`, `survey`, `diyQuality`, `placeholders`.
 - Component: `belowWaterline`, `replaceText`.
 - Removable part: `uncoverText`, `refitText`. The impeller now has a raw-water pump cover.
-- Fault: `effect.kind: none`, `onHardOnly`, `harmless`, `dormant`, `consequence`, `costLaterNok`, `laterNote`, `diy {how, partsNok, minutes}`, `yard {how, nok, leadDays}`, `escalation`, `properties`.
+- Fault: `effect.kind: none`, `onHardOnly`, `harmless`, `dormant`, `consequence`, `costLaterNok`, `laterNote`, `diy {how, partsNok, minutes}`, `yard {how, nok, leadDays}`, `escalation {to, afterDays, onLaunch, text}`, `properties`; `economy.emergencyLiftDays`.
 - 43 components (new: navigation lights, cockpit drain hoses, lifelines) and 12 faults.
 
 ### The twelve survey items
@@ -102,7 +102,7 @@ An item whose fault is no longer there when the survey is ordered is left out.
 
 ### Placeholders for Amit (all in data)
 - Money: 25 000 NOK starting balance; survey 200 NOK per foot (5 600 NOK), 1 day; emergency lift 9 000 NOK; launch takes 2 h and costs 0 NOK.
-- Deadline: day 96. Seacock seizes after 20 deferred days, or on launch.
+- Deadline: day 96. Seacock seizes after 20 days, or on launch.
 - DIY quality: threshold 2 jobs, poor-job chance 25 %.
 - Costs now / later (NOK):
 
@@ -119,16 +119,8 @@ An item whose fault is no longer there when the survey is ordered is left out.
 
 - Yard prices and lead times: 1 to 5 days, about 3× the DIY parts.
 
-### Open questions
-- Should a discovered but undeferred fault age and escalate too, or only a deferred one? Now: only a deferred one, plus every fault on launch.
-- Should the emergency lift be a command afloat, at 9 000 NOK and a yard slot? It is cut from this round.
-- Does a seized seacock still pass cooling water, so the engine still runs? Now: yes.
-- Can you change cockpit drain hose clamps afloat? Now: yes.
-- Does the surveyor's fee scale per foot? Now: per foot.
-
-## Decisions (Amit, 2026-11-08)
-
-1. Known but undeferred faults also escalate over time. Escalation timers run from the day a fault becomes active, whatever its state, until it is fixed.
-2. The emergency lift is a command: afloat only, costs the lift fee and two days, puts her back on the hard.
-3. A seized seacock passes no water: the engine overheats if run.
-4. Cockpit drain hose clamps can be changed afloat.
+### Decisions (Amit, 2026-11-08)
+1. Escalation for any active fault: `escalation.afterDays`, counted from the day the fault became active (game start for faults present at load; the wake-up day for a successor or a poor job), whether it is latent, symptomatic, discovered or deferred. `onLaunch` stays. Latent faults escalate silently. The seacock escalates after 20 days. Readiness shows `EscalatesInDays` (known faults with a timer) and `EscalatesOnLaunch`.
+2. The emergency lift is a command (`EmergencyLift`): afloat only, costs `economy.emergencyLiftNok` and `economy.emergencyLiftDays` of calendar time (no work time), puts her back on the hard. Launch again is the ordinary Launch, free.
+3. A seized seacock passes no water (`rawWaterFlowFactor` 0): the engine overheats if run.
+4. Cockpit drain hose clamps can be changed afloat (not on the hard only, not below the waterline).

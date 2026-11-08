@@ -52,6 +52,8 @@ public static class WordParser
             "readiness" or "ready" => new RunQuery(new Readiness()),
             "wait" => ParseWait(arg),
             "launch" => new RunCommand(new Launch()),
+            "emergency" when arg.Equals("lift", StringComparison.OrdinalIgnoreCase) => new RunCommand(new EmergencyLift()),
+            "emergency" => new Problem("Usage: emergency lift"),
             "log" => new RunQuery(new Logbook()),
             "status" => new RunQuery(new Status()),
             "help" => new RunQuery(new Commands()),

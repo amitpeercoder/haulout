@@ -24,6 +24,7 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(OrderSurvey), "order-survey")]
 [JsonDerivedType(typeof(WaitDays), "wait")]
 [JsonDerivedType(typeof(Launch), "launch")]
+[JsonDerivedType(typeof(EmergencyLift), "emergency-lift")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -56,6 +57,8 @@ public sealed record OrderSurvey() : Command;
 public sealed record WaitDays(int Days) : Command;
 /// <summary>Put her in the water. Allowed any time; the choice is recorded.</summary>
 public sealed record Launch() : Command;
+/// <summary>Afloat only: pay the yard to lift her out again. Costs money and calendar days; she is back on the hard.</summary>
+public sealed record EmergencyLift() : Command;
 
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]

@@ -65,7 +65,7 @@ public static class Prose
                 if (s.LaunchDeadlineDay > 0)
                     sb.AppendLine($"Money left: {s.BalanceNok} NOK. Launch deadline: day {s.LaunchDeadlineDay}.");
                 sb.AppendLine($"You're {PlacePhrase(s.Place)}.");
-                if (s.Launched) sb.AppendLine("She's in the water.");
+                if (s.Afloat) sb.AppendLine("She's in the water.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) sb.AppendLine($"  Known: {f.Name} ({f.ComponentName})");
@@ -152,7 +152,7 @@ public static class Prose
             _ => $"{-v.DaysToDeadline} days past",
         };
         sb.AppendLine($"Day {v.Day}. Launch deadline: day {v.LaunchDeadlineDay} ({deadline}). Money left: {v.BalanceNok} NOK. " +
-                      (v.Launched ? "She's in the water." : "She's ashore."));
+                      (v.Afloat ? "She's in the water." : "She's ashore."));
         if (v.Open.Count == 0 && v.ToInvestigate.Count == 0 && v.Fixed.Count == 0)
         {
             sb.AppendLine("No known problems.");
@@ -164,6 +164,7 @@ public static class Prose
             sb.AppendLine($"{item.Problem} ({item.Component}){state}");
             var later = $"Later: {item.CostLaterNok} NOK" + (string.IsNullOrEmpty(item.LaterNote) ? "" : $", {item.LaterNote}");
             sb.AppendLine($"  Now: {item.CostNowNok} NOK. {later}.{(item.OnHardOnly ? " On the hard only." : "")}");
+            if (EscalationText(item) is { } escalates) sb.AppendLine($"  {escalates}");
             sb.AppendLine($"  If left: {item.Consequence}");
             foreach (var r in item.Routes)
             {
@@ -183,6 +184,11 @@ public static class Prose
             sb.AppendLine("Done: " + string.Join(", ", v.Fixed) + ".");
         return sb.ToString();
     }
+
+    /// <summary>"Escalates in N days." or "Escalates on launch."; null when nothing is on a timer.</summary>
+    public static string? EscalationText(ReadinessItem item) =>
+        item.EscalatesInDays is { } n ? $"Escalates in {n} {(n == 1 ? "day" : "days")}."
+        : item.EscalatesOnLaunch ? "Escalates on launch." : null;
 
     /// <summary>"in the quarter berth", but "on deck" and "beside the hull".</summary>
     private static string PlacePhrase(string place) =>

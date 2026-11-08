@@ -10,7 +10,7 @@ public class McpServerTests
     [
         "look", "go", "remove", "refit", "inspect", "uncover", "measure", "clean", "replace", "charge", "buy",
         "check_filter", "check_flow", "start_engine",
-        "order_survey", "survey", "readiness", "defer", "undefer", "yard_fix", "wait", "launch",
+        "order_survey", "survey", "readiness", "defer", "undefer", "yard_fix", "wait", "launch", "emergency_lift",
         "status", "logbook", "aboard", "help", "briefing",
     ];
 
@@ -106,6 +106,17 @@ public class McpServerTests
         var names = (await client.ListToolsAsync()).Select(t => t.Name).ToHashSet();
         foreach (var n in ExpectedTools) Assert.Contains(n, names);
         Assert.Equal(ExpectedTools.Length, names.Count);
+    }
+
+    [Fact]
+    public async Task Emergency_lift_tool_description_quotes_the_data_numbers()
+    {
+        var eco = Haulout.Sim.Data.BoatLoader.LoadSloop28().Economy;
+        Assert.Equal(28, ExpectedTools.Length);
+        await using var client = await Connect();
+        var tool = (await client.ListToolsAsync()).Single(t => t.Name == "emergency_lift");
+        Assert.Contains($"{eco.EmergencyLiftNok} NOK", tool.Description);
+        Assert.Contains($"{eco.EmergencyLiftDays} days", tool.Description);
     }
 
     [Fact]

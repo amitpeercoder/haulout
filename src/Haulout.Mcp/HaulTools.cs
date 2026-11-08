@@ -113,6 +113,10 @@ public sealed class HaulTools(GameSession session)
         "Put her in the water. Takes 2 hours, free; she goes in and stays in, and below-waterline work then needs an emergency lift.")]
     public string Launch() => session.Do("launch", new Launch());
 
+    [McpServerTool(Name = "emergency_lift"), Description(
+        "Only when she is afloat: pay the yard to lift her out again. Costs 9000 NOK and 2 days of calendar time (no work time). She is back on the hard: the ground beside the hull is there again and below-waterline fixes are possible. Launch again afterwards, free.")]
+    public string EmergencyLift() => session.Do("emergency_lift", new EmergencyLift());
+
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
     public string Status() => session.Ask("status", new Status());
@@ -132,7 +136,7 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, read survey = survey, yard fix = yard_fix. " +
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix. " +
         "There is no quit; also available: status, aboard (what you have found so far), readiness, briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
