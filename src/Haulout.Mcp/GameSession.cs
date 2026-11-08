@@ -11,6 +11,8 @@ public sealed class GameSession
     private readonly string? _tracePath;
     private readonly object _lock = new();
     private int _seq;
+    /// <summary>How much of each result the trace keeps: enough for an arrival, tow or sinking card to show.</summary>
+    private const int TraceResultChars = 300;
 
     public GameSession(Game game, string? tracePath)
     {
@@ -57,13 +59,17 @@ public sealed class GameSession
                 tool,
                 args = argMap,
                 accepted,
-                result = text.Length <= 80 ? text : text[..80],
+                result = text.Length <= TraceResultChars ? text : text[..TraceResultChars],
                 minutesSpent = status.MinutesSpent,
                 moneySpentNok = status.MoneySpentNok,
                 balanceNok = status.BalanceNok,
                 launched = status.Launched,
                 engineRunning = status.EngineRunning,
                 finished = status.Finished,
+                day = status.Day,
+                port = status.Port,
+                atSea = status.AtSea,
+                sunk = status.Sunk,
             });
             using var w = new StreamWriter(_tracePath, append: true);
             w.WriteLine(line);

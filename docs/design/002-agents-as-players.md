@@ -61,6 +61,13 @@ Yes, as an architecture rule now and a dev tool soon; as a marketing promise onl
   - `decoys`: accepted clean/replace/charge actions on anything other than the fault's real fix.
   - `rejected`: commands the game refused, such as unknown names.
 - The fix target is the `FIX_COMPONENT_IDS` constant in `score.py`, and each fault needs its own.
+- Since the first trip (007) the trace keeps the first 300 characters of each result (was 80), so arrival, tow and sinking cards show, and each line also carries `day`, `port` (null at sea), `atSea` and `sunk` from the status. The score line keeps the fields above and adds the trip, read from those fields over the whole trace, for example `... rejected=0 departed=2 arrived_out=yes arrived_home=yes towed=0 sank=no hours_at_sea=6.0 goal=yes model=sonnet`:
+  - `departed`: accepted `depart` calls.
+  - `arrived_out` / `arrived_home`: she came off the sea into Hestholmen / Skjærvik at least once (by any means, a tow included).
+  - `towed`: accepted `call_tow` calls.
+  - `sank`: she sank at any point.
+  - `hours_at_sea`: work time that passed while she was at sea (the tow's lost idle hours are not counted).
+  - `goal`: yes only when she reached Hestholmen and later got back to Skjærvik, neither arrival by tow. Old traces without the status fields score no trip.
 
 ### Reference agent
 

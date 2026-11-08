@@ -32,6 +32,44 @@ def fix_names():
     return {n for n in names if n}
 
 
+HOME_PORT = "Skjærvik"
+OUT_PORT = "Hestholmen"
+
+
+def trip_fields(rows):
+    """Trip outcome from the trace's status fields (port, atSea, sunk). Old traces without them score no trip."""
+    departed = sum(1 for r in rows if r.get("tool") == "depart" and r.get("accepted"))
+    towed = sum(1 for r in rows if r.get("tool") == "call_tow" and r.get("accepted"))
+    sank = any(r.get("sunk") for r in rows)
+    arrived_out = arrived_home = goal = False
+    been_out = False
+    minutes_at_sea = 0
+    prev = None
+    for r in rows:
+        if prev is not None and prev.get("atSea"):
+            minutes_at_sea += max(0, r.get("minutesSpent", 0) - prev.get("minutesSpent", 0))
+            if not r.get("atSea") and not r.get("sunk"):
+                towed_here = r.get("tool") == "call_tow"
+                if r.get("port") == OUT_PORT:
+                    arrived_out = True
+                    if not towed_here:
+                        been_out = True
+                elif r.get("port") == HOME_PORT:
+                    arrived_home = True
+                    if been_out and not towed_here:
+                        goal = True
+        prev = r
+    return {
+        "departed": departed,
+        "arrived_out": "yes" if arrived_out else "no",
+        "arrived_home": "yes" if arrived_home else "no",
+        "towed": towed,
+        "sank": "yes" if sank else "no",
+        "hours_at_sea": round(minutes_at_sea / 60, 1),
+        "goal": "yes" if goal else "no",
+    }
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     as_json = "--json" in argv
@@ -75,6 +113,7 @@ def main(argv):
         "money": last.get("moneySpentNok", 0),
         "decoys": decoys,
         "rejected": sum(1 for r in upto if r.get("accepted") is False),
+        **trip_fields(rows),
         "model": m.group(1) if m else "unknown",
         "trace": path,
     }

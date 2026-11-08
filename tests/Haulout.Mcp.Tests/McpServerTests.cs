@@ -221,7 +221,10 @@ public class McpServerTests
                 Assert.Equal(JsonValueKind.String, r.GetProperty("tool").ValueKind);
                 Assert.Equal(JsonValueKind.Object, r.GetProperty("args").ValueKind);
                 Assert.True(r.GetProperty("accepted").ValueKind is JsonValueKind.True or JsonValueKind.False);
-                Assert.True(r.GetProperty("result").GetString()!.Length <= 80);
+                Assert.True(r.GetProperty("result").GetString()!.Length <= 300);
+                Assert.True(r.GetProperty("atSea").ValueKind is JsonValueKind.True or JsonValueKind.False);
+                Assert.True(r.GetProperty("sunk").ValueKind is JsonValueKind.True or JsonValueKind.False);
+                Assert.Equal("Skjærvik", r.GetProperty("port").GetString());
                 Assert.True(r.GetProperty("minutesSpent").GetInt32() >= 0);
                 Assert.True(r.GetProperty("moneySpentNok").GetInt32() >= 0);
                 Assert.True(r.GetProperty("engineRunning").ValueKind is JsonValueKind.True or JsonValueKind.False);
