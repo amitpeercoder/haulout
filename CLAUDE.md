@@ -47,7 +47,7 @@ tests/Haulout.Sim.Tests/
 
 - Small commits with a one-line summary of the design decision, not just the change.
 - When a design question comes up, write the decision into `docs/design/` and link it from the commit.
-- Domain questions (how a boat actually behaves) go to Amit. Do not invent sailing facts; flag uncertainty.
+- Domain facts (how a boat, a yard, an insurer or a licence actually works) are researched first, by Claude, with a short web search before a number or a rule is written; the design note cites the sources and says which figures stay unverified. Amit is the final authority and corrects what the research got wrong. Never invent a sailing fact; where the research is thin, say so and mark the number a placeholder.
 
 ## Team and roles
 
