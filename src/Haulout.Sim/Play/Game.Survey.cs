@@ -15,6 +15,7 @@ public sealed partial class Game
     private CommandResult DoOrderSurvey(Turn t)
     {
         var data = _boat.Survey;
+        if (YardGate() is { } away) return Reject("order-survey", away);
         if (data is null) return Reject("order-survey", "There's no surveyor to be had.");
         if (_report is not null) return Reject("order-survey", "You've already had her surveyed.");
         if (Afloat) return Reject("order-survey", "The surveyor wants her ashore.");

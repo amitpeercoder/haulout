@@ -129,7 +129,7 @@ public sealed partial class Game
     private string? YardRefusal(Fault f)
     {
         if (f.Yard is not { } yard) return "The yard can't take that on.";
-        return AfloatRefusal(f, _boat.Get(f.ComponentId)) ?? MoneyRefusal(yard.Nok);
+        return YardGate() ?? AfloatRefusal(f, _boat.Get(f.ComponentId)) ?? MoneyRefusal(yard.Nok);
     }
 
     private CommandResult DoYardFix(Turn t, string name)
@@ -149,6 +149,7 @@ public sealed partial class Game
 
     private CommandResult DoWait(Turn t, int days)
     {
+        if (AtSea) return Reject("wait", "You're at sea: continue, heave to or anchor.");
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
         ShutDownEngine(t);
         t.Narrative.Add($"You leave her for {Days(days)}.");
@@ -205,6 +206,7 @@ public sealed partial class Game
 
     private CommandResult DoLaunch(Turn t)
     {
+        if (YardGate() is { } away) return Reject("launch", away);
         if (Afloat) return Reject("launch", "She's already in the water.");
         if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
             return Reject("launch", $"The yard won't launch her in this: {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}). Try another day.");
@@ -239,6 +241,7 @@ public sealed partial class Game
 
     private CommandResult DoEmergencyLift(Turn t)
     {
+        if (YardGate() is { } away) return Reject("emergency-lift", away);
         if (!Afloat) return Reject("emergency-lift", "She's already ashore.");
         var economy = _boat.Economy;
         if (MoneyRefusal(economy.EmergencyLiftNok) is { } broke) return Reject("emergency-lift", broke);

@@ -41,6 +41,25 @@ public static class WordParser
             "stop" or "kill" => new RunCommand(new StopEngine()),
             "clean" or "tighten" => WithArg(arg, "clean <component>", a => new Clean(a)),
             "replace" => WithArg(arg, "replace <component>", a => new Replace(a)),
+            "plan" => ParsePlan(arg),
+            "depart" or "leave" => new RunCommand(new Depart(OrNull(StripFor(arg)))),
+            "continue" => new RunCommand(new Continue()),
+            "on" when arg.Length == 0 => new RunCommand(new Continue()),
+            "carry" when arg.Equals("on", StringComparison.OrdinalIgnoreCase) => new RunCommand(new Continue()),
+            "carry" => new Problem("Usage: carry on"),
+            "motor" => new RunCommand(new Motor()),
+            "sail" => new RunCommand(new Sail()),
+            "heave" when arg.Equals("to", StringComparison.OrdinalIgnoreCase) => new RunCommand(new HeaveTo()),
+            "heave" => new Problem("Usage: heave to"),
+            "heave-to" or "heaveto" => new RunCommand(new HeaveTo()),
+            "anchor" => new RunCommand(new Anchor()),
+            "turn" when arg.Equals("back", StringComparison.OrdinalIgnoreCase) => new RunCommand(new TurnBack()),
+            "turn" => new Problem("Usage: turn back"),
+            "tow" => new RunCommand(new CallTow()),
+            "call" when arg.Equals("tow", StringComparison.OrdinalIgnoreCase) => new RunCommand(new CallTow()),
+            "call" => new Problem("Usage: call tow"),
+            "inventory" or "inv" or "spares" => new RunQuery(new Inventory()),
+            "trip" => new RunQuery(new Trip()),
             "buy" => WithArg(arg, "buy <item>", a => new Buy(a)),
             "charge" => new RunCommand(new Charge(arg.Length == 0 ? "start battery" : arg)),
             "check" => ParseCheck(arg),
@@ -65,6 +84,32 @@ public static class WordParser
             "quit" or "exit" => new Quit(),
             _ => new Problem($"I don't know how to '{verb}'. Type 'help'."),
         };
+    }
+
+    private static string? OrNull(string s) => s.Length == 0 ? null : s;
+
+    private static string StripFor(string arg) =>
+        arg.StartsWith("for ", StringComparison.OrdinalIgnoreCase) ? arg[4..].Trim() : StripTo(arg);
+
+    /// <summary>"plan", "plan trip", "plan trip to X", "plan trip to X on day N", "plan trip on day N".</summary>
+    private static Parsed ParsePlan(string arg)
+    {
+        const string usage = "Usage: plan trip [to <destination>] [on day <n>]";
+        if (arg.Equals("trip", StringComparison.OrdinalIgnoreCase)) arg = "";
+        else if (arg.StartsWith("trip ", StringComparison.OrdinalIgnoreCase)) arg = arg[5..].Trim();
+        int? day = null;
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        int on = words.FindIndex(w => w.Equals("on", StringComparison.OrdinalIgnoreCase));
+        if (on >= 0)
+        {
+            var rest = words.Skip(on + 1).ToList();
+            if (rest.Count > 0 && rest[0].Equals("day", StringComparison.OrdinalIgnoreCase)) rest.RemoveAt(0);
+            if (rest.Count != 1 || !int.TryParse(rest[0], out var n) || n < 0) return new Problem(usage);
+            day = n;
+            words = words.Take(on).ToList();
+        }
+        var dest = string.Join(' ', words);
+        return new RunQuery(new PlanTrip(OrNull(StripTo(dest)), day));
     }
 
     /// <summary>"lift (the) boot on|of X", "pull back (the) boot on|of X"; null when it is not about a boot.</summary>

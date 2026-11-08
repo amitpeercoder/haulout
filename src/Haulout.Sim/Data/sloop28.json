@@ -317,6 +317,7 @@
       "faults": [
         {
           "id": "battery-low-charge",
+          "atSea": { "text": "The battery is low; it may not turn the engine over again once you stop it." },
           "name": "Battery at 60 % charge",
           "effect": {
             "kind": "stateOfCharge",
@@ -883,6 +884,7 @@
       "faults": [
         {
           "id": "water-in-fuel",
+          "atSea": { "text": "When the sea gets up, the engine may cough and die.", "spare": "primary-filter-element" },
           "name": "Water in the fuel tank",
           "effect": {
             "kind": "none",
@@ -1005,9 +1007,13 @@
       "cleanable": false,
       "replaceCostNok": 180,
       "replaceMinutes": 45,
+      "properties": {
+        "waterMinutes": 0
+      },
       "faults": [
         {
           "id": "primary-filter-clogged",
+          "atSea": { "text": "Working hard for hours, the engine may starve and stumble.", "spare": "primary-filter-element" },
           "name": "Primary fuel filter half clogged",
           "effect": {
             "kind": "fuelRestriction",
@@ -1214,6 +1220,7 @@
       "faults": [
         {
           "id": "seacock-weeping",
+          "atSea": { "text": "The bilge will keep taking water the whole way." },
           "name": "Weeping raw-water seacock",
           "effect": {
             "kind": "none",
@@ -1279,6 +1286,7 @@
         },
         {
           "id": "seacock-seized",
+          "atSea": { "text": "You won't be able to shut the cooling water off if something goes wrong." },
           "name": "Seized raw-water seacock",
           "effect": {
             "kind": "rawWaterFlowFactor",
@@ -1396,9 +1404,13 @@
       "cleanable": false,
       "replaceCostNok": 350,
       "replaceMinutes": 60,
+      "properties": {
+        "vaneFactor": 1
+      },
       "faults": [
         {
           "id": "impeller-tired",
+          "atSea": { "text": "Under load for hours the engine will run hot.", "spare": "impeller" },
           "name": "Tired impeller",
           "effect": {
             "kind": "rawWaterFlowFactor",
@@ -1590,6 +1602,7 @@
       "faults": [
         {
           "id": "exhaust-hose-cooked",
+          "atSea": { "text": "The exhaust hose is cooked; the engine room may fill with steam and fumes." },
           "name": "Exhaust hose cooked",
           "effect": {
             "kind": "none",
@@ -1790,6 +1803,7 @@
       "faults": [
         {
           "id": "alternator-belt-slipping",
+          "atSea": { "text": "The battery won't be charged while you motor.", "spare": "alternator-belt" },
           "name": "Slipping alternator belt",
           "effect": {
             "kind": "none",
@@ -2162,6 +2176,7 @@
       "faults": [
         {
           "id": "drain-clamps-rusted",
+          "atSea": { "text": "Spray and green water may find their way into the boat.", "spare": "hose-clamps" },
           "name": "Rusted cockpit drain hose clamps",
           "note": "UNVERIFIED (decision 1): 1.5 L of rain in per mm through the rusted clamps.",
           "effect": {
@@ -2218,6 +2233,7 @@
         },
         {
           "id": "drain-hose-failed",
+          "atSea": { "text": "Water will come in through the cockpit drain whenever the sea is up.", "spare": "hose-clamps" },
           "name": "Cockpit drain hose off its tail",
           "note": "UNVERIFIED (decision 1): 60 L/h afloat through the open through-hull.",
           "effect": {
@@ -2398,6 +2414,7 @@
       "faults": [
         {
           "id": "bilge-pump-burnt-out",
+          "atSea": { "text": "The bilge pump will not run, so any water that comes in stays in." },
           "name": "Burnt-out bilge pump",
           "effect": {
             "kind": "none",
@@ -2716,6 +2733,55 @@
     "valueNok": 180000,
     "payoutFraction": 0.6
   },
+  "chandlery": [
+    { "id": "remote-start-button", "name": "remote start button", "aliases": ["remote start", "remote", "button"], "priceNok": 400, "minutes": 30, "tool": true, "logText": "Bought a remote start button." },
+    { "id": "impeller", "name": "impeller", "aliases": ["spare impeller", "raw-water impeller", "raw water impeller"], "priceNok": 350, "minutes": 15, "forComponent": "impeller" },
+    { "id": "alternator-belt", "name": "alternator belt", "aliases": ["belt", "fan belt", "spare belt"], "priceNok": 220, "minutes": 15, "forComponent": "alternator-belt" },
+    { "id": "primary-filter-element", "name": "primary filter element", "aliases": ["primary filter", "fuel filter", "filter element", "primary element"], "priceNok": 180, "minutes": 15, "forComponent": "primary-filter" },
+    { "id": "secondary-filter-element", "name": "secondary filter element", "aliases": ["secondary filter", "secondary element", "fine filter"], "priceNok": 160, "minutes": 15, "forComponent": "secondary-filter" },
+    { "id": "engine-oil", "name": "engine oil (4 L)", "aliases": ["oil", "engine oil"], "priceNok": 300, "minutes": 15, "forComponent": "engine-oil" },
+    { "id": "hose-clamps", "name": "hose clamps (10)", "aliases": ["hose clamps", "clamps"], "priceNok": 120, "minutes": 15, "forComponent": "cockpit-drains" },
+    { "id": "fuses", "name": "fuses (5)", "aliases": ["fuses", "fuse"], "priceNok": 60, "minutes": 15 },
+    { "id": "hose", "name": "hose (2 m)", "aliases": ["hose", "2 m hose", "length of hose"], "priceNok": 250, "minutes": 15 }
+  ],
+  "trips": {
+    "home": "skjaervik",
+    "ports": [
+      {
+        "id": "skjaervik", "name": "Skjærvik", "aliases": ["home", "skjaervik", "the yard", "yard"], "yard": true, "shopName": "the yard chandlery",
+        "arrivalLines": [
+          "The mooring buoy comes up out of the grey, and you hook it on the second try.",
+          "She swings to the wind, and the yard sheds stand where you left them.",
+          "You're home. The engine ticks as it cools."
+        ]
+      },
+      {
+        "id": "hestholmen", "name": "Hestholmen", "aliases": ["hestholmen", "the regatta", "the party", "regatta"], "yard": false, "shopName": "the harbour shop",
+        "arrivalLines": [
+          "Hestholmen opens up round the point: masts, bunting, a quay full of people.",
+          "A man in a yellow jacket waves you onto a mooring and takes your line without a word.",
+          "By evening the regatta party has spilled down onto the jetty, lanterns lit, someone playing a fiddle badly and nobody minding.",
+          "You sit in the cockpit with a mug and listen. She got you here."
+        ]
+      }
+    ],
+    "routes": [
+      { "from": "skjaervik", "to": "hestholmen", "distanceNm": 14, "courseDeg": 40, "shelter": [ { "name": "Lyngskjær", "atNm": 7 } ] }
+    ],
+    "tow": { "nok": 6000, "hours": 6, "lostHours": 18 }
+  },
+  "sea": {
+    "stateByForce": [0, 1, 1, 2, 3, 4, 5, 6, 7, 8],
+    "stateWords": ["flat calm", "a ripple", "small wavelets", "a short chop", "moderate waves", "rough water, whitecaps everywhere", "a rough sea", "a very rough sea", "a high sea"],
+    "motorKnots": 5, "sailMinForce": 3, "sailMaxForce": 5, "sailKnots": [0, 0, 0, 4.0, 5.0, 5.5], "noGoDeg": 45,
+    "heaveToDriftKnots": 0.5, "anchorWithinNm": 1, "towKnots": 3,
+    "slopPerSeaState": 0.5, "sprayFromSeaState": 2, "sprayLitresPerHourPerSeaState": 2,
+    "stirFromSeaState": 3, "stirHoursToBite": 2,
+    "impellerShedPerLoadHour": 0.3, "overheatStopMinutes": 90,
+    "underWayDrawPerHour": 0.05,
+    "departMinutes": 10, "heaveToMinutes": 5, "anchorMinutes": 15, "turnBackMinutes": 2
+  },
+  "forecast": { "maxLeadDays": 3, "forceErrorChance": [0, 0.3, 0.5, 0.7], "rainFlipChance": [0, 0.1, 0.2, 0.3] },
   "placeholders": [
     "PLACEHOLDER (design note 006): rates.weatherGates (the wind force from which nobody goes on deck or launches, the rain in mm from which a paint job is refused) are placeholders for Amit to calibrate.",
     "PLACEHOLDER (design note 005): every price, hour, lead time, timer and chance in economy, survey, diyQuality and in each fault's diy/yard/costLaterNok is a placeholder for Amit to calibrate.",
@@ -2728,6 +2794,12 @@
     "PLACEHOLDER (design note 006): the bilge pump (20 L/min, on at 15 L, off at 5 L, 0.0005 charge per cycle, 0.0003 per run minute) and its burn-out spawn thresholds (150 cycles, 300 run minutes) are placeholders.",
     "PLACEHOLDER (design note 006): electrical { selfDischargePerDay 0.002, pumpMinStateOfCharge 0.15 }, and the soaked faults (spawn at 2 awash hours; starter +0.03 ohm, ground stud +0.04 ohm, battery +0.05 self-discharge per day) and their prices.",
     "PLACEHOLDER (design note 006): insurance { valueNok 180000, payoutFraction 0.6 }, void if a Before-launch survey item was put off and never fixed.",
-    "PLACEHOLDER (design note 006): electrical { crankDraw 0.01 per start, chargePerHour 0.10 at full chargeFactor, runDrawPerHour 0.03 }, the spawn thresholds terminal-strained (4 drag starts) and exhaust-hose-cooked (10 overheat minutes), their effects (+0.02 ohm) and the prices of alternator-belt-slipping, terminal-strained and exhaust-hose-cooked are placeholders."
+    "PLACEHOLDER (design note 006): electrical { crankDraw 0.01 per start, chargePerHour 0.10 at full chargeFactor, runDrawPerHour 0.03 }, the spawn thresholds terminal-strained (4 drag starts) and exhaust-hose-cooked (10 overheat minutes), their effects (+0.02 ohm) and the prices of alternator-belt-slipping, terminal-strained and exhaust-hose-cooked are placeholders.",
+    "PLACEHOLDER (design note 007): chandlery prices and walking minutes (remote start button 400 NOK and 30 min; impeller 350; alternator belt 220; primary filter element 180; secondary filter element 160; engine oil 300; hose clamps 120; fuses 60; hose 250; 15 min each).",
+    "PLACEHOLDER (design note 007): trips { Skjaervik to Hestholmen 14 nm on 040 degrees, shelter at Lyngskjaer 7 nm out, tow 6000 NOK for 6 hours aboard and 18 hours lost }, and the arrival lines.",
+    "PLACEHOLDER (design note 007): sea { motoring 5 kn; sailing in force 3 to 5 at 4.0, 5.0 and 5.5 kn, not closer than 45 degrees to the wind; heave-to drift 0.5 kn; anchoring within 1 nm of shelter; tow 3 kn; sea state by wind force }.",
+    "PLACEHOLDER (design note 007): sea { waves add 50 % per sea state to seawater leaks; spray 2 L/h per sea state with the hatch open from sea state 2; the tank is stirred from sea state 3 and bites after 2 hours; impeller sheds 0.3 x (1 - condition) of its vanes per load hour; the engine stops itself after 90 overheat minutes; 0.05 of a charge an hour drawn under way }.",
+    "PLACEHOLDER (design note 007): sea { depart 10 min, heave-to 5, anchor 15, turn back 2 }; forecast { 3 days of lead, force error chance 0 / 0.3 / 0.5 / 0.7 by lead day, rain flip chance 0 / 0.1 / 0.2 / 0.3 }.",
+    "PLACEHOLDER (design note 007): the atSea sentence on each fault names the consequence under way, and the vaneFactor (impeller) and waterMinutes (primary filter) properties start at 1 and 0."
   ]
 }

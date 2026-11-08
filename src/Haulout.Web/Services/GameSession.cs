@@ -5,6 +5,9 @@ namespace Haulout.Web.Services;
 /// <summary>The two UI levels of docs/design/004: the map, and the close-up of the current place.</summary>
 public enum ViewLevel { Map, CloseUp }
 
+/// <summary>The tabs of the context panel: the part and place, the launch picture, the passage.</summary>
+public enum PanelTab { Here, Readiness, Trip }
+
 /// <summary>
 /// The web adapter's one door into the sim. Holds the Game, forwards commands and queries,
 /// and remembers what the UI needs between clicks (selection, last result, what the player read).
@@ -30,8 +33,8 @@ public sealed class GameSession
     /// <summary>Map (overview cutaway) or the close-up of the place the player is in.</summary>
     public ViewLevel Level { get; private set; } = ViewLevel.Map;
 
-    /// <summary>Which tab of the context panel is showing: the part and place ("Here") or the launch picture ("Readiness").</summary>
-    public bool ReadinessTab { get; private set; }
+    /// <summary>Which tab of the context panel is showing.</summary>
+    public PanelTab Tab { get; private set; } = PanelTab.Here;
 
     /// <summary>The survey letter is open in the Readiness tab.</summary>
     public bool SurveyOpen { get; private set; }
@@ -45,14 +48,14 @@ public sealed class GameSession
         get
         {
             int total = Log.Entries.Count(e => e.Alert);
-            if (ReadinessTab) _alertsSeen = total;
+            if (Tab == PanelTab.Readiness) _alertsSeen = total;
             return Math.Max(0, total - _alertsSeen);
         }
     }
 
-    public void ShowTab(bool readiness)
+    public void ShowTab(PanelTab tab)
     {
-        ReadinessTab = readiness;
+        Tab = tab;
         Changed?.Invoke();
     }
 
@@ -65,7 +68,7 @@ public sealed class GameSession
     /// <summary>Opens the Readiness tab with the survey letter showing.</summary>
     public void ShowSurvey()
     {
-        ReadinessTab = true;
+        Tab = PanelTab.Readiness;
         SurveyOpen = true;
         Changed?.Invoke();
     }
@@ -81,6 +84,9 @@ public sealed class GameSession
     /// <summary>The closing card when she has sunk, kept so it stays readable.</summary>
     public LossView? Loss { get; private set; }
 
+    /// <summary>The card of the passage that just ended (arrival, turned back, tow); kept until the next command.</summary>
+    public TripResultView? TripResult { get; private set; }
+
     // ------------------------------------------------------------- queries
 
     public T Ask<T>(Query query) where T : QueryResult => (T)_game.Ask(query);
@@ -95,11 +101,16 @@ public sealed class GameSession
     public ComponentActionsView ActionsFor(string componentName) =>
         Ask<ComponentActionsView>(new ComponentActions(componentName));
 
+    public TripPlanView PlanTrip() => Ask<TripPlanView>(new PlanTrip());
+    public InventoryView Inventory => Ask<InventoryView>(new Inventory());
+    public TripView Trip => Ask<TripView>(new Trip());
+
     public bool HasTool(string tool) => Status.Tools.Contains(tool);
 
     public bool HasRemoteStartButton => HasTool(Shop.RemoteStartButton);
 
-    public int RemoteStartButtonCostNok => Shop.Find(Shop.RemoteStartButton)?.CostNok ?? 0;
+    public int RemoteStartButtonCostNok =>
+        Ask<InventoryView>(new Inventory()).ForSale.FirstOrDefault(l => l.Name == Shop.RemoteStartButton)?.PriceNok ?? 0;
 
     /// <summary>The text of the last Inspect on this component, if the player has inspected it.</summary>
     public string? LastInspectText(string componentName) => _lastInspect.GetValueOrDefault(componentName);
@@ -121,6 +132,7 @@ public sealed class GameSession
     {
         var result = _game.Execute(command);
         LastResult = result;
+        TripResult = result.Accepted ? result.Observation as TripResultView : null;
         if (result.Finished && ClosingNarrative is null && command is StartEngine) ClosingNarrative = result.Narrative;
         if (result.Accepted)
         {
@@ -236,4 +248,21 @@ public sealed class GameSession
     public CommandResult StopEngine() => Execute(new StopEngine());
 
     public CommandResult BuyRemoteStartButton() => Execute(new Buy(Shop.RemoteStartButton));
+
+    public CommandResult Buy(string item) => Execute(new Buy(item));
+
+    public CommandResult Depart()
+    {
+        var result = Execute(new Depart());
+        if (result.Accepted) { Tab = PanelTab.Trip; Changed?.Invoke(); }
+        return result;
+    }
+
+    public CommandResult Continue() => Execute(new Continue());
+    public CommandResult Motor() => Execute(new Motor());
+    public CommandResult Sail() => Execute(new Sail());
+    public CommandResult HeaveTo() => Execute(new HeaveTo());
+    public CommandResult Anchor() => Execute(new Anchor());
+    public CommandResult TurnBack() => Execute(new TurnBack());
+    public CommandResult CallTow() => Execute(new CallTow());
 }

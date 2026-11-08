@@ -60,9 +60,9 @@ public sealed class HaulTools(GameSession session)
         session.Do("charge", new Charge(component), ("component", component));
 
     [McpServerTool(Name = "buy"), Description(
-        "Buy a tool at the yard chandlery. The only item for sale is the remote start button: 400 NOK and 30 minutes. " +
-        "It lets you hold the multimeter probes while the engine cranks.")]
-    public string Buy([Description("Name of the item, e.g. remote start button.")] string item) =>
+        "Buy a tool or a spare at the chandlery, only while she lies at a port (refused at sea). Prices and minutes are listed by inventory and charged in NOK; the result tells you what it cost. " +
+        "A tool is bought once; spares stack. A spare is used if you replace the matching part later.")]
+    public string Buy([Description("Name of the item, e.g. remote start button, impeller.")] string item) =>
         session.Do("buy", new Buy(item), ("item", item));
 
     [McpServerTool(Name = "check_filter"), Description(
@@ -74,7 +74,7 @@ public sealed class HaulTools(GameSession session)
     public string CheckFlow() => session.Do("check_flow", new CheckRawWaterFlow());
 
     [McpServerTool(Name = "start_engine"), Description(
-        "Try to start the engine. Takes 2 minutes, free. Only from the cockpit, where the key is. Reports what happens. If she runs properly the game ends.")]
+        "Try to start the engine. Takes 2 minutes, free. Only from the cockpit, where the key is. Reports what happens.")]
     public string StartEngine() => session.Do("start_engine", new StartEngine());
 
     [McpServerTool(Name = "stop_engine"), Description(
@@ -125,6 +125,58 @@ public sealed class HaulTools(GameSession session)
         "Work the manual bilge pump by hand. Takes 15 minutes of work, free, and moves up to 150 litres out of the bilge. Only from the cockpit, where the handle is. The result says whether the pump emptied her or the water still comes.")]
     public string PumpBilge() => session.Do("pump_bilge", new PumpBilge());
 
+    [McpServerTool(Name = "plan_trip", ReadOnly = true), Description(
+        "Plan a trip from the port she lies at: distance and course, expected hours, the forecast for the departure day and the day after (it can be wrong, and is not known far ahead), " +
+        "the problems you have found that matter at sea and whether you carry the spare for each, shelter on the way, your money and what a tow would cost. Costs no time. " +
+        "Leave the destination out for the one route out of this port; depart_day defaults to today.")]
+    public string PlanTrip(
+        [Description("Where to, e.g. Hestholmen. Optional.")] string? destination = null,
+        [Description("The day to leave. Optional; defaults to today.")] int? depart_day = null) =>
+        session.Ask("plan_trip", new PlanTrip(destination, depart_day));
+
+    [McpServerTool(Name = "inventory", ReadOnly = true), Description(
+        "What is aboard (tools and spares, with counts) and, in port, what the chandlery sells with prices; nothing is for sale at sea. Costs no time.")]
+    public string Inventory() => session.Ask("inventory", new Inventory());
+
+    [McpServerTool(Name = "trip", ReadOnly = true), Description(
+        "Where she is on the passage: at which port, or at sea with the distance made good, the distance left, how she is being sailed and the nearest place to anchor. Costs no time.")]
+    public string Trip() => session.Ask("trip", new Trip());
+
+    [McpServerTool(Name = "depart"), Description(
+        "Cast off for another port. Takes 10 minutes, free. Only from the cockpit, afloat at a port, with the engine already running (you motor off the mooring) and not in a gale; " +
+        "refused otherwise, and the engine must have run this season. Leave the destination out for the one route out of this port. Then use continue and the other at-sea tools, an hour at a time.")]
+    public string Depart([Description("Where to, e.g. Hestholmen. Optional.")] string? destination = null) =>
+        session.Do("depart", new Depart(destination), ("destination", destination ?? ""));
+
+    [McpServerTool(Name = "continue"), Description(
+        "At sea, from the cockpit: another hour as she is now (under engine, under sail, hove-to, drifting). Takes up to an hour; the result is a line about the hour. Refused in port.")]
+    public string ContinuePassage() => session.Do("continue", new Continue());
+
+    [McpServerTool(Name = "motor"), Description(
+        "At sea, from the cockpit: go under engine (weighing anchor if at anchor), then an hour. Takes up to an hour. Refused if the engine is not running or you are not at sea.")]
+    public string Motor() => session.Do("motor", new Motor());
+
+    [McpServerTool(Name = "sail"), Description(
+        "At sea, from the cockpit: go under sail, then an hour. Takes up to an hour. Refused when the wind is too light, too strong or on the nose.")]
+    public string Sail() => session.Do("sail", new Sail());
+
+    [McpServerTool(Name = "heave_to"), Description(
+        "At sea: stop her where she is so you can work on the boat; she drifts slowly and the hours still pass. Takes 5 minutes. Refused at anchor, if already hove-to, or in port. " +
+        "Work on the engine at sea needs her hove-to or at anchor with the engine stopped.")]
+    public string HeaveTo() => session.Do("heave_to", new HeaveTo());
+
+    [McpServerTool(Name = "anchor"), Description(
+        "At sea: let the anchor go. Takes 15 minutes. Only within a mile of a port or a named anchorage; otherwise refused and the result says where the nearest is.")]
+    public string Anchor() => session.Do("anchor", new Anchor());
+
+    [McpServerTool(Name = "turn_back"), Description(
+        "At sea: give up the passage and head for the port she left. Takes 2 minutes. Once only; the way back is as long as the way made good.")]
+    public string TurnBack() => session.Do("turn_back", new TurnBack());
+
+    [McpServerTool(Name = "call_tow"), Description(
+        "At sea, anywhere: call the towboat on the VHF. Costs the tow in NOK (plan_trip shows it; it is charged even if you cannot afford it) and the best part of a day. Ends the trip at the port she left.")]
+    public string CallTow() => session.Do("call_tow", new CallTow());
+
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
     public string Status() => session.Ask("status", new Status());
@@ -152,8 +204,8 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge. " +
-        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), notices (what the boat has told you), briefing.\n";
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow. " +
+        "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), inventory, trip, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

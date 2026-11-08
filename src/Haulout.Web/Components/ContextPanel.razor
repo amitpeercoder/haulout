@@ -29,11 +29,78 @@
 
     @{ var unseen = Session.UnseenAlerts; }
     <nav class="tabs">
-        <button class="@(Session.ReadinessTab ? "" : "on")" data-tab="here" @onclick="() => Session.ShowTab(false)">Here</button>
-        <button class="@(Session.ReadinessTab ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(true)">Readiness @if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
+        <button class="@(Session.Tab == PanelTab.Here ? "on" : "")" data-tab="here" @onclick="() => Session.ShowTab(PanelTab.Here)">Here</button>
+        <button class="@(Session.Tab == PanelTab.Readiness ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(PanelTab.Readiness)">Readiness @if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
+        <button class="@(Session.Tab == PanelTab.Trip ? "on" : "")" data-tab="trip" @onclick="() => Session.ShowTab(PanelTab.Trip)">Trip</button>
     </nav>
 
-    @if (Session.ReadinessTab)
+    @if (Session.Tab == PanelTab.Trip)
+    {
+        var trip = Session.Trip;
+        <section class="trip">
+            @if (Session.TripResult is { } tr)
+            {
+                <section class="closing">
+                    <h2>@(tr.Towed ? "Towed in." : tr.TurnedBack ? "Back where she started." : "Made port.")</h2>
+                    @foreach (var line in tr.Lines) { <p>@line</p> }
+                    <p class="cost">@tr.Destination · @Duration(tr.Minutes)@(tr.MoneySpentNok > 0 ? $", {tr.MoneySpentNok} NOK" : "")</p>
+                </section>
+            }
+            @if (Session.LastResult is { } lr && lr.Observation is not TripResultView)
+            {
+                <section class="result @(lr.Accepted ? "" : "refused")">
+                    @foreach (var line in lr.Narrative) { <p>@line</p> }
+                    @if (lr.Accepted && (lr.MinutesTaken > 0 || lr.CostNok > 0)) { <p class="cost">@Cost(lr)</p> }
+                </section>
+            }
+            @if (trip.AtSea)
+            {
+                <p data-trip-text>@trip.Text</p>
+                <p class="faint">@trip.From to @trip.To · @trip.PositionNm.ToString("0.0") nm made good, @trip.RemainingNm.ToString("0.0") nm to go · @trip.Mode@(trip.NearestShelter is { Length: > 0 } sh ? " · shelter: " + sh : "")</p>
+                <div class="options">
+                    <div class="option"><button class="primary" data-action="continue" @onclick="() => Session.Continue()">Continue</button></div>
+                    <div class="option"><button data-action="motor" @onclick="() => Session.Motor()">Motor</button></div>
+                    <div class="option"><button data-action="sail" @onclick="() => Session.Sail()">Sail</button></div>
+                    <div class="option"><button data-action="heave-to" @onclick="() => Session.HeaveTo()">Heave to</button></div>
+                    <div class="option"><button data-action="anchor" disabled="@(!trip.CanAnchor)" @onclick="() => Session.Anchor()">Anchor</button></div>
+                    <div class="option"><button data-action="turn-back" @onclick="() => Session.TurnBack()">Turn back</button></div>
+                    <div class="option"><button data-action="call-tow" @onclick="() => Session.CallTow()">Call tow</button></div>
+                </div>
+            }
+            else
+            {
+                var plan = Session.PlanTrip();
+                var inv = Session.Inventory;
+                <h3>@plan.From to @plan.To</h3>
+                <p>@plan.DistanceNm.ToString("0.0") nm · @plan.Estimate</p>
+                @foreach (var f in plan.Forecast) { <p class="faint">Day @f.Day: @f.Text</p> }
+                @if (plan.Risks.Count > 0)
+                {
+                    <h3>Known problems at sea</h3>
+                    @foreach (var risk in plan.Risks)
+                    {
+                        <p><strong>@risk.Problem</strong> · @risk.Component: @risk.AtSea@(risk.Spare is { } sp ? (risk.SpareAboard ? $" (spare {sp} aboard)" : $" (no {sp} aboard)") : "")</p>
+                    }
+                }
+                @if (plan.SparesAboard.Count > 0) { <p class="faint">Spares aboard: @string.Join(", ", plan.SparesAboard)</p> }
+                @if (plan.SparesMissing.Count > 0) { <p class="faint">Missing: @string.Join(", ", plan.SparesMissing)</p> }
+                @foreach (var b in plan.Blockers) { <p class="why" data-blocker>@b</p> }
+                <div class="options">
+                    <div class="option"><button class="primary" data-action="depart" disabled="@(plan.Blockers.Count > 0)" title="@string.Join(" ", plan.Blockers)" @onclick="() => Session.Depart()">Depart</button></div>
+                </div>
+                <h3>Spares</h3>
+                @foreach (var l in inv.Aboard) { <p class="faint">@l.Name@(l.Tool ? "" : " x" + l.Count)</p> }
+                @if (inv.Aboard.Count == 0) { <p class="faint">Nothing aboard.</p> }
+                <div class="options">
+                    @foreach (var l in inv.ForSale)
+                    {
+                        <div class="option"><button data-action="buy" data-item="@l.Name" @onclick="() => Session.Buy(l.Name)">Buy @l.Name (@l.PriceNok NOK)</button></div>
+                    }
+                </div>
+            }
+        </section>
+    }
+    else if (Session.Tab == PanelTab.Readiness)
     {
         var rd = Session.Readiness;
         var sv = Session.Survey;

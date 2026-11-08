@@ -1,3 +1,4 @@
+using System.Globalization;
 using Haulout.Sim.Data;
 using Haulout.Sim.Faults;
 using Haulout.Sim.Systems;
@@ -38,7 +39,8 @@ public sealed partial class Game
         _values.Set(SystemValues.Charging, Electrical.Run(_boat, minutes, _running));
         _cooling.Step(minutes, _running, _running ? EngineInputsBuilder.Build(_boat).Cooling.RawWaterFlow : 1.0);
         _cooling.Publish(_values);
-        _water.Step(new WaterSystem.Inputs(minutes, Afloat, _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId)));
+        _water.Step(new WaterSystem.Inputs(minutes, Afloat, _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
+            AtSea ? Sea.SeaState(_boat.SeaRules, _weather[day].WindForce) : 0));
         _water.Publish(_values);
         if (Afloat && _water.Level >= _boat.Water.SinkLitres) Sink(day);
     }
@@ -91,7 +93,10 @@ public sealed partial class Game
 
         var lines = new List<string>
         {
-            $"She went down at her mooring on day {day}, a little after {TimeOfDay}. The water came up over the sole, then the berths, and the stern settled first.",
+            (_passage is { } sea
+                ? $"She went down {sea.ProgressNm.ToString("0.0", CultureInfo.InvariantCulture)} nm out from {PortName(sea.Route.From)} on day {day}, a little after {TimeOfDay}."
+                : $"She went down at her mooring on day {day}, a little after {TimeOfDay}.")
+                + " The water came up over the sole, then the berths, and the stern settled first.",
             PumpLine(),
             voided
                 ? $"The insurer's man comes down to the quay with a camera and a folder, and pays nothing: {voidReason}."

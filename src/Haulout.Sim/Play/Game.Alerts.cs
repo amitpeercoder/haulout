@@ -35,6 +35,7 @@ public sealed partial class Game
         var alert = new Alert(day, TimeOfDay, text);
         _alerts.Items.Add((alert, false));
         _log.Add(new LogEntry(day, alert.TimeOfDay, text, Alert: true));
+        _passage?.Failures.Add(text);
     }
 
     /// <summary>All unread alerts, now marked read.</summary>
@@ -60,7 +61,7 @@ public sealed partial class Game
     private bool OverSole => _water.Level > _boat.Water.SoleLitres;
 
     /// <summary>Per aboard step: what the player can see, hear and smell right now.</summary>
-    private void PresentAlerts(int minutes)
+    private void PresentAlerts(int minutes, bool atSea = false)
     {
         if (_running && _values.Get(SystemValues.Charging) <= 0.01)
             Raise("alternator",
@@ -73,6 +74,13 @@ public sealed partial class Game
         bool over = OverSole;
         if (over && !_alerts.WasOverSole) Raise("sole", SoleAlert);
         _alerts.WasOverSole = over;
+
+        // At sea the voltmeter is watched every step, not only at the morning check (kinds are still raised once a day).
+        if (atSea)
+        {
+            if (Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
+            return;
+        }
 
         int day = Day;
         if (_alerts.LastMorningCheckDay != day)
@@ -87,7 +95,7 @@ public sealed partial class Game
     private string BatteryAlert()
     {
         double volts = ElectricalChain.OpenCircuitVolts(Electrical.StateOfCharge(_boat));
-        return $"The panel voltmeter reads {volts.ToString("F1", CultureInfo.InvariantCulture)} V this morning. The battery isn't holding its charge; worth a meter on it.";
+        return $"The panel voltmeter reads {volts.ToString("F1", CultureInfo.InvariantCulture)} V {(AtSea ? "and falling" : "this morning")}. The battery isn't holding its charge; worth a meter on it.";
     }
 
     /// <summary>On coming back aboard after an away period of a day or more: what built up while she sat.</summary>

@@ -37,6 +37,9 @@ public sealed record YardRoute(string How, int Nok, int LeadDays);
 /// </summary>
 public sealed record Escalation(string To, bool OnLaunch, string Text);
 
+/// <summary>What a known fault means on a trip, in plain words, and the chandlery item (id) that answers it, if any.</summary>
+public sealed record AtSeaSpec(string Text, string? Spare = null);
+
 public sealed class Fault
 {
     public Fault(
@@ -60,8 +63,10 @@ public sealed class Fault
         ProgressionSpec? progression = null,
         IEnumerable<FaultEffect>? effects = null,
         IEnumerable<SpawnRule>? spawn = null,
-        string? arrivalSign = null)
+        string? arrivalSign = null,
+        AtSeaSpec? atSea = null)
     {
+        AtSea = atSea;
         ArrivalSign = arrivalSign;
         Id = id;
         Name = name;
@@ -86,6 +91,8 @@ public sealed class Fault
     }
 
     public string Id { get; }
+    /// <summary>The consequence at sea, for the trip plan; null: nothing to say. Never shown unless the fault is known.</summary>
+    public AtSeaSpec? AtSea { get; }
     /// <summary>What a mechanic calls it.</summary>
     public string Name { get; }
     public string ComponentId { get; }

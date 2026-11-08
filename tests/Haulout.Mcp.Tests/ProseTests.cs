@@ -188,4 +188,75 @@ public class ProseTests
         Assert.Contains("Nothing new from the boat.", P.Query(new NoticesView([])));
         Assert.Contains("Day 5 07:00  ! A damp", P.Query(new LogView([new LogEntry(5, "07:00", alert.Text, Alert: true)])));
     }
+
+    private static TripPlanView SamplePlan(bool blocked = false) => new(
+        "Skjærvik", "Hestholmen", 14, 40, 150, 2.8, 3.1, "About 2.8 hours under engine, or 3.1 under sail.",
+        [new ForecastDay(150, true, "Bright, force 3 from the southwest.", 3, "southwest", false, true), new ForecastDay(151, false, "No forecast that far out.", 0, "", false, false)],
+        [new TripRisk("Tired impeller", "Impeller", "Under load for hours the engine will run hot.", "impeller", false)],
+        ["hose clamps (10) x1"], ["impeller"], ["Lyngskjær, 7 nm out"], 4200, 6000,
+        blocked ? ["She's still on the hard."] : []);
+
+    [Fact]
+    public void Plan_renders_route_forecast_readiness_spares_and_tow_price()
+    {
+        var text = P.Query(SamplePlan());
+        Assert.Contains("Skjærvik to Hestholmen: 14 nm", text);
+        Assert.Contains("About 2.8 hours under engine", text);
+        Assert.Contains("Day 150: Bright, force 3 from the southwest. The wind would serve under sail.", text);
+        Assert.Contains("Day 151: No forecast that far out.", text);
+        Assert.Contains("Readiness for this trip:", text);
+        Assert.Contains("Tired impeller (Impeller): Under load for hours the engine will run hot. [no spare aboard (impeller)]", text);
+        Assert.Contains("Spares aboard: hose clamps (10) x1.", text);
+        Assert.Contains("Spares you don't have for the known problems: impeller.", text);
+        Assert.Contains("Lyngskjær, 7 nm out", text);
+        Assert.Contains("If it goes wrong, a tow costs 6000 NOK.", text);
+        Assert.StartsWith("Skjærvik", text);
+        Assert.StartsWith("Can't go yet: She's still on the hard.", P.Query(SamplePlan(blocked: true)));
+        Assert.EndsWith(Environment.NewLine, text);
+    }
+
+    [Fact]
+    public void Inventory_renders_aboard_shop_and_the_sea()
+    {
+        var port = P.Query(new InventoryView([new InventoryLine("remote start button", 1, true), new InventoryLine("impeller", 2, false)],
+            "the yard chandlery", [new ShopLine("fuses (5)", 60, 15)]));
+        Assert.Contains("remote start button (tool)", port);
+        Assert.Contains("impeller x2", port);
+        Assert.Contains("For sale at the yard chandlery:", port);
+        Assert.Contains("fuses (5): 60 NOK, 15 min", port);
+        var sea = P.Query(new InventoryView([], null, []));
+        Assert.Contains("Nothing for sale out here.", sea);
+    }
+
+    [Fact]
+    public void Trip_and_status_say_where_she_is()
+    {
+        var text = P.Query(new TripView(true, null, "Skjærvik", "Hestholmen", 5, 9, "under engine", 1, false, "Lyngskjær, 2.0 nm ahead", true, "You're at sea."));
+        Assert.Contains("You're at sea.", text);
+        Assert.Contains("5 nm out from Skjærvik, 9 nm to Hestholmen. Under engine in hour 1.", text);
+        Assert.Contains("She's at sea.", P.Query(new StatusView(80, "10:00", 0, 0, null, true, true, [], [], "Cockpit", AtSea: true)));
+        Assert.Contains("at Skjærvik", P.Query(new StatusView(80, "10:00", 0, 0, null, true, true, [], [], "Cockpit", Afloat: true, Port: "Skjærvik")));
+    }
+
+    [Fact]
+    public void A_leg_line_comes_through_and_the_trip_card_adds_a_summary_without_repeating()
+    {
+        const string hour = "Hour 1. Force 3 from the southwest, small wavelets from astern. The engine note is steady. 9.0 nm to Hestholmen.";
+        var leg = new CommandResult(true, "continue", [hour], 60, 0,
+            new LegView(1, "under engine", 5, 9, 3, "southwest", 2, hour), [], true, true, []);
+        var legText = P.Result(leg, new StatusView(80, "10:00", 0, 0, null, true, true, [], [], "Cockpit"));
+        Assert.Contains(hour, legText);
+
+        const string alarm = "The temperature alarm whines.";
+        var card = new TripResultView("Hestholmen", false, false, 190, 350, [alarm, "The battery is low."], ["Replaced the impeller from the spares aboard."],
+            [], ["The party is in full swing."]);
+        var res = new CommandResult(true, "continue", ["Hour 4.", "You pick up a mooring and stop the engine.", "The party is in full swing.", alarm],
+            60, 0, card, [], false, true, []);
+        var text = P.Result(res, new StatusView(80, "13:00", 0, 0, null, false, true, [], [], "Cockpit"));
+        Assert.Contains("Arrived at Hestholmen: 4 hours since casting off, 350 NOK spent.", text);
+        Assert.Contains("Trouble on the way: The battery is low.", text);
+        Assert.DoesNotContain("Trouble on the way: The temperature alarm", text);
+        Assert.Contains("Put right at sea: Replaced the impeller from the spares aboard.", text);
+        Assert.Single(text.Split('\n'), l => l.Contains("The party is in full swing."));
+    }
 }

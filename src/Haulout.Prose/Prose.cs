@@ -31,6 +31,8 @@ public static class Prose
         foreach (var line in result.Narrative) sb.AppendLine(line);
         if (!result.Accepted) return sb.ToString();
 
+        if (result.Observation is TripResultView trip) AppendTripSummary(sb, trip, result.Narrative);
+
         foreach (var fault in result.NewlyDiscovered)
             sb.AppendLine($"  Noted in the log: {fault.Name}.");
 
@@ -85,7 +87,9 @@ public static class Prose
                     sb.AppendLine($"Money left: {s.BalanceNok} NOK. Launch deadline: day {s.LaunchDeadlineDay}.");
                 if (s.Weather is not null) sb.AppendLine(s.Weather);
                 sb.AppendLine($"You're {PlacePhrase(s.Place)}.");
-                if (s.Sunk) sb.AppendLine("She's on the bottom of the harbour.");
+                if (s.Sunk) sb.AppendLine(s.AtSea ? "She's on the bottom of the sound." : "She's on the bottom of the harbour.");
+                else if (s.AtSea) sb.AppendLine("She's at sea.");
+                else if (s.Afloat && s.Port is not null) sb.AppendLine($"She's in the water, at {s.Port}.");
                 else if (s.Afloat) sb.AppendLine("She's in the water.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
@@ -103,6 +107,92 @@ public static class Prose
             case ReadinessView r:
                 sb.Append(Readiness(r));
                 break;
+            case TripPlanView plan:
+                sb.Append(TripPlan(plan));
+                break;
+            case InventoryView inv:
+                sb.Append(Inventory(inv));
+                break;
+            case TripView trip:
+                sb.Append(TripState(trip));
+                break;
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The short block after a passage ends: hours, money, what went wrong, what was put right. The narrative already has the lines.</summary>
+    private static void AppendTripSummary(StringBuilder sb, TripResultView t, IReadOnlyList<string> narrative)
+    {
+        bool Said(string text) => narrative.Any(n => n.Contains(text, StringComparison.OrdinalIgnoreCase));
+        var hours = (t.Minutes + 59) / 60;
+        var how = t.Towed ? "Towed to" : t.TurnedBack ? "Turned back to" : "Arrived at";
+        sb.AppendLine($"  {how} {t.Destination}: {hours} {(hours == 1 ? "hour" : "hours")} since casting off, {t.MoneySpentNok} NOK spent.");
+        var failures = t.Failures.Where(f => !Said(f)).ToList();
+        var fixes = t.Fixes.Where(f => !Said(f)).ToList();
+        if (t.Failures.Count == 0) sb.AppendLine("  Trouble on the way: none.");
+        else if (failures.Count > 0) sb.AppendLine("  Trouble on the way: " + string.Join(" ", failures));
+        else sb.AppendLine($"  Trouble on the way: {t.Failures.Count} {(t.Failures.Count == 1 ? "alarm" : "alarms")}, noted in the logbook.");
+        if (t.Fixes.Count == 0) sb.AppendLine("  Put right at sea: nothing.");
+        else if (fixes.Count > 0) sb.AppendLine("  Put right at sea: " + string.Join(" ", fixes));
+    }
+
+    /// <summary>The plan for a trip: route, estimate, forecast, readiness against it, spares, shelter, money.</summary>
+    public static string TripPlan(TripPlanView v)
+    {
+        var sb = new StringBuilder();
+        foreach (var b in v.Blockers) sb.AppendLine($"Can't go yet: {b}");
+        if (v.DistanceNm <= 0 && string.IsNullOrEmpty(v.To)) return sb.ToString();
+        sb.AppendLine($"{v.From} to {v.To}: {v.DistanceNm:0.#} nm on a course of {v.CourseDeg} degrees. Leaving day {v.DepartDay}.");
+        sb.AppendLine(v.Estimate);
+        foreach (var d in v.Forecast)
+            sb.AppendLine(d.Known
+                ? $"  Day {d.Day}: {d.Text}{(d.WindServes ? " The wind would serve under sail." : "")}"
+                : $"  Day {d.Day}: {d.Text}");
+        sb.AppendLine("Readiness for this trip:");
+        if (v.Risks.Count == 0) sb.AppendLine("  No known problems that matter at sea.");
+        foreach (var r in v.Risks)
+        {
+            var spare = r.Spare is null ? "no spare answers it"
+                : r.SpareAboard ? $"spare aboard: {r.Spare}" : $"no spare aboard ({r.Spare})";
+            sb.AppendLine($"  {r.Problem} ({r.Component}): {r.AtSea} [{spare}]");
+        }
+        sb.AppendLine(v.SparesAboard.Count == 0 ? "Spares aboard: none." : "Spares aboard: " + string.Join(", ", v.SparesAboard) + ".");
+        if (v.SparesMissing.Count > 0)
+            sb.AppendLine("Spares you don't have for the known problems: " + string.Join(", ", v.SparesMissing) + ".");
+        if (v.Shelter.Count > 0) sb.AppendLine("Shelter on the way: " + string.Join(", ", v.Shelter) + ".");
+        sb.AppendLine($"Money: {v.BalanceNok} NOK. If it goes wrong, a tow costs {v.TowNok} NOK.");
+        return sb.ToString();
+    }
+
+    /// <summary>What is aboard, and what the chandlery sells where she lies.</summary>
+    public static string Inventory(InventoryView v)
+    {
+        var sb = new StringBuilder();
+        if (v.Aboard.Count == 0) sb.AppendLine("Aboard: nothing in the way of spares or tools.");
+        else
+        {
+            sb.AppendLine("Aboard:");
+            foreach (var l in v.Aboard) sb.AppendLine(l.Tool ? $"  {l.Name} (tool)" : $"  {l.Name} x{l.Count}");
+        }
+        if (v.Shop is null) sb.AppendLine("Nothing for sale out here.");
+        else
+        {
+            sb.AppendLine($"For sale at {v.Shop}:");
+            foreach (var l in v.ForSale) sb.AppendLine($"  {l.Name}: {l.PriceNok} NOK, {Duration(l.Minutes)}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Where she is on the passage: the view's own text, plus the numbers when at sea.</summary>
+    public static string TripState(TripView v)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(v.Text);
+        if (v.AtSea)
+        {
+            sb.AppendLine($"{v.PositionNm:0.#} nm out from {v.From}, {v.RemainingNm:0.#} nm to {v.To}. {(v.Mode is null ? "" : char.ToUpperInvariant(v.Mode[0]) + v.Mode[1..])} " +
+                          $"in hour {v.Hours}.");
+            if (v.NearestShelter is not null) sb.AppendLine($"Nearest shelter: {v.NearestShelter}.{(v.CanAnchor ? " You could anchor." : "")}");
         }
         return sb.ToString();
     }

@@ -37,6 +37,8 @@ public sealed record NoticesView(IReadOnlyList<Alert> Alerts) : QueryResult;
 [JsonDerivedType(typeof(RepairView), "repair-view")]
 [JsonDerivedType(typeof(LaunchView), "launch-view")]
 [JsonDerivedType(typeof(LossView), "loss-view")]
+[JsonDerivedType(typeof(LegView), "leg-view")]
+[JsonDerivedType(typeof(TripResultView), "trip-result-view")]
 public abstract record Observation;
 
 /// <summary>
@@ -87,6 +89,9 @@ public sealed record LossView(
 [JsonDerivedType(typeof(ReadinessView), "readiness-view")]
 [JsonDerivedType(typeof(WeatherView), "weather-view")]
 [JsonDerivedType(typeof(NoticesView), "notices-view")]
+[JsonDerivedType(typeof(InventoryView), "inventory-view")]
+[JsonDerivedType(typeof(TripPlanView), "trip-plan-view")]
+[JsonDerivedType(typeof(TripView), "trip-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -108,7 +113,9 @@ public sealed record StatusView(
     bool Afloat = false,
     string? Weather = null,
     bool Sunk = false,
-    IReadOnlyList<Alert>? Notices = null) : QueryResult;
+    IReadOnlyList<Alert>? Notices = null,
+    string? Port = null,
+    bool AtSea = false) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 /// <summary>Document: set when the entry is a document the player can read again (e.g. "survey report").</summary>
@@ -190,3 +197,50 @@ public sealed record InvestigateItem(string Component, string Note);
 public sealed record ReadinessView(
     int Day, int LaunchDeadlineDay, int DaysToDeadline, int BalanceNok, bool Launched,
     IReadOnlyList<ReadinessItem> Open, IReadOnlyList<InvestigateItem> ToInvestigate, IReadOnlyList<string> Fixed, bool Afloat = false, int EmergencyLiftNok = 0) : QueryResult;
+
+/// <summary>One thing aboard. Tool: kept for good (the remote start button); otherwise a spare, Count of them.</summary>
+public sealed record InventoryLine(string Name, int Count, bool Tool);
+
+/// <summary>One thing the chandlery sells, with its price and the walking time.</summary>
+public sealed record ShopLine(string Name, int PriceNok, int Minutes);
+
+/// <summary>Aboard: what you carry. Shop: the chandlery in this port (null at sea, where ForSale is empty).</summary>
+public sealed record InventoryView(IReadOnlyList<InventoryLine> Aboard, string? Shop, IReadOnlyList<ShopLine> ForSale) : QueryResult;
+
+/// <summary>One day of the forecast. Known false beyond the forecast's reach ("No forecast that far out."): the numbers are then empty.</summary>
+public sealed record ForecastDay(int Day, bool Known, string Text, int WindForce, string WindFrom, bool Rain, bool WindServes);
+
+/// <summary>A known problem and what it means at sea. Spare: the chandlery item that answers it (null: none); SpareAboard: you have one.</summary>
+public sealed record TripRisk(string Problem, string Component, string AtSea, string? Spare, bool SpareAboard);
+
+/// <summary>
+/// The plan for a trip. Blockers: plain words for why Depart would be refused now (empty: you could go).
+/// SparesMissing: the spares the risks name that are not aboard. SailHours null: the wind will not serve, or no forecast.
+/// </summary>
+public sealed record TripPlanView(
+    string From, string To, double DistanceNm, int CourseDeg, int DepartDay, double MotorHours, double? SailHours, string Estimate,
+    IReadOnlyList<ForecastDay> Forecast, IReadOnlyList<TripRisk> Risks, IReadOnlyList<string> SparesAboard,
+    IReadOnlyList<string> SparesMissing, IReadOnlyList<string> Shelter, int BalanceNok, int TowNok,
+    IReadOnlyList<string> Blockers) : QueryResult;
+
+/// <summary>
+/// Where she is on the passage. At a port: AtSea false, Port set, the rest empty. At sea: From and To are port names, PositionNm is the
+/// net distance made good from From (drift already taken off), RemainingNm what is left to To, Mode in the game's words ("under engine",
+/// "under sail", "hove-to", "at anchor", "drifting", "under tow"), Hours the hour in progress since she cast off. CanAnchor: shelter is within
+/// reach; NearestShelter the nearest place to anchor, in words. WindServes: the wind would carry her under sail on this course now.
+/// </summary>
+public sealed record TripView(
+    bool AtSea, string? Port, string? From, string? To, double PositionNm, double RemainingNm, string? Mode, int Hours,
+    bool CanAnchor, string? NearestShelter, bool WindServes, string Text) : QueryResult;
+
+/// <summary>The observation after an hour (or part of one) at sea: Continue, Motor, Sail. Text is the hour line, also in the narrative and the logbook.</summary>
+public sealed record LegView(
+    int Hour, string Mode, double PositionNm, double RemainingNm, int WindForce, string WindFrom, int SeaState, string Text) : Observation;
+
+/// <summary>
+/// The card at the end of a passage: arrival, arrival back home after turning back, or a tow. Destination is the port she ended at.
+/// Failures are what the boat told you on the way (alerts); Fixes what you put right at sea; Log the logbook entries of the passage.
+/// </summary>
+public sealed record TripResultView(
+    string Destination, bool Towed, bool TurnedBack, int Minutes, int MoneySpentNok,
+    IReadOnlyList<string> Failures, IReadOnlyList<string> Fixes, IReadOnlyList<LogEntry> Log, IReadOnlyList<string> Lines) : Observation;

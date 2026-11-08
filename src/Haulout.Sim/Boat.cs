@@ -39,8 +39,13 @@ public sealed class Boat
         string name, IEnumerable<Place> places, IEnumerable<Cover> covers,
         IEnumerable<Position> positions, IEnumerable<Component> components,
         Economy? economy = null, SurveyData? survey = null, DiyQuality? diyQuality = null, Rates? rates = null,
-        WaterRules? water = null, ElectricalRules? electrical = null, InsuranceRules? insurance = null)
+        WaterRules? water = null, ElectricalRules? electrical = null, InsuranceRules? insurance = null,
+        IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null)
     {
+        Chandlery = (chandlery ?? []).ToList();
+        Trips = trips;
+        SeaRules = seaRules ?? SeaRules.Default;
+        ForecastRules = forecastRules ?? ForecastRules.Default;
         Rates = rates ?? Rates.Default;
         Water = water ?? WaterRules.Default;
         Electrical = electrical ?? ElectricalRules.Default;
@@ -102,6 +107,12 @@ public sealed class Boat
     public WaterRules Water { get; }
     public ElectricalRules Electrical { get; }
     public InsuranceRules Insurance { get; }
+    /// <summary>What the chandlery sells, in every port. Empty: nothing for sale.</summary>
+    public IReadOnlyList<ChandleryItem> Chandlery { get; }
+    /// <summary>Ports and routes. Null: this boat has nowhere to go.</summary>
+    public TripRules? Trips { get; }
+    public SeaRules SeaRules { get; }
+    public ForecastRules ForecastRules { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }
     /// <summary>Null: no poor-job rule.</summary>

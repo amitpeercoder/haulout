@@ -43,7 +43,7 @@ internal sealed class WaterSystem
     public double PumpRunMinutes => _boat.TryGet(PumpId, out var p) ? p.State.GetValueOrDefault(RunMinutesState) : 0;
 
     /// <summary>What a step needs to know of the world. RainMm is the day's rain; the step takes its share of 24 hours.</summary>
-    public readonly record struct Inputs(int Minutes, bool Afloat, double RainMm, bool HatchOpen, bool FuseIn);
+    public readonly record struct Inputs(int Minutes, bool Afloat, double RainMm, bool HatchOpen, bool FuseIn, int SeaState = 0);
 
     /// <summary>The pump has current: its fuse is in and the battery is above the floor.</summary>
     public bool PumpPowered(bool fuseIn) =>
@@ -63,6 +63,11 @@ internal sealed class WaterSystem
             if (input.Afloat) sea += Math.Max(0, Properties.Effective(_boat, id, LeakProperty, 0));
             perMm += Math.Max(0, Properties.Effective(_boat, id, RainProperty, 0));
         }
+        // Under way (design note 007): the sea slops at every leak, and spray finds the open hatch.
+        var seaRules = _boat.SeaRules;
+        sea *= 1 + seaRules.SlopPerSeaState * input.SeaState;
+        if (input.Afloat && input.HatchOpen && input.SeaState >= seaRules.SprayFromSeaState)
+            sea += seaRules.SprayLitresPerHourPerSeaState * input.SeaState;
         double rate = (sea * hours + perMm * input.RainMm * hours / 24.0) / minutes;
 
         // The pump, with its float switch: on at onLitres, off at offLitres.

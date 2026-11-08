@@ -1,25 +1,13 @@
 namespace Haulout.Sim.Play;
 
-/// <summary>One thing the yard chandlery sells. Data, not logic.</summary>
-public sealed record ShopItem(string Name, string[] Aliases, int CostNok, int Minutes, string LogText);
-
-/// <summary>The yard chandlery's catalogue. Placeholder prices and walking time (design note 001, decision 7).</summary>
+/// <summary>
+/// The chandlery's catalogue is data (<see cref="Boat.Chandlery"/>); this holds only the names the facade itself needs.
+/// </summary>
 public static class Shop
 {
+    /// <summary>The tool's name, as the player sees it in the chandlery and in Status.Tools.</summary>
     public const string RemoteStartButton = "remote start button";
 
-    public static readonly IReadOnlyList<ShopItem> Catalogue =
-    [
-        new(RemoteStartButton, ["remote start", "remote", "button"], 400, 30, "Bought a remote start button."),
-    ];
-
-    public static ShopItem? Find(string name)
-    {
-        var n = name.Trim().ToLowerInvariant();
-        if (n.StartsWith("a ")) n = n[2..];
-        else if (n.StartsWith("the ")) n = n[4..];
-        return Catalogue.FirstOrDefault(i =>
-            i.Name.Equals(n, StringComparison.OrdinalIgnoreCase)
-            || i.Aliases.Any(a => a.Equals(n, StringComparison.OrdinalIgnoreCase)));
-    }
+    /// <summary>The same item's id in the data.</summary>
+    internal const string RemoteStartButtonId = "remote-start-button";
 }

@@ -45,10 +45,13 @@ public sealed partial class Game
                 _workMinutesToday += step;
                 if (_running) _engineMinutesToday += step;
             }
+            bool atSea = AtSea;
+            if (atSea) SeaBefore(step);
             SystemsStep(step);
             if (_sunk) return; // she is on the bottom: the rest of the time does not pass
             Spawn(aboard);
-            if (aboard) PresentAlerts(step);
+            if (atSea) SeaAfter(step);
+            if (aboard) PresentAlerts(step, atSea);
             if (aboard)
             {
                 _water.CyclesSinceAboard = 0;

@@ -27,6 +27,14 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(EmergencyLift), "emergency-lift")]
 [JsonDerivedType(typeof(PumpBilge), "pump-bilge")]
 [JsonDerivedType(typeof(StopEngine), "stop-engine")]
+[JsonDerivedType(typeof(Depart), "depart")]
+[JsonDerivedType(typeof(Continue), "continue")]
+[JsonDerivedType(typeof(Motor), "motor")]
+[JsonDerivedType(typeof(Sail), "sail")]
+[JsonDerivedType(typeof(HeaveTo), "heave-to")]
+[JsonDerivedType(typeof(Anchor), "anchor")]
+[JsonDerivedType(typeof(TurnBack), "turn-back")]
+[JsonDerivedType(typeof(CallTow), "call-tow")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -67,6 +75,25 @@ public sealed record EmergencyLift() : Command;
 /// <summary>Work the manual bilge pump from the cockpit: 15 minutes, up to 150 litres out.</summary>
 public sealed record PumpBilge() : Command;
 
+/// <summary>
+/// Cast off for another port, the engine running, from the cockpit (design note 007). Destination null: the one route out of this port.
+/// </summary>
+public sealed record Depart(string? Destination = null) : Command;
+/// <summary>At sea, from the cockpit: another hour in the mode she is in.</summary>
+public sealed record Continue() : Command;
+/// <summary>At sea, from the cockpit, engine running: under engine, then an hour.</summary>
+public sealed record Motor() : Command;
+/// <summary>At sea, from the cockpit, wind serving: under sail, then an hour.</summary>
+public sealed record Sail() : Command;
+/// <summary>At sea: stop her where she is so you can work on the boat. She drifts.</summary>
+public sealed record HeaveTo() : Command;
+/// <summary>At sea, within a mile of shelter (a port or a named anchorage): let the anchor go.</summary>
+public sealed record Anchor() : Command;
+/// <summary>At sea: give up the passage and head back to the port she left. Once.</summary>
+public sealed record TurnBack() : Command;
+/// <summary>At sea, anywhere: call the towboat. Costs the tow and the best part of a day; ends the trip at the port she left.</summary>
+public sealed record CallTow() : Command;
+
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(Briefing), "briefing")]
@@ -79,6 +106,9 @@ public sealed record PumpBilge() : Command;
 [JsonDerivedType(typeof(Readiness), "readiness")]
 [JsonDerivedType(typeof(Weather), "weather")]
 [JsonDerivedType(typeof(Notices), "notices")]
+[JsonDerivedType(typeof(Inventory), "inventory")]
+[JsonDerivedType(typeof(PlanTrip), "plan-trip")]
+[JsonDerivedType(typeof(Trip), "trip")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -97,3 +127,13 @@ public sealed record Readiness() : Query;
 public sealed record Weather() : Query;
 /// <summary>What the boat has told you since you last asked: the unread alerts, which it then marks read. Costs no time.</summary>
 public sealed record Notices() : Query;
+/// <summary>What is aboard (tools and spares) and, in port, what the chandlery sells. Costs no time.</summary>
+public sealed record Inventory() : Query;
+/// <summary>
+/// The plan for a trip: distance, hours, the forecast for the window, the known problems that matter at sea, the spares aboard.
+/// Destination null: the one route out of this port. DepartDay null: today. Costs no time.
+/// </summary>
+public sealed record PlanTrip(string? Destination = null, int? DepartDay = null) : Query;
+
+/// <summary>Where she is on the passage: at a port, or at sea with the position, the mode and the nearest shelter. Costs no time.</summary>
+public sealed record Trip() : Query;

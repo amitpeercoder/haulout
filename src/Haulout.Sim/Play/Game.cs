@@ -46,7 +46,6 @@ public sealed partial class Game
     private bool _running;
     private bool _finished;
     private bool _measureNoted;
-    private readonly List<string> _tools = [];
     private StartOutcome? _lastStart;
 
     /// <summary>The player-luck stream (poor jobs).</summary>
@@ -59,6 +58,8 @@ public sealed partial class Game
     public Game(Boat boat, int startDay = 75, IRandom? random = null, int worldSeed = DefaultSeed, WeatherSeries? weather = null)
     {
         _weather = weather ?? WeatherSeries.Generate(worldSeed);
+        _worldSeed = worldSeed;
+        _portId = boat?.Trips?.Home ?? "";
         _boat = boat ?? throw new ArgumentNullException(nameof(boat));
         _startDay = startDay;
         _random = random ?? new SeededRandom(DefaultSeed);
@@ -97,9 +98,9 @@ public sealed partial class Game
                 $"The yard has her down for launch on day {_boat.Economy.LaunchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
             ]),
             Status => new StatusView(
-                Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true } || Superseded(FaultById(k.Id)!)).ToList(), _tools.ToList(), CurrentPlace.Name,
+                Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true } || Superseded(FaultById(k.Id)!)).ToList(), ToolNames(), CurrentPlace.Name,
                 Balance, _boat.Economy.LaunchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today), _sunk,
-                UnreadAlerts()),
+                UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea),
             Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
             Weather => TodayView(),
             Notices => new NoticesView(TakeUnread()),
@@ -108,6 +109,9 @@ public sealed partial class Game
             ComponentActions q => ActionsFor(q.Component),
             SurveyReport => SurveyReportSnapshot(),
             Readiness => ReadinessSnapshot(),
+            Inventory => InventorySnapshot(),
+            PlanTrip q => PlanTripSnapshot(q.Destination, q.DepartDay),
+            Trip => TripSnapshot(),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -125,7 +129,18 @@ public sealed partial class Game
         new("stop", null, "Pull the stop and shut the engine down (1 min)"),
         new("clean", "component", "Clean and tighten a part"),
         new("replace", "component", "Fit a new part"),
-        new("buy", "item", "Buy a tool at the yard chandlery"),
+        new("buy", "item", "Buy a tool or a spare at the chandlery"),
+        new("inventory", null, "See what is aboard and what the chandlery sells"),
+        new("plan trip", "destination", "Plan a trip: distance, hours, the forecast, what could go wrong and what you carry"),
+        new("depart", "destination", "Cast off for another port (engine running, from the cockpit)"),
+        new("continue", null, "At sea: another hour as you are"),
+        new("motor", null, "At sea: under engine, then an hour"),
+        new("sail", null, "At sea: under sail if the wind serves, then an hour"),
+        new("heave to", null, "At sea: stop her where she is so you can work on the boat"),
+        new("anchor", null, "At sea, near shelter: let the anchor go"),
+        new("turn back", null, "At sea: give up the passage and head for the port you left"),
+        new("call tow", null, "At sea: call the towboat (costs money and the best part of a day)"),
+        new("trip", null, "Where you are on the passage"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
         new("order survey", null, "Hire the surveyor to go over her (costs money and a day)"),
         new("read survey", null, "Read the surveyor's report"),
@@ -183,7 +198,7 @@ public sealed partial class Game
         var r = NameResolver.Resolve(seen, name, c => c.Id, c => c.Name, c => c.Aliases);
         if (r.Match is not { } c) return new ComponentActionsView(name, false, null, []);
 
-        bool hasButton = _tools.Contains(Shop.RemoteStartButton);
+        bool hasButton = OwnsButton;
         string? sight = _reach.Refusal(c, _placeId, false);
         string? touch = _reach.Refusal(c, _placeId, true);
         var options = new List<ActionOption>();
@@ -194,17 +209,22 @@ public sealed partial class Game
 
         if (c.RemovablePart is { } part)
             Add("uncover", $"Pull back the {part.Name}",
-                touch ?? (_uncovered.Contains(c.Id) ? AlreadyUncovered(part) : null), 2, 0);
+                SeaWorkRefusal() ?? touch ?? (_uncovered.Contains(c.Id) ? AlreadyUncovered(part) : null), 2, 0);
 
         if (c.Id == "start-battery" || c.Id == "glow-plugs")
-            Add("measure", "Measure", touch, 10, 0);
+            Add("measure", "Measure", SeaWorkRefusal() ?? touch, 10, 0);
         else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
-            Add("measure", "Measure", touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
+            Add("measure", "Measure", SeaWorkRefusal() ?? touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
 
-        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", AfloatRefusal(c) ?? touch ?? WetRefusal(c), 30, 0);
+        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", SeaWorkRefusal() ?? AfloatRefusal(c) ?? touch ?? WetRefusal(c), 30, 0);
         if (c.ReplaceCostNok > 0)
-            Add("replace", "Replace", AfloatRefusal(c) ?? touch ?? WetRefusal(c) ?? MoneyRefusal(c.ReplaceCostNok), c.ReplaceMinutes, c.ReplaceCostNok);
-        if (c.Id == "start-battery") Add("charge", "Charge", touch, 480, 0);
+        {
+            bool spare = SpareFor(c.Id) is not null;
+            Add("replace", "Replace",
+                ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? (spare ? null : MoneyRefusal(c.ReplaceCostNok)),
+                c.ReplaceMinutes, spare ? 0 : c.ReplaceCostNok);
+        }
+        if (c.Id == "start-battery") Add("charge", "Charge", YardGate() ?? touch, 480, 0);
         if (c.Id == "primary-filter") Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
         if (RawWaterParts.Contains(c.Id))
             Add("check-raw-water-flow", "Check flow",
@@ -251,6 +271,14 @@ public sealed partial class Game
             EmergencyLift => DoEmergencyLift(turn),
             PumpBilge => DoPumpBilge(turn),
             StopEngine => DoStopEngine(turn),
+            Depart c => DoDepart(turn, c.Destination),
+            Continue => DoContinue(turn),
+            Motor => DoMotor(turn),
+            Sail => DoSail(turn),
+            HeaveTo => DoHeaveTo(turn),
+            Anchor => DoAnchor(turn),
+            TurnBack => DoTurnBack(turn),
+            CallTow => DoCallTow(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -394,11 +422,11 @@ public sealed partial class Game
 
     private CommandResult DoMeasure(Turn t, string name)
     {
-        if (!ResolveComponent("measure", name, needTouch: true, out var c, out var rejected)) return rejected!;
+        if (!ResolveComponent("measure", name, needTouch: true, out var c, out var rejected, pre: _ => SeaWorkRefusal())) return rejected!;
 
         var inputs = EngineInputsBuilder.Build(_boat);
         var reading = EngineModel.Attempt(inputs).Electrical;
-        bool hasButton = _tools.Contains(Shop.RemoteStartButton);
+        bool hasButton = OwnsButton;
         bool needsCranking = c.Id == EngineInputsBuilder.StarterId || reading.DropVolts.ContainsKey(c.Id);
         if (needsCranking && !hasButton) return Reject("measure", NeedButtonMessage);
         var ci = CultureInfo.InvariantCulture;
@@ -498,7 +526,7 @@ public sealed partial class Game
 
     private CommandResult DoUncover(Turn t, string name)
     {
-        if (!ResolveComponent("uncover", name, needTouch: true, out var c, out var rejected)) return rejected!;
+        if (!ResolveComponent("uncover", name, needTouch: true, out var c, out var rejected, pre: _ => SeaWorkRefusal())) return rejected!;
         if (c.RemovablePart is not { } part) return Reject("uncover", $"There's nothing to pull back on the {c.Name.ToLowerInvariant()}.");
         if (!_uncovered.Add(c.Id)) return Reject("uncover", AlreadyUncovered(part));
 
@@ -510,7 +538,7 @@ public sealed partial class Game
     private CommandResult DoClean(Turn t, string name)
     {
         if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected,
-                pre: x => x.Cleanable || CanRedoByClean(x) ? AfloatRefusal(x) : null)) return rejected!;
+                pre: x => SeaWorkRefusal() ?? (x.Cleanable || CanRedoByClean(x) ? AfloatRefusal(x) : null))) return rejected!;
         if (!c.Cleanable && !CanRedoByClean(c)) return Reject("clean", "Nothing to clean there.");
         if (WetRefusal(c) is { } wet) return Reject("clean", wet);
 
@@ -546,14 +574,21 @@ public sealed partial class Game
     private CommandResult DoReplace(Turn t, string name)
     {
         if (!ResolveComponent("replace", name, needTouch: true, out var c, out var rejected,
-                pre: x => x.ReplaceCostNok > 0 ? AfloatRefusal(x) : null)) return rejected!;
+                pre: x => x.ReplaceCostNok > 0 ? ReplaceGate(x) : null)) return rejected!;
         if (c.ReplaceCostNok <= 0) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
         if (WetRefusal(c) is { } wet) return Reject("replace", wet);
-        if (MoneyRefusal(c.ReplaceCostNok) is { } broke) return Reject("replace", broke);
+        var spare = SpareFor(c.Id);
+        int cost = spare is null ? c.ReplaceCostNok : 0;
+        if (spare is null && MoneyRefusal(cost) is { } broke) return Reject("replace", broke);
 
         ShutDownEngine(t);
         c.Replace();
         _uncovered.Remove(c.Id);
+        if (spare is not null)
+        {
+            ConsumeSpare(spare);
+            t.Narrative.Add($"You take the spare {spare.Name} from the spares aboard.");
+        }
         var text = c.ReplaceText ?? $"You fit a new {c.Name.ToLowerInvariant()}.";
         t.Narrative.Add(text);
         if (c.Id == "primary-filter" && FixDrainedWater() is { } runsClean)
@@ -562,12 +597,13 @@ public sealed partial class Game
             text += " " + runsClean;
         }
         MaybePoorJob(c);
-        return Accept(t, "replace", c.ReplaceMinutes, c.ReplaceCostNok, new RepairView(c.Name, text),
-            $"Replaced the {c.Name.ToLowerInvariant()}.");
+        return Accept(t, "replace", c.ReplaceMinutes, cost, new RepairView(c.Name, text),
+            spare is null ? $"Replaced the {c.Name.ToLowerInvariant()}." : $"Replaced the {c.Name.ToLowerInvariant()} from the spares aboard.");
     }
 
     private CommandResult DoCharge(Turn t, string name)
     {
+        if (YardGate() is { } away) return Reject("charge", away);
         if (!ResolveComponent("charge", name, needTouch: true, out var c, out var rejected)) return rejected!;
         if (c.Id != "start-battery") return Reject("charge", "Only a battery takes a charge.");
 
@@ -581,19 +617,6 @@ public sealed partial class Game
 
     private const string NeedButtonMessage =
         "You can't crank and hold the probes at once. A remote start button from the chandlery would let you.";
-
-    private CommandResult DoBuy(Turn t, string item)
-    {
-        var shopItem = Shop.Find(item);
-        if (shopItem is null) return Reject("buy", $"The chandlery doesn't have '{item.Trim()}'.");
-        if (_tools.Contains(shopItem.Name)) return Reject("buy", "You already have one.");
-
-        if (MoneyRefusal(shopItem.CostNok) is { } broke) return Reject("buy", broke);
-
-        _tools.Add(shopItem.Name);
-        t.Narrative.Add($"You walk over to the yard chandlery and buy a {shopItem.Name}.");
-        return Accept(t, "buy", shopItem.Minutes, shopItem.CostNok, null, shopItem.LogText);
-    }
 
     private CommandResult DoCheckFilterBowl(Turn t)
     {
@@ -713,21 +736,37 @@ public sealed partial class Game
     private CommandResult Reject(string action, string message) =>
         new(false, action, [message], 0, 0, null, [], _running, _finished, []);
 
-    private CommandResult Accept(Turn t, string action, int minutes, int costNok, Observation? obs, string logText, bool work = true)
+    /// <summary>
+    /// Logs the command (a null <paramref name="logText"/> logs nothing: the leg commands write their own line), passes the time, and builds the result.
+    /// <paramref name="afterTick"/> runs once the time has passed and may add to the narrative and the logbook; its observation is used
+    /// unless she sank (the loss card) or the passage ended (the trip card).
+    /// </summary>
+    private CommandResult Accept(Turn t, string action, int minutes, int costNok, Observation? obs, string? logText, bool work = true,
+        Func<Observation?>? afterTick = null)
     {
         var stamp = TimeOfDay;
         int day = Day;
-        _log.Add(new LogEntry(day, stamp, logText, costNok));
+        if (logText is not null)
+        {
+            _log.Add(new LogEntry(day, stamp, logText, costNok));
+            if (_passage is not null && action is "clean" or "replace") _passage?.Fixes.Add(logText);
+        }
         LogFound(t, 0, day, stamp);
         _money += costNok;
         int before = ClockMinutes;
         Tick(t, minutes, work);
+        if (afterTick is not null) obs = afterTick();
         if (_sunk)
         {
             // She went down while the time passed: the card is the result, and the rest of the time does not pass.
             minutes = ClockMinutes - before;
             obs = _loss;
             t.Narrative.AddRange(_loss!.Lines);
+        }
+        else if (_arrived is { } arrived)
+        {
+            _arrived = null;
+            obs = FinishArrival(t, arrived);
         }
         return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished, TakeUnread());
     }

@@ -92,3 +92,112 @@ public sealed record InsuranceRules(int ValueNok, double PayoutFraction)
     public static InsuranceRules Default { get; } = new(180000, 0.6);
     public int PayoutNok => (int)Math.Round(ValueNok * PayoutFraction);
 }
+
+/// <summary>
+/// One thing the chandlery sells. Tool: bought once and kept (the remote start button). Otherwise a spare that stacks.
+/// ForComponent: the component id a spare is used to replace. Fuses and hose have none (no component takes them yet).
+/// </summary>
+public sealed record ChandleryItem
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public IReadOnlyList<string> Aliases { get; init; } = [];
+    public int PriceNok { get; init; }
+    public int Minutes { get; init; } = 15;
+    public bool Tool { get; init; }
+    public string? ForComponent { get; init; }
+    public string? LogText { get; init; }
+}
+
+/// <summary>A place she can lie. Yard: the yard (repairs, survey, shore power, the crane) is here. ShopName: where Buy happens.</summary>
+public sealed record Port
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public IReadOnlyList<string> Aliases { get; init; } = [];
+    public bool Yard { get; init; }
+    public string ShopName { get; init; } = "the chandlery";
+    public IReadOnlyList<string> ArrivalLines { get; init; } = [];
+}
+
+/// <summary>A place to get out of the weather, AtNm along the route from its From port.</summary>
+public sealed record Shelter
+{
+    public string Name { get; init; } = "";
+    public double AtNm { get; init; }
+}
+
+/// <summary>A passage from one port to another. The way back is the same route reversed (see <see cref="Reversed"/>).</summary>
+public sealed record Route
+{
+    public string From { get; init; } = "";
+    public string To { get; init; } = "";
+    public double DistanceNm { get; init; }
+    public int CourseDeg { get; init; }
+    public IReadOnlyList<Shelter> Shelter { get; init; } = [];
+
+    /// <summary>The way back: course + 180, shelters at distance - atNm (nearest the new start first).</summary>
+    public Route Reversed() => this with
+    {
+        From = To, To = From, CourseDeg = (CourseDeg + 180) % 360,
+        Shelter = Shelter.Select(s => new Shelter { Name = s.Name, AtNm = DistanceNm - s.AtNm }).OrderBy(s => s.AtNm).ToList(),
+    };
+}
+
+/// <summary>What a tow costs: money, hours aboard on the way, hours lost on top. PLACEHOLDERS.</summary>
+public sealed record TowRules
+{
+    public int Nok { get; init; } = 6000;
+    public int Hours { get; init; } = 6;
+    public int LostHours { get; init; } = 18;
+}
+
+/// <summary>The ports and routes of the slice. Home: the port id she starts at.</summary>
+public sealed record TripRules(string Home, IReadOnlyList<Port> Ports, IReadOnlyList<Route> Routes, TowRules Tow)
+{
+    public Port? FindPort(string id) => Ports.FirstOrDefault(p => p.Id == id);
+
+    /// <summary>Routes out of a port: the data routes from it, and each route to it, reversed.</summary>
+    public IEnumerable<Route> RoutesFrom(string portId) =>
+        Routes.Where(r => r.From == portId).Concat(Routes.Where(r => r.To == portId).Select(r => r.Reversed()));
+}
+
+/// <summary>Speed, sea state and the load of a passage (design note 007). All PLACEHOLDERS for Amit.</summary>
+public sealed record SeaRules
+{
+    public IReadOnlyList<int> StateByForce { get; init; } = [0, 1, 1, 2, 3, 4, 5, 6, 7, 8];
+    public IReadOnlyList<string> StateWords { get; init; } =
+        ["flat calm", "a ripple", "small wavelets", "a short chop", "moderate waves", "rough water, whitecaps everywhere", "a rough sea", "a very rough sea", "a high sea"];
+    public double MotorKnots { get; init; } = 5;
+    public int SailMinForce { get; init; } = 3;
+    public int SailMaxForce { get; init; } = 5;
+    public IReadOnlyList<double> SailKnots { get; init; } = [0, 0, 0, 4.0, 5.0, 5.5];
+    public int NoGoDeg { get; init; } = 45;
+    public double HeaveToDriftKnots { get; init; } = 0.5;
+    public double AnchorWithinNm { get; init; } = 1;
+    public double TowKnots { get; init; } = 3;
+    public double SlopPerSeaState { get; init; } = 0.5;
+    public int SprayFromSeaState { get; init; } = 2;
+    public double SprayLitresPerHourPerSeaState { get; init; } = 2;
+    public int StirFromSeaState { get; init; } = 3;
+    public int StirHoursToBite { get; init; } = 2;
+    public double ImpellerShedPerLoadHour { get; init; } = 0.3;
+    public int OverheatStopMinutes { get; init; } = 90;
+    public double UnderWayDrawPerHour { get; init; } = 0.05;
+    public int DepartMinutes { get; init; } = 10;
+    public int HeaveToMinutes { get; init; } = 5;
+    public int AnchorMinutes { get; init; } = 15;
+    public int TurnBackMinutes { get; init; } = 2;
+
+    public static SeaRules Default { get; } = new();
+}
+
+/// <summary>How far ahead the forecast sees and how often it is wrong, by lead in days (index 0 = today). PLACEHOLDERS.</summary>
+public sealed record ForecastRules
+{
+    public int MaxLeadDays { get; init; } = 3;
+    public IReadOnlyList<double> ForceErrorChance { get; init; } = [0, 0.3, 0.5, 0.7];
+    public IReadOnlyList<double> RainFlipChance { get; init; } = [0, 0.1, 0.2, 0.3];
+
+    public static ForecastRules Default { get; } = new();
+}

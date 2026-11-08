@@ -9,6 +9,12 @@ namespace Haulout.Sim.Play;
 internal static class EngineInputsBuilder
 {
     public const string StarterId = "starter-motor";
+    public const string ImpellerId = "impeller";
+    public const string VaneFactorProperty = "vaneFactor";
+    public const string PrimaryFilterId = "primary-filter";
+    public const string WaterMinutesProperty = "waterMinutes";
+    /// <summary>The fuel restriction of water that has reached the filter: past fires-and-dies, so the engine will not stay running.</summary>
+    public const double WaterRestriction = 0.9;
 
     public static readonly string[] LoopOrder =
     [
@@ -53,6 +59,11 @@ internal static class EngineInputsBuilder
             .Where(f => f.Effect.Kind == FaultEffectKind.FuelRestriction)
             .Select(f => f.Effect.Value).DefaultIfEmpty(0.0).Max();
 
+        // Stirred-up water from the tank has reached the primary filter (design note 007).
+        if (boat.TryGet(PrimaryFilterId, out _)
+            && Properties.Effective(boat, PrimaryFilterId, WaterMinutesProperty, 0) >= boat.SeaRules.StirHoursToBite * 60)
+            restriction = Math.Max(restriction, WaterRestriction);
+
         var glow = boat.Get("glow-plugs");
         var fuel = new FuelInputs(
             fuelAvailable, restriction,
@@ -62,6 +73,7 @@ internal static class EngineInputsBuilder
         double flow = boat.Get("raw-water-seacock").Properties.GetValueOrDefault("open") == 1 ? 1.0 : 0.0;
         foreach (var f in activeFaults.Where(f => f.Effect.Kind == FaultEffectKind.RawWaterFlowFactor))
             flow *= f.Effect.Value;
+        flow *= Properties.Effective(boat, ImpellerId, VaneFactorProperty, 1.0); // vanes shed under load at sea
 
         return new EngineInputs(electrical, fuel, new CoolingInputs(flow));
     }

@@ -58,7 +58,8 @@ public static class BoatLoader
                 f.Escalation is { } e ? new Escalation(e.To, e.OnLaunch, e.Text ?? "") : null,
                 f.Properties is null ? null : new Dictionary<string, double>(f.Properties),
                 f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? [], pr.RainOnlyWhenOff ?? []) : null,
-                f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text));
+                f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text,
+                f.AtSea is { } asp ? new AtSeaSpec(asp.Text, asp.Spare) : null));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         });
 
@@ -102,7 +103,14 @@ public static class BoatLoader
         var electrical = dto.Electrical is { } el ? new ElectricalRules(el.SelfDischargePerDay, el.PumpMinStateOfCharge, el.CrankDraw, el.ChargePerHour, el.RunDrawPerHour) : null;
         var insurance = dto.Insurance is { } ins ? new InsuranceRules(ins.ValueNok, ins.PayoutFraction) : null;
 
-        return new Boat(dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance);
+        var trips = dto.Trips is { } tr
+            ? new TripRules(
+                tr.Home, tr.Ports ?? [], tr.Routes ?? [], tr.Tow ?? new TowRules())
+            : null;
+
+        return new Boat(
+            dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
+            dto.Chandlery ?? [], trips, dto.Sea, dto.Forecast);
     }
 
     /// <summary>"spawn": one rule or a list of rules; any one crossing wakes the fault.</summary>
@@ -129,6 +137,18 @@ public static class BoatLoader
         public WaterDto? Water { get; set; }
         public ElectricalDto? Electrical { get; set; }
         public InsuranceDto? Insurance { get; set; }
+        public List<ChandleryItem>? Chandlery { get; set; }
+        public TripsDto? Trips { get; set; }
+        public SeaRules? Sea { get; set; }
+        public ForecastRules? Forecast { get; set; }
+    }
+
+    private sealed class TripsDto
+    {
+        public string Home { get; set; } = "";
+        public List<Port>? Ports { get; set; }
+        public List<Route>? Routes { get; set; }
+        public TowRules? Tow { get; set; }
     }
 
     private sealed class LevelWordDto
@@ -381,6 +401,13 @@ public static class BoatLoader
         /// <summary>Free text for the data's readers (for example "UNVERIFIED"); ignored by the loader.</summary>
         public string? Note { get; set; }
         public ArrivalSignDto? ArrivalSign { get; set; }
+        public AtSeaDto? AtSea { get; set; }
+    }
+
+    private sealed class AtSeaDto
+    {
+        public string Text { get; set; } = "";
+        public string? Spare { get; set; }
     }
 
     private sealed class ArrivalSignDto

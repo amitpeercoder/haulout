@@ -31,6 +31,17 @@ public static class Electrical
         battery.State[ChargeProperty] = Math.Max(0, battery.State.GetValueOrDefault(ChargeProperty, 1.0) - amount);
     }
 
+    /// <summary>
+    /// Takes charge out of what the panel shows: the live value is first brought down to the effective charge (the cap of a battery
+    /// that can only hold 60 %), so a load on a capped battery is seen at once. Used by the draw of a passage (design note 007).
+    /// </summary>
+    public static void DrawFromEffective(Boat boat, double amount)
+    {
+        if (amount <= 0 || !boat.TryGet(BatteryId, out var battery)) return;
+        double live = Math.Min(battery.State.GetValueOrDefault(ChargeProperty, 1.0), StateOfCharge(boat));
+        battery.State[ChargeProperty] = Math.Max(0, live - amount);
+    }
+
     /// <summary>Full again: shore-power charging.</summary>
     public static void Fill(Boat boat)
     {
