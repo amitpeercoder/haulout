@@ -69,9 +69,13 @@ public sealed class Fault
         IEnumerable<FaultEffect>? effects = null,
         IEnumerable<SpawnRule>? spawn = null,
         string? arrivalSign = null,
-        AtSeaSpec? atSea = null)
+        AtSeaSpec? atSea = null,
+        string? failsWhen = null,
+        string? symptom = null)
     {
         AtSea = atSea;
+        FailsWhen = failsWhen;
+        Symptom = symptom;
         ArrivalSign = arrivalSign;
         Id = id;
         Name = name;
@@ -96,6 +100,13 @@ public sealed class Fault
     }
 
     public string Id { get; }
+    /// <summary>
+    /// Design note 010, second pass G: an instrument's fault that does not stop it all the time. "rain": it stops working on a day of rain and
+    /// works on a dry one. Null: the fault stops it always. The truth of the day decides, so the intermittence can be reasoned about.
+    /// </summary>
+    public string? FailsWhen { get; }
+    /// <summary>What the player sees of it while it is stopping the instrument (the screen blank, the radar empty); told on a look and in the hour's report. Null: nothing.</summary>
+    public string? Symptom { get; }
     /// <summary>The consequence at sea, for the trip plan; null: nothing to say. Never shown unless the fault is known.</summary>
     public AtSeaSpec? AtSea { get; }
     /// <summary>What a mechanic calls it.</summary>
@@ -153,7 +164,7 @@ public sealed class Fault
     /// </summary>
     internal Fault CloneDormant(string id, IReadOnlyDictionary<string, double> baseline) => new(
         id, Name, ComponentId, new FaultEffect(FaultEffectKind.None, 0), Reveals, FixedBy, present: true, OnHardOnly, Harmless, dormant: true,
-        Consequence, CostLaterNok, LaterNote, Diy, Yard, Escalation, Properties, Progression, Effects, Spawn, ArrivalSign, AtSea)
+        Consequence, CostLaterNok, LaterNote, Diy, Yard, Escalation, Properties, Progression, Effects, Spawn, ArrivalSign, AtSea, FailsWhen, Symptom)
     {
         SpawnBaseline = baseline,
     };

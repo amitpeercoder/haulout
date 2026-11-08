@@ -53,6 +53,8 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(WaitWeek), "wait-week")]
 [JsonDerivedType(typeof(Order), "order")]
 [JsonDerivedType(typeof(InviteFriend), "invite-friend")]
+[JsonDerivedType(typeof(PlanEvent), "plan-event")]
+[JsonDerivedType(typeof(UnplanEvent), "unplan-event")]
 [JsonDerivedType(typeof(Install), "install")]
 [JsonDerivedType(typeof(YardInstall), "yard-install")]
 public abstract record Command;
@@ -138,7 +140,7 @@ public sealed record BatteryAboard() : Command;
 public sealed record WinterCharger() : Command;
 /// <summary>On the hard, on deck: rig the winter cover over the deck. Kept for later winters; taken off at launch.</summary>
 public sealed record FitWinterCover() : Command;
-/// <summary>Not at sea: leave her day by day to the next day 75 of the year, coming back early if the boat has something to tell you or your haulout slot comes.</summary>
+/// <summary>Not at sea: leave her day by day to the next day 75 of the year, coming back early if the boat has something to tell you, a delivery is due at the yard or your haulout slot comes.</summary>
 public sealed record WaitUntilSpring() : Command;
 
 public sealed record ListForSale(int AskNok) : Command;
@@ -159,6 +161,13 @@ public sealed record Order(string Item) : Command;
 /// at least a few days ahead). Design note 010, step 2.
 /// </summary>
 public sealed record InviteFriend(int Day) : Command;
+/// <summary>
+/// Mark an event of the calendar as one you are going to (free, no time, from anywhere): a wait stops on the morning it starts. Event: its
+/// name as you would say it, or its id. Design note 010, second pass I.
+/// </summary>
+public sealed record PlanEvent(string Event) : Command;
+/// <summary>Take the mark off an event: waits no longer stop for it. It still happens, and is still judged if you are there. Design note 010, second pass I.</summary>
+public sealed record UnplanEvent(string Event) : Command;
 
 /// <summary>
 /// Fit an upgrade you have aboard (bought or delivered): at the place it goes, not at sea, on a dry day if the job needs one. Its minutes

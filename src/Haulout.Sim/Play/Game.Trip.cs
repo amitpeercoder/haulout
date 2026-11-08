@@ -40,18 +40,26 @@ public sealed partial class Game
         public double CoveredNm { get; set; }
         public SeaMode Mode { get; set; } = SeaMode.Motoring;
         public bool TurnedBack { get; set; }
+        /// <summary>The friend of the week was aboard when she cast off (design note 010, second pass H).</summary>
+        public bool FriendAboard { get; init; }
         /// <summary>Overheat minutes in a row; cleared when the engine stops or cools.</summary>
         public int OverheatMinutes { get; set; }
         /// <summary>How the engine sounded at the end of the last step, for the hour line.</summary>
         public string EngineNote { get; set; } = "";
+        /// <summary>The legs still to sail after this one when she is bound for a port by another (design note 010, second pass I); null for a direct route.</summary>
+        public IReadOnlyList<Route>? Onward { get; init; }
         public int DepartClockMinutes { get; init; }
         /// <summary>Set when the passage ends (arrival, or the end of the tow).</summary>
         public int EndClockMinutes { get; set; }
         public int MoneyAtDeparture { get; init; }
         public int LogStart { get; init; }
-        /// <summary>The knots fog holds her to this step (null: none), for the hour line. The patrol fined her already this passage (design note 010).</summary>
+        /// <summary>The knots fog holds her to this step (null: none), for the hour line.</summary>
         public double? FogCap { get; set; }
-        public bool PatrolFined { get; set; }
+        /// <summary>Instrument symptoms already told this passage (by text), so the hour line says each once (design note 010, second pass G).</summary>
+        public HashSet<string> SymptomsTold { get; } = [];
+        /// <summary>The (absolute day * 24 + hour) of the hours of this passage already rolled for a close call, and the close calls waiting to be told in the hour line.</summary>
+        public HashSet<(string Cause, int Hour)> CloseCallHoursRolled { get; } = [];
+        public List<(string Text, string? Report)> CloseCalls { get; } = [];
         public List<string> Failures { get; } = [];
         public List<string> Fixes { get; } = [];
         /// <summary>The clock year she left in, and the hourly fixes of the passage (design note 009).</summary>
@@ -93,7 +101,7 @@ public sealed partial class Game
     /// What the forecast says for a day. Lead 0 is the real day. Further out, with the data's chances, the force is off by one
     /// (clamped 0 to 9) and the rain is flipped. Uses its own random stream, never the world's or the player's.
     /// </summary>
-    private ForecastDay ForecastFor(int day, Route route)
+    private ForecastDay ForecastFor(int day, IReadOnlyList<Route> legs)
     {
         var rules = _boat.ForecastRules;
         int lead = Math.Max(0, day - Day);
@@ -115,20 +123,65 @@ public sealed partial class Game
             }
         }
         // The fog is a morning you see coming: the forecast's noise does not touch it.
+        // With the dew point and the sea in the day, the report says what they say; a hand-made day just names the fog.
         string fog = WeatherWords.FogWord(real);
-        string text = WeatherWords.Describe(noisy) + (fog.Length > 0 ? $" {char.ToUpperInvariant(fog[0])}{fog[1..]}." : "");
+        string text = WeatherWords.Describe(noisy) + (real.HasSky ? " " + WeatherWords.SkyLine(real)
+            : fog.Length > 0 ? $" {char.ToUpperInvariant(fog[0])}{fog[1..]}." : "");
         return new ForecastDay(day, true, text, noisy.WindForce, noisy.WindFrom,
-            noisy.RainMm > 0, Sea.Serves(_boat.SeaRules, noisy.WindForce, noisy.WindFrom, route.CourseDeg), fog.Length > 0);
+            noisy.RainMm > 0, legs.All(l => Sea.Serves(_boat.SeaRules, noisy.WindForce, noisy.WindFrom, l.CourseDeg)), fog.Length > 0);
     }
 
-    /// <summary>The route out of the current port to the named destination (null: the one route out). Null: there is none.</summary>
-    private Route? FindRoute(TripRules trips, string? destination)
+    /// <summary>
+    /// The way to a destination: one leg for a port with a route from here, else the shortest way through the routes of the data (design
+    /// note 010, second pass I). A passage is always one leg: the first of them.
+    /// </summary>
+    private sealed record Way(IReadOnlyList<Route> Legs)
     {
-        var routes = trips.RoutesFrom(_portId).ToList();
-        if (string.IsNullOrWhiteSpace(destination)) return routes.FirstOrDefault();
-        var ports = routes.Select(r => trips.FindPort(r.To)).OfType<Port>().ToList();
-        var res = NameResolver.Resolve(ports, destination, p => p.Id, p => p.Name, p => p.Aliases);
-        return res.Match is { } target ? routes.First(r => r.To == target.Id) : null;
+        public Route First => Legs[0];
+        public Route Last => Legs[^1];
+        public bool Direct => Legs.Count == 1;
+        public double TotalNm => Legs.Sum(l => l.DistanceNm);
+    }
+
+    /// <summary>The way out of the current port to the named destination (null: the one route out). Null: there is none.</summary>
+    private Way? FindWay(TripRules trips, string? destination)
+    {
+        if (string.IsNullOrWhiteSpace(destination))
+            return trips.RoutesFrom(_portId).FirstOrDefault() is { } only ? new Way([only]) : null;
+        var res = NameResolver.Resolve(trips.Ports.Where(p => p.Id != _portId), destination, p => p.Id, p => p.Name, p => p.Aliases);
+        if (res.Match is not { } target) return null;
+        var direct = trips.RoutesFrom(_portId).FirstOrDefault(r => r.To == target.Id);
+        if (direct is not null) return new Way([direct]);
+        var legs = trips.PathBetween(_portId, target.Id);
+        return legs.Count == 0 ? null : new Way(legs);
+    }
+
+    /// <summary>"Hestholmen": the ports passed through on the way.</summary>
+    private string ViaNames(Way way) => JoinAnd(way.Legs.Take(way.Legs.Count - 1).Select(l => PortName(l.To)).ToList());
+
+    private static List<ChartShelter> ShelterViewsAlong(TripRules trips, Way way)
+    {
+        var views = new List<ChartShelter>();
+        double offset = 0;
+        foreach (var leg in way.Legs)
+        {
+            foreach (var s in leg.Shelter)
+            {
+                var at = trips.PointAlong(leg, s.AtNm);
+                views.Add(new ChartShelter(s.Name, Math.Round(offset + s.AtNm, 3), Tenth(at.EastNm), Tenth(at.NorthNm)));
+            }
+            offset += leg.DistanceNm;
+        }
+        return views;
+    }
+
+    /// <summary>What the player is told when the passage is the first leg of a longer way: the rest, in words. Empty for a direct route.</summary>
+    private string RestOfTheWay(Way way)
+    {
+        if (way.Direct) return "";
+        var ci = CultureInfo.InvariantCulture;
+        double rest = way.Legs.Skip(1).Sum(l => l.DistanceNm);
+        return $"From there it is {rest.ToString("0.#", ci)} nm on to {PortName(way.Last.To)}.";
     }
 
     private List<string> TripBlockers(int departDay)
@@ -142,7 +195,6 @@ public sealed partial class Game
             if (!_finished) b.Add("The engine hasn't run yet this season.");
             if (departDay == Day && Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
                 b.Add($"It's blowing too hard to leave today: {WeatherWords.WindPhrase(Today)}.");
-            if (departDay == Day && FogHoldsHarbour) b.Add(FogHarbourMessage);
         }
         return b;
     }
@@ -165,17 +217,19 @@ public sealed partial class Game
         if (_boat.Trips is not { } trips || AtSea)
             return NoRoute(destination?.Trim() ?? "", AtSea ? "You can't plan a trip from the water." : "There's nowhere to go from here.");
 
-        var route = FindRoute(trips, destination);
-        if (route is null)
+        var way = FindWay(trips, destination);
+        if (way is null)
             return NoRoute(destination?.Trim() ?? "", $"There's no route from {fromName} to '{(destination ?? "").Trim()}'.");
 
-        var toName = trips.FindPort(route.To)?.Name ?? route.To;
-        var days = new[] { depart, depart + 1 }.Select(d => ForecastFor(d, route)).ToList();
+        var route = way.First;
+        double totalNm = way.TotalNm;
+        var toName = trips.FindPort(way.Last.To)?.Name ?? way.Last.To;
+        var days = new[] { depart, depart + 1 }.Select(d => ForecastFor(d, way.Legs)).ToList();
         var ci = CultureInfo.InvariantCulture;
 
         // What the player has seen of the growth on her hull is all the plan may know of it.
         double motorKnots = Slowed(sea.MotorKnots, _foulingSeen);
-        double motorHours = Math.Round(route.DistanceNm / motorKnots, 1);
+        double motorHours = Math.Round(totalNm / motorKnots, 1);
         double? sailHours = null;
         string estimate = $"About {motorHours.ToString("0.0", ci)} hours under engine at {motorKnots.ToString("0.#", ci)} knots";
         if (_foulingSeen > 0) estimate += $" (the growth you saw on her hull costs her about {(sea.MotorKnots - motorKnots).ToString("0.#", ci)} knots)";
@@ -183,7 +237,7 @@ public sealed partial class Game
         if (!first.Known) estimate += "; no forecast that far out, so no sailing estimate.";
         else if (first.WindServes)
         {
-            sailHours = Math.Round(route.DistanceNm / Slowed(Sea.SailKnots(sea, first.WindForce), _foulingSeen), 1);
+            sailHours = Math.Round(totalNm / Slowed(Sea.SailKnots(sea, first.WindForce), _foulingSeen), 1);
             estimate += $"; about {sailHours.Value.ToString("0.0", ci)} under sail if the forecast wind holds.";
         }
         else estimate += "; the forecast wind doesn't serve for sailing.";
@@ -197,16 +251,17 @@ public sealed partial class Game
                 spare is not null && _inventory.GetValueOrDefault(spare.Id) > 0));
         }
         var missing = risks.Where(r => r.Spare is not null && !r.SpareAboard).Select(r => r.Spare!).Distinct().ToList();
-        var shelter = route.Shelter.Select(s => $"{s.Name}, {s.AtNm.ToString("0.#", ci)} nm out").ToList();
+        var shelter = ShelterViewsAlong(trips, way).Select(s => $"{s.Name}, {s.AtNm.ToString("0.#", ci)} nm out").ToList();
 
         var (fuelLine, warnings) = PassageWarnings(route, depart, motorHours, days, out int vacationDays);
-        var atDestination = EventsAt(route.To, ArrivalDay(depart, motorHours));
-        if (trips.FindPort(route.To) is { Anchorage: true }) atDestination.Add("An anchorage: no shop, no fuel.");
+        var atDestination = EventsAt(way.Last.To, ArrivalDay(depart, motorHours));
+        if (trips.FindPort(way.Last.To) is { Anchorage: true }) atDestination.Add("An anchorage: no shop, no fuel.");
 
         return new TripPlanView(
-            fromName, toName, route.DistanceNm, route.CourseDeg, depart, motorHours, sailHours, estimate, days, risks,
+            fromName, toName, totalNm, route.CourseDeg, depart, motorHours, sailHours, estimate, days, risks,
             SparesAboardNames(), missing, shelter, Balance, towNok, blockers,
-            fuelLine, vacationDays, warnings, atDestination.Count == 0 ? null : atDestination);
+            fuelLine, vacationDays, warnings, atDestination.Count == 0 ? null : atDestination,
+            way.Direct ? null : way.Legs.Select(l => new PlanLeg(PortName(l.From), PortName(l.To), l.DistanceNm, l.CourseDeg)).ToList());
     }
 
     /// <summary>The hour the plan assumes she casts off: now, today; 09:00 on a later day.</summary>
@@ -225,12 +280,14 @@ public sealed partial class Game
         string? fuelLine = null;
         var ci = CultureInfo.InvariantCulture;
 
-        if (GaugeLitres() is { } aboard && _boat.Fuel.MotorLitresPerHour > 0)
+        if (GaugeLitres() is { } aboard && _boat.Fuel.Burns)
         {
-            double burn = _boat.Fuel.MotorLitresPerHour;
+            var plan = PlannedBurn();
+            double burn = plan.LitresPerHour;
             int needs = (int)Math.Round(motorHours * burn, MidpointRounding.AwayFromZero);
             int hours = (int)Math.Round(aboard / burn, MidpointRounding.AwayFromZero);
-            fuelLine = $"About {aboard} litres aboard: some {hours} hours of motoring. This passage needs about {needs} litres.";
+            string why = plan.Adds.Count == 0 ? "" : $" ({FuelBurn.Words(_boat.Fuel, plan.Adds)})";
+            fuelLine = $"About {aboard} litres aboard: some {hours} hours of motoring at about {burn.ToString("0.0", ci)} L/h{why}. This passage needs about {needs} litres.";
             if (motorHours * burn > aboard) warnings.Add("The fuel aboard won't motor her all the way: fill the tank or count on the wind.");
         }
 
@@ -248,17 +305,28 @@ public sealed partial class Game
                 string text = arrivesDark
                     ? $"She'll arrive after dark (the light goes at about {LightGoes(arrivalDay)})."
                     : $"Part of the passage is in the dark (the light comes at about {LightComes(depart)}).";
-                if (KnownOpenFaults().Any(f => f.ComponentId == NavLightsId))
-                    text = text[..^1] + ", and you know the navigation lights have a problem: the patrol fines boats running without lights.";
+                if (KnownOpenFaults().Any(f => f.ComponentId == NavLightsId)
+                    && _boat.CloseCalls.Causes.TryGetValue("night", out var nightCause) && nightCause.PlanLine.Length > 0)
+                    text = text[..^1] + ", and you know the navigation lights have a problem: " + nightCause.PlanLine;
                 warnings.Add(text);
             }
         }
 
-        // Fog: a wall today in the harbour (a blocker), a warning for a later day.
-        if (_boat.Night.FogMatters && days.Count > 0 && days[0].Fog && depart != Day
-            && !UpgradeWorks(PlotterId) && !UpgradeWorks(RadarId))
-            warnings.Add($"The forecast says fog on day {depart}: without a plotter or radar the harbourmaster holds you in until it lifts, and at sea you would creep at "
-                + $"{_boat.Night.FogKnots.ToString("0.#", ci)} knots.");
+        // Fog: a risk, not a wall. A morning you see coming in the forecast; the plan says what it costs without instruments.
+        if (_boat.Night.FogMatters && days.Count > 0 && !UpgradeWorks(PlotterId, depart, knownOnly: true) && !UpgradeWorks(RadarId, depart, knownOnly: true))
+        {
+            var fogDay = _weather[depart];
+            if (days[0].Fog && fogDay.FogUntilHour > leave)
+            {
+                string knots = _boat.Night.FogKnots.ToString("0.#", ci);
+                if (fogDay.HarbourOnly) warnings.Add(Climate.Default.FogRule.Words.HarbourPlan.Replace("{knots}", knots, StringComparison.Ordinal));
+                else
+                {
+                    string when = fogDay.FogUntilHour >= 24 ? "the day" : "the morning";
+                    warnings.Add($"Fog forecast for {when}: without a plotter or radar you creep at {knots} knots and listen for ferries.");
+                }
+            }
+        }
 
         // The weekdays the passage touches, none counted twice, less one already charged.
         vacationDays = 0;

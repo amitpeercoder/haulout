@@ -1,4 +1,5 @@
 using System.Text;
+using Haulout.Sim.Data;
 using Haulout.Sim.Play;
 
 namespace Haulout.Prose;
@@ -8,9 +9,17 @@ namespace Haulout.Prose;
 /// Every method returns lines each terminated by <see cref="Environment.NewLine"/>.
 /// Facade ids are never rendered: names only.
 /// </summary>
-public static class Prose
+public sealed class Prose
 {
-    public static string Briefing(BriefingView view, bool includeHelpHint = true)
+    private readonly Currency _currency;
+
+    /// <summary>The currency comes from the game (<c>Game.Currency</c>); the renderer never reads data files.</summary>
+    public Prose(Currency currency) => _currency = currency;
+
+    private string Money(int units) => MoneyWords.Amount(units, _currency);
+    private string SignedMoney(int units) => MoneyWords.Signed(units, _currency);
+
+    public string Briefing(BriefingView view, bool includeHelpHint = true)
     {
         var sb = new StringBuilder();
         foreach (var line in view.Lines) sb.AppendLine(line);
@@ -22,7 +31,7 @@ public static class Prose
         return sb.ToString();
     }
 
-    public static string Result(CommandResult result, StatusView status)
+    public string Result(CommandResult result, StatusView status)
     {
         var sb = new StringBuilder();
         // At the start of any look the boat speaks first; after anything else it speaks last.
@@ -35,7 +44,7 @@ public static class Prose
         if (result.Observation is TripResultView trip) AppendTripSummary(sb, trip, result.Narrative);
         if (result.Observation is HauloutView lift) AppendLiftSummary(sb, lift);
         if (result.Observation is ListingView listing) sb.Append(Letter(listing.Letter));
-        if (result.Observation is ClosingView closing) sb.AppendLine($"  {MoneyWords.Balance(closing.BalanceNok)} The game is over; the logbook still reads.");
+        if (result.Observation is ClosingView closing) sb.AppendLine($"  {MoneyWords.Balance(closing.BalanceNok, _currency)} The game is over; the logbook still reads.");
 
         foreach (var fault in result.NewlyDiscovered)
             sb.AppendLine($"  Noted in the log: {fault.Name}.");
@@ -44,7 +53,7 @@ public static class Prose
         {
             var parts = new List<string>();
             if (result.MinutesTaken > 0) parts.Add($"+{Duration(result.MinutesTaken)}");
-            if (result.CostNok > 0) parts.Add($"{result.CostNok} NOK");
+            if (result.CostNok > 0) parts.Add($"{Money(result.CostNok)}");
             sb.AppendLine($"  [{string.Join(", ", parts)} · {status.TimeOfDay}]");
         }
         if (!lookFirst) AppendAlerts(sb, result.Alerts);
@@ -61,13 +70,13 @@ public static class Prose
             : $"{gap.GapVolts.ToString("F1", ci)} V lost somewhere in the starting circuit while cranking; your readings so far account for {gap.AccountedVolts.ToString("F2", ci)} V of it.";
     }
 
-    private static void AppendAlerts(StringBuilder sb, IReadOnlyList<Alert>? alerts)
+    private void AppendAlerts(StringBuilder sb, IReadOnlyList<Alert>? alerts)
     {
         if (alerts is null) return;
         foreach (var a in alerts) sb.AppendLine($"  ! {a.Text}");
     }
 
-    public static string Query(QueryResult result)
+    public string Query(QueryResult result)
     {
         var sb = new StringBuilder();
         switch (result)
@@ -96,11 +105,11 @@ public static class Prose
                 break;
             case StatusView s:
                 AppendAlerts(sb, s.Notices);
-                sb.AppendLine($"Day {s.Day}, {s.TimeOfDay} · worked {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min · money spent {s.MoneySpentNok} NOK.");
+                sb.AppendLine($"Day {s.Day}, {s.TimeOfDay} · worked {s.MinutesSpent / 60} h {s.MinutesSpent % 60} min · money spent {Money(s.MoneySpentNok)}.");
                 if (s.LaunchDeadlineDay > 0)
                     sb.AppendLine(s.SeasonLead is { Length: > 0 } lead
-                        ? $"{MoneyWords.Balance(s.BalanceNok)} {lead}"
-                        : $"{MoneyWords.Balance(s.BalanceNok)} Launch deadline: day {s.LaunchDeadlineDay}.");
+                        ? $"{MoneyWords.Balance(s.BalanceNok, _currency)} {lead}"
+                        : $"{MoneyWords.Balance(s.BalanceNok, _currency)} Launch deadline: day {s.LaunchDeadlineDay}.");
                 if (s.Season is not null) sb.AppendLine(s.Season);
                 if (s.Week is not null) sb.AppendLine(s.Week);
                 if (s.Next is not null) sb.AppendLine(s.Next);
@@ -160,12 +169,12 @@ public static class Prose
     }
 
     /// <summary>The short block after a passage ends: hours, money, what went wrong, what was put right. The narrative already has the lines.</summary>
-    private static void AppendTripSummary(StringBuilder sb, TripResultView t, IReadOnlyList<string> narrative)
+    private void AppendTripSummary(StringBuilder sb, TripResultView t, IReadOnlyList<string> narrative)
     {
         bool Said(string text) => narrative.Any(n => n.Contains(text, StringComparison.OrdinalIgnoreCase));
         var hours = (t.Minutes + 59) / 60;
         var how = t.Towed ? "Towed to" : t.TurnedBack ? "Turned back to" : "Arrived at";
-        sb.AppendLine($"  {how} {t.Destination}: {hours} {(hours == 1 ? "hour" : "hours")} since casting off, {t.MoneySpentNok} NOK spent.");
+        sb.AppendLine($"  {how} {t.Destination}: {hours} {(hours == 1 ? "hour" : "hours")} since casting off, {Money(t.MoneySpentNok)} spent.");
         var failures = t.Failures.Where(f => !Said(f)).ToList();
         var fixes = t.Fixes.Where(f => !Said(f)).ToList();
         if (t.Failures.Count == 0) sb.AppendLine("  Trouble on the way: none.");
@@ -176,45 +185,45 @@ public static class Prose
     }
 
     /// <summary>The bill of a lift, after the card in the narrative.</summary>
-    private static void AppendLiftSummary(StringBuilder sb, HauloutView v)
+    private void AppendLiftSummary(StringBuilder sb, HauloutView v)
     {
         sb.AppendLine(v.StorageNok > 0
-            ? $"  Lift {v.LiftNok} NOK, winter storage {v.StorageNok} NOK: {v.LiftNok + v.StorageNok} NOK in all, in the logbook."
-            : $"  Lift {v.LiftNok} NOK, in the logbook.");
+            ? $"  Lift {Money(v.LiftNok)}, winter storage {Money(v.StorageNok)}: {Money(v.LiftNok + v.StorageNok)} in all, in the logbook."
+            : $"  Lift {Money(v.LiftNok)}, in the logbook.");
     }
 
     /// <summary>The note at the end of a logbook line that has a document behind it.</summary>
-    private static string DocumentNote(string? document) =>
+    private string DocumentNote(string? document) =>
         document is null ? ""
         : document.StartsWith("viewing", StringComparison.Ordinal) ? " (sale)"
         : document.StartsWith("season", StringComparison.Ordinal) ? " (season page)"
+        : document.StartsWith("letter", StringComparison.Ordinal) ? " (letter: the text is the entry)"
         : " (read survey)";
 
-    /// <summary>The broker's valuation letter, as a letter: who, the lines with their NOK, the value, the ask, the broker's words.</summary>
-    public static string Letter(ValuationLetter v)
+    /// <summary>The broker's valuation letter, as a letter: who, the lines with their amounts, the value, the ask, the broker's words.</summary>
+    public string Letter(ValuationLetter v)
     {
         var sb = new StringBuilder();
         sb.AppendLine();
         sb.AppendLine(v.Broker);
         sb.AppendLine($"Valuation, day {v.Day}.");
-        foreach (var l in v.Lines) sb.AppendLine($"  {l.Text}: {Signed(l.Nok)} NOK");
-        sb.AppendLine($"The broker values her at {v.ValueNok} NOK.");
+        foreach (var l in v.Lines) sb.AppendLine($"  {l.Text}: {SignedMoney(l.Nok)}");
+        sb.AppendLine($"The broker values her at {Money(v.ValueNok)}.");
         if (v.AskNok is { } ask)
-            sb.AppendLine(ask > v.ValueNok ? $"You are asking {ask} NOK, {ask - v.ValueNok} NOK over that."
-                : ask < v.ValueNok ? $"You are asking {ask} NOK, {v.ValueNok - ask} NOK under that."
-                : $"You are asking {ask} NOK.");
+            sb.AppendLine(ask > v.ValueNok ? $"You are asking {Money(ask)}, {Money(ask - v.ValueNok)} over that."
+                : ask < v.ValueNok ? $"You are asking {Money(ask)}, {Money(v.ValueNok - ask)} under that."
+                : $"You are asking {Money(ask)}.");
         foreach (var line in v.Text) sb.AppendLine(line);
         return sb.ToString();
     }
 
-    private static string Signed(int nok) => nok > 0 ? $"+{nok}" : nok.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The sale: the letter, the listing, and every viewing with what the buyer's surveyor found.</summary>
-    public static string Sale(SaleView v)
+    public string Sale(SaleView v)
     {
         var sb = new StringBuilder();
         if (v.Sold) sb.AppendLine("She's sold.");
-        else sb.AppendLine(v.Listed ? $"Listed for sale at {v.AskNok} NOK." : "Not listed for sale. 'list for sale <nok>' puts her on the market from the hard.");
+        else sb.AppendLine(v.Listed ? $"Listed for sale at {Money(v.AskNok ?? 0)}." : "Not listed for sale. 'list for sale <nok>' puts her on the market from the hard.");
         if (v.Letter is { } letter) sb.Append(Letter(letter));
         if (v.Viewings.Count == 0)
         {
@@ -228,7 +237,7 @@ public static class Prose
                 ? "their surveyor found nothing wrong."
                 : "their surveyor found:"));
             foreach (var f in viewing.Findings) sb.AppendLine($"  {f}");
-            sb.AppendLine($"  They value her at {viewing.ValueNok} NOK and offer {viewing.OfferNok} NOK, " +
+            sb.AppendLine($"  They value her at {Money(viewing.ValueNok)} and offer {Money(viewing.OfferNok)}, " +
                           (viewing.Open ? $"open until day {viewing.HoldsUntilDay}." : $"which lapsed on day {viewing.HoldsUntilDay}."));
         }
         if (v.Listed && v.Viewings.Any(x => x.Open)) sb.AppendLine("'accept' takes the best open offer; 'accept <n>' takes offer n.");
@@ -236,7 +245,7 @@ public static class Prose
     }
 
     /// <summary>The week (design note 010): today, the days, the money, what is coming and what is on order.</summary>
-    public static string Calendar(CalendarView v)
+    public string Calendar(CalendarView v)
     {
         var sb = new StringBuilder();
         sb.AppendLine(v.Week);
@@ -246,14 +255,14 @@ public static class Prose
             sb.AppendLine($"Vacation days: {v.VacationDaysLeft} of {v.VacationDaysPerYear} left this year ({v.VacationDaysUsed} used{unpaid}).");
         }
         sb.AppendLine(v.OverdraftLimitNok > 0
-            ? $"Balance {v.BalanceNok} NOK (the bank allows {v.OverdraftLimitNok} overdrawn)."
-            : MoneyWords.Balance(v.BalanceNok));
-        if (v.PayNok > 0) sb.AppendLine($"Payday: {v.PayNok} NOK, next on day {v.NextPaydayDay}.");
+            ? $"Balance {Money(v.BalanceNok)} (the bank allows {v.OverdraftLimitNok} overdrawn)."
+            : MoneyWords.Balance(v.BalanceNok, _currency));
+        if (v.PayNok > 0) sb.AppendLine($"Payday: {Money(v.PayNok)}, next on day {v.NextPaydayDay}.");
         if (v.Ahead.Count > 0)
         {
             sb.AppendLine("Coming up:");
             foreach (var e in v.Ahead)
-                sb.AppendLine($"  Day {e.Day}, {e.Weekday}: {e.Text}{(e.Nok != 0 ? $" {Signed(e.Nok)} NOK" : "")}.");
+                sb.AppendLine($"  Day {e.Day}, {e.Weekday}: {e.Text}{(e.Nok != 0 ? $" {SignedMoney(e.Nok)}" : "")}.");
         }
         if (v.Orders.Count > 0)
         {
@@ -265,38 +274,46 @@ public static class Prose
             sb.AppendLine("Worth sailing for:");
             foreach (var e in events)
             {
-                sb.AppendLine($"  {e.Name}{(e.Name.Contains(e.Place, StringComparison.Ordinal) ? "" : $" at {e.Place}")}, {e.When}: {e.Status}.");
+                string going = e.Status is "ahead" or "on now"
+                    ? (e.ToBePicked ? $"; ask your friend first (invite friend <day>, days {e.FromDay} to {e.ToDay})"
+                        : e.Going ? "; going: a wait stops on its morning" : "; not marked: a wait goes past it")
+                    : "";
+                string outcome = e.Outcome.Length > 0 ? $" ({e.Outcome})" : "";
+                sb.AppendLine($"  {e.Name}{(e.Name.Contains(e.Place, StringComparison.Ordinal) ? "" : $" at {e.Place}")}, {e.When}: {e.Status}{outcome}{going}.");
                 foreach (var r in e.Requirements)
                     sb.AppendLine($"    {r.Text}: {(r.Met == true ? "met" : r.Met == false ? "not met" : "not known yet")} ({r.Note}).");
+                if (e.Beats is { Count: > 0 } beats)
+                    foreach (var b in beats)
+                        sb.AppendLine($"    {b.Text}, {b.When}: {b.Status}{(b.Note.Length > 0 ? $" ({b.Note})" : "")}.");
                 if (e.Story.Length > 0) sb.AppendLine($"    {e.Story}");
             }
         }
         if (v.Reputation is { Length: > 0 } standing) sb.AppendLine(standing);
         var m = v.Money;
-        sb.AppendLine($"This season: in {m.IncomeNok} NOK; out {m.SpendingNok} NOK spent, {m.BillsNok} NOK bills"
-            + (m.InterestNok > 0 ? $", {m.InterestNok} NOK interest" : "") + (m.UnpaidNok > 0 ? $", {m.UnpaidNok} NOK unpaid leave" : "") + ".");
+        sb.AppendLine($"This season: in {Money(m.IncomeNok)}; out {Money(m.SpendingNok)} spent, {Money(m.BillsNok)} bills"
+            + (m.InterestNok > 0 ? $", {Money(m.InterestNok)} interest" : "") + (m.UnpaidNok > 0 ? $", {Money(m.UnpaidNok)} unpaid leave" : "") + ".");
         if (m.Recent.Count > 0)
         {
             sb.AppendLine("Recent:");
-            foreach (var e in m.Recent) sb.AppendLine($"  Day {e.Day}: {e.Text} {Signed(e.Nok)} NOK.");
+            foreach (var e in m.Recent) sb.AppendLine($"  Day {e.Day}: {e.Text} {SignedMoney(e.Nok)}.");
         }
         return sb.ToString();
     }
 
     /// <summary>The yard calendar: the season line and the prices.</summary>
-    public static string Season(SeasonView v)
+    public string Season(SeasonView v)
     {
         var sb = new StringBuilder();
         sb.AppendLine(v.Text);
         sb.AppendLine($"The yard lifts boats from day {v.SlotsFromDay} to day {v.SlotsToDay}.");
-        sb.AppendLine($"A lift costs {v.LiftNok} NOK and winter storage on the hard {v.StorageNok} NOK; changing a booking costs {v.ChangeFeeNok} NOK; the emergency lift costs {v.EmergencyLiftNok} NOK.");
+        sb.AppendLine($"A lift costs {Money(v.LiftNok)} and winter storage on the hard {Money(v.StorageNok)}; changing a booking costs {Money(v.ChangeFeeNok)}; the emergency lift costs {Money(v.EmergencyLiftNok)}.");
         if (v.Reputation is { Length: > 0 } standing) sb.AppendLine(standing);
         if (v.Tasks.Count > 0)
         {
             sb.AppendLine("The winter work on her:");
             foreach (var task in v.Tasks)
             {
-                string price = task.CostNok > 0 ? $", {task.CostNok} NOK" : "";
+                string price = task.CostNok > 0 ? $", {Money(task.CostNok)}" : "";
                 sb.AppendLine(task.Done
                     ? $"  Done: {task.Name}."
                     : $"  To do: {task.Name} ({task.Command}; {Duration(task.Minutes)}{price}). Left alone: {task.Risk}");
@@ -305,13 +322,22 @@ public static class Prose
         return sb.ToString();
     }
 
+    private static string AndList(IReadOnlyList<string> items) =>
+        items.Count <= 1 ? string.Concat(items) : string.Join(", ", items.Take(items.Count - 1)) + " and " + items[^1];
+
     /// <summary>The plan for a trip: route, estimate, forecast, readiness against it, spares, shelter, money.</summary>
-    public static string TripPlan(TripPlanView v)
+    public string TripPlan(TripPlanView v)
     {
         var sb = new StringBuilder();
         foreach (var b in v.Blockers) sb.AppendLine($"Can't go yet: {b}");
         if (v.DistanceNm <= 0 && string.IsNullOrEmpty(v.To)) return sb.ToString();
-        sb.AppendLine($"{v.From} to {v.To}: {v.DistanceNm:0.#} nm on a course of {v.CourseDeg} degrees. Leaving day {v.DepartDay}.");
+        if (v.Legs is { Count: > 1 } legs)
+        {
+            string by = AndList(legs.Take(legs.Count - 1).Select(l => l.To).ToList());
+            sb.AppendLine($"{v.From} to {v.To} by {by}: {v.DistanceNm:0.#} nm. Leaving day {v.DepartDay}.");
+            sb.AppendLine("The legs: " + string.Join("; then ", legs.Select(l => $"{l.From} to {l.To}, {l.DistanceNm:0.#} nm on {l.CourseDeg:000}")) + $". A passage is one leg: you depart again from {legs[0].To}.");
+        }
+        else sb.AppendLine($"{v.From} to {v.To}: {v.DistanceNm:0.#} nm on a course of {v.CourseDeg} degrees. Leaving day {v.DepartDay}.");
         sb.AppendLine(v.Estimate);
         if (v.Fuel is not null) sb.AppendLine(v.Fuel);
         foreach (var w in v.Warnings ?? []) sb.AppendLine($"Mind: {w}");
@@ -332,12 +358,12 @@ public static class Prose
             sb.AppendLine("Spares you don't have for the known problems: " + string.Join(", ", v.SparesMissing) + ".");
         if (v.Shelter.Count > 0) sb.AppendLine("Shelter on the way: " + string.Join(", ", v.Shelter) + ".");
         foreach (var line in v.AtDestination ?? []) sb.AppendLine($"At {v.To}: {line}");
-        sb.AppendLine($"{MoneyWords.Balance(v.BalanceNok)} If it goes wrong, a tow costs {v.TowNok} NOK.");
+        sb.AppendLine($"{MoneyWords.Balance(v.BalanceNok, _currency)} If it goes wrong, a tow costs {Money(v.TowNok)}.");
         return sb.ToString();
     }
 
     /// <summary>The upgrades: status first, then what they cost, what they ask of you and what they open.</summary>
-    public static string Upgrades(UpgradesView v)
+    public string Upgrades(UpgradesView v)
     {
         var sb = new StringBuilder();
         if (v.Items.Count == 0) return "There is nothing to fit to her.\n";
@@ -345,15 +371,15 @@ public static class Prose
         foreach (var u in v.Items)
         {
             string yard = u.YardNok is { } nok && u.YardDays is { } days
-                ? $"the yard {nok} NOK labour and {days} day{(days == 1 ? "" : "s")}"
+                ? $"the yard {Money(nok)} labour and {days} day{(days == 1 ? "" : "s")}"
                 : "not a job for the yard";
-            sb.AppendLine($"  {u.Name} ({u.Status}): {u.PriceNok} NOK; {Duration(u.InstallMinutes)} of your own work, or {yard}; adds {u.ValueNok} NOK to her value; opens {u.Opens}.");
+            sb.AppendLine($"  {u.Name} ({u.Status}): {Money(u.PriceNok)}; {Duration(u.InstallMinutes)} of your own work, or {yard}; adds {Money(u.ValueNok)} to her value; opens {u.Opens}.");
         }
         return sb.ToString();
     }
 
     /// <summary>The page the logbook wrote at the autumn lift: the lines as they are, no grade.</summary>
-    public static string SeasonPage(SeasonPageView v)
+    public string SeasonPage(SeasonPageView v)
     {
         var sb = new StringBuilder();
         foreach (var line in v.Lines) sb.AppendLine(line);
@@ -361,7 +387,7 @@ public static class Prose
     }
 
     /// <summary>What is aboard, and what the chandlery sells where she lies.</summary>
-    public static string Inventory(InventoryView v)
+    public string Inventory(InventoryView v)
     {
         var sb = new StringBuilder();
         if (v.Aboard.Count == 0) sb.AppendLine("Aboard: nothing in the way of spares or tools.");
@@ -374,16 +400,16 @@ public static class Prose
         else
         {
             sb.AppendLine($"For sale at {v.Shop}:");
-            foreach (var l in v.ForSale) sb.AppendLine($"  {l.Name}: {l.PriceNok} NOK, {Duration(l.Minutes)}");
+            foreach (var l in v.ForSale) sb.AppendLine($"  {l.Name}: {Money(l.PriceNok)}, {Duration(l.Minutes)}");
         }
         return sb.ToString();
     }
 
-    private static string Position(double east, double north) =>
+    private string Position(double east, double north) =>
         $"{Math.Abs(east):0.0} {(east < 0 ? "W" : "E")} {Math.Abs(north):0.0} {(north < 0 ? "S" : "N")}";
 
     /// <summary>The shelters of the route between two ports, nearest the first port first, whichever way the data writes it.</summary>
-    private static IEnumerable<(string Name, double AtNm)> ShelterAlong(ChartView v, string from, string to)
+    private IEnumerable<(string Name, double AtNm)> ShelterAlong(ChartView v, string from, string to)
     {
         var direct = v.Routes.FirstOrDefault(r => r.From == from && r.To == to);
         if (direct is not null) return direct.Shelters.Select(s => (s.Name, s.AtNm));
@@ -396,7 +422,7 @@ public static class Prose
     /// shelters on the way, the plan, the track of the passage under way as fixes, and this season's earlier passages. Positions are
     /// nautical miles east and north of the home port.
     /// </summary>
-    public static string Chart(ChartView v)
+    public string Chart(ChartView v)
     {
         var sb = new StringBuilder();
         sb.AppendLine(v.Here);
@@ -411,7 +437,8 @@ public static class Prose
             if (p.Fuel) marks.Add("fuel");
             if (p.Anchorage) marks.Add("anchorage");
             string where = p.IsHere ? "you are here" : $"{p.DistanceNm:0.0} nm on {p.BearingDeg:000}";
-            string note = p.IsHere || v.Boat.AtSea || p.Reachable ? "" : " (no route from here)";
+            string note = p.IsHere || v.Boat.AtSea || p.Reachable ? ""
+                : p.Via is not null ? $" (by {p.Via}: {p.RouteNm:0.#} nm along the routes)" : " (no route from here)";
             sb.AppendLine($"  {p.Name}, {where}, at {Position(p.EastNm, p.NorthNm)}: {(marks.Count == 0 ? "nothing" : string.Join(", ", marks))}.{note}");
         }
         if (v.Boat.AtSea && v.Boat.From is not null && v.Boat.To is not null)
@@ -445,7 +472,7 @@ public static class Prose
         return sb.ToString();
     }
 
-    private static void AppendFixes(StringBuilder sb, ChartTrack track)
+    private void AppendFixes(StringBuilder sb, ChartTrack track)
     {
         var start = track.Fixes.Count > 0 ? track.Fixes[0] : null;
         foreach (var f in track.Fixes)
@@ -457,7 +484,7 @@ public static class Prose
     }
 
     /// <summary>Where she is on the passage: the view's own text, plus the numbers when at sea.</summary>
-    public static string TripState(TripView v)
+    public string TripState(TripView v)
     {
         var sb = new StringBuilder();
         sb.AppendLine(v.Text);
@@ -472,11 +499,11 @@ public static class Prose
     }
 
     /// <summary>"Day 75 · Bright, 6 °C, ..." the logbook's header; null when the view carries no weather.</summary>
-    private static string? WeatherHeader(LogView log) =>
+    private string? WeatherHeader(LogView log) =>
         log.Weather is null ? null : log.Day > 0 ? $"Day {log.Day} \u00b7 {log.Weather}" : log.Weather;
 
     /// <summary>Where you are, the places and covers aboard, and what you have found. Names only.</summary>
-    public static string Aboard(AboardView view)
+    public string Aboard(AboardView view)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"You're {PlacePhrase(view.Place)}.");
@@ -512,7 +539,7 @@ public static class Prose
     }
 
     /// <summary>The surveyor's report as a letter.</summary>
-    public static string Survey(SurveyReportView r)
+    public string Survey(SurveyReportView r)
     {
         var sb = new StringBuilder();
         if (!r.Ordered)
@@ -521,7 +548,7 @@ public static class Prose
             return sb.ToString();
         }
         sb.AppendLine(r.Surveyor);
-        sb.AppendLine($"Survey of {r.BoatName}, day {r.Day}. Fee: {r.FeeNok} NOK.");
+        sb.AppendLine($"Survey of {r.BoatName}, day {r.Day}. Fee: {Money(r.FeeNok)}.");
         sb.AppendLine();
         foreach (var l in r.Opening) sb.AppendLine(l);
         sb.AppendLine();
@@ -532,7 +559,7 @@ public static class Prose
     }
 
     /// <summary>The launch picture: open problems with prices now and later, what to look into, what is done.</summary>
-    public static string Readiness(ReadinessView v)
+    public string Readiness(ReadinessView v)
     {
         var sb = new StringBuilder();
         string lead;
@@ -549,7 +576,7 @@ public static class Prose
             };
             lead = $"Launch deadline: day {v.LaunchDeadlineDay} ({deadline}).";
         }
-        sb.AppendLine($"Day {v.Day}. {lead} {MoneyWords.Balance(v.BalanceNok)} " +
+        sb.AppendLine($"Day {v.Day}. {lead} {MoneyWords.Balance(v.BalanceNok, _currency)} " +
                       (v.Afloat ? "She's in the water." : "She's ashore."));
         if (v.Open.Count == 0 && v.ToInvestigate.Count == 0 && v.Fixed.Count == 0)
         {
@@ -560,15 +587,15 @@ public static class Prose
         {
             var state = item.State.Equals("Deferred", StringComparison.OrdinalIgnoreCase) ? " - deferred" : "";
             sb.AppendLine($"{item.Problem} ({item.Component}){state}");
-            var later = $"Later: {item.CostLaterNok} NOK" + (string.IsNullOrEmpty(item.LaterNote) ? "" : $", {item.LaterNote}");
-            sb.AppendLine($"  Now: {item.CostNowNok} NOK. {later}.{(item.OnHardOnly ? " On the hard only." : "")}");
+            var later = $"Later: {Money(item.CostLaterNok)}" + (string.IsNullOrEmpty(item.LaterNote) ? "" : $", {item.LaterNote}");
+            sb.AppendLine($"  Now: {Money(item.CostNowNok)}. {later}.{(item.OnHardOnly ? " On the hard only." : "")}");
             if (EscalationText(item) is { } escalates) sb.AppendLine($"  {escalates}");
             sb.AppendLine($"  If left: {item.Consequence}");
             foreach (var r in item.Routes)
             {
                 var detail = r.Route.Equals("Yard", StringComparison.OrdinalIgnoreCase)
-                    ? $"{r.How}, {r.CostNok} NOK, {r.LeadDays} {(r.LeadDays == 1 ? "day" : "days")}"
-                    : $"{r.How}, {r.CostNok} NOK, {Duration(r.Minutes)}";
+                    ? $"{r.How}, {Money(r.CostNok)}, {r.LeadDays} {(r.LeadDays == 1 ? "day" : "days")}"
+                    : $"{r.How}{(r.PartNote is { Length: > 0 } part ? $" ({part})" : "")}, {Money(r.CostNok)}, {Duration(r.Minutes)}";
                 var note = r.Available ? "" : $" (not available: {r.UnavailableReason})";
                 sb.AppendLine($"  {r.Route}: {detail}{note}");
             }
@@ -590,13 +617,13 @@ public static class Prose
         : item.EscalatesOnLaunch ? "Escalates on launch." : null;
 
     /// <summary>"in the quarter berth", but "on deck" and "beside the hull".</summary>
-    private static string PlacePhrase(string place) =>
+    private string PlacePhrase(string place) =>
         place.StartsWith("On ", StringComparison.Ordinal) || place.StartsWith("Beside ", StringComparison.Ordinal)
             ? Lower(place) : $"in the {Lower(place)}";
 
-    private static string Lower(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
+    private string Lower(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
-    private static string Duration(int minutes) =>
+    private string Duration(int minutes) =>
         minutes >= 1440 && minutes % 1440 == 0 ? (minutes == 1440 ? "1 day" : $"{minutes / 1440} days") :
         minutes >= 1440 ? $"{Duration(minutes / 1440 * 1440)} {Duration(minutes % 1440)}" :
         minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" :

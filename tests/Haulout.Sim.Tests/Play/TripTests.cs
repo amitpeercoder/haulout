@@ -44,7 +44,7 @@ public class TripTests
     private static Game Afloat(WeatherSeries weather, out Boat boat, bool newImpeller = false, bool calendar = true, bool chainFixed = false)
     {
         boat = BoatLoader.LoadSloop28(withCalendar: calendar);
-        if (chainFixed) boat.Get("anchor-gear").Replace(); // she starts with a seized anchor chain (design note 010); a test that anchors begins with it replaced
+        if (chainFixed) { boat.Get("anchor-gear").Replace(); boat.Get("anchor-shackle").Replace(); } // she starts with a seized anchor chain (design note 010); a test that anchors begins with it replaced
         var g = new Game(boat, 75, new FixedRandom(0.99), Game.DefaultSeed, weather);
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
@@ -470,7 +470,7 @@ public class TripTests
         Assert.True(Status(g).BalanceNok < 0);
         // Ordinary purchases stay refused past zero, and the refusal says it is debt.
         No(g.Execute(new Buy("hose")), $"That's 250 NOK and you owe {6000 - balance} NOK already.");
-        Assert.Equal($"You owe {6000 - balance} NOK.", MoneyWords.Balance(Status(g).BalanceNok));
+        Assert.Equal($"You owe {6000 - balance} NOK.", MoneyWords.Balance(Status(g).BalanceNok, g.Currency));
         var ready = (ReadinessView)g.Ask(new Readiness());
         Assert.True(ready.BalanceNok < 0);
         Assert.Equal(balance - 6000, ((TripPlanView)g.Ask(new PlanTrip())).BalanceNok);

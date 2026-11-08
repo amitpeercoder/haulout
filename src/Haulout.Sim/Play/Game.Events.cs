@@ -14,6 +14,8 @@ public sealed partial class Game
 {
     private enum EventStatus { Open, Made, Failed, Missed }
 
+    private enum BeatStatus { Pending, Made, Failed, Missed }
+
     private sealed class EventRecord
     {
         public string Id { get; init; } = "";
@@ -21,17 +23,28 @@ public sealed partial class Game
         public EventStatus Status { get; set; } = EventStatus.Open;
         /// <summary>The requirement (in words) that failed last; told once.</summary>
         public string? FailedRequirement { get; set; }
-        /// <summary>No second try (the friend's week).</summary>
-        public bool Closed { get; set; }
         public string Story { get; set; } = "";
+        /// <summary>The beats of a picked week by id (design note 010, second pass H); absent: still to come.</summary>
+        public Dictionary<string, BeatStatus> Beats { get; } = [];
+        /// <summary>The week is finished (the friend went home, never came, or the last night is done): no more beats.</summary>
+        public bool Over { get; set; }
+        /// <summary>The key of the week's outcome (good, made, thin) once it is over.</summary>
+        public string Outcome { get; set; } = "";
+        /// <summary>The event was made early (the club cruise on the Friday evening).</summary>
+        public bool Early { get; set; }
+        /// <summary>What a failed beat of the week lacked, by beat id, for the beat's view.</summary>
+        public Dictionary<string, string> BeatFailed { get; } = [];
     }
 
     private readonly List<EventRecord> _eventRecords = [];
     /// <summary>The week the player asked their friend for, by year: the start day.</summary>
     private readonly Dictionary<int, int> _friendStart = [];
-    /// <summary>Weekdays of the friend's week charged at once, and the ones among them that were unpaid leave.</summary>
-    private readonly HashSet<int> _prepaid = [];
-    private readonly HashSet<int> _prepaidUnpaid = [];
+
+    /// <summary>The events the player marked as going, by (event, clock year). The friend's week counts once invited (see <see cref="IsGoing"/>).</summary>
+    private readonly HashSet<(string Id, int Year)> _going = [];
+
+    /// <summary>A marked event, or the friend's week once the friend is asked: the waits stop on its first morning.</summary>
+    private bool IsGoing(EventRule e, int year) => e.Pick is not null ? _friendStart.ContainsKey(year) : _going.Contains((e.Id, year));
 
     private IReadOnlyList<EventRule> EventRules => _boat.Calendar.Events;
 
@@ -62,11 +75,19 @@ public sealed partial class Game
     private bool RequirementHolds(RequirementRule r) => r.Kind switch
     {
         "fitted" => UpgradeWorks(r.Component),
-        "working" => ComponentWorks(r.Component),
+        "working" => ComponentWorks(r.Component) && r.Components.All(ComponentWorks),
+        "anyWorking" => r.Components.Any(AlternativeWorks),
         "dryBunks" => UpgradeWorks(r.Component) && Day - _lastOverSoleDay >= r.Days,
-        "warm" => UpgradeWorks(r.Component) || _weather[Day].TempC >= r.BelowC,
+        "warm" => UpgradeWorks(r.Component) || _weather[Day].NightC >= r.BelowC,
         _ => true,
     };
+
+    /// <summary>An alternative of an anyWorking requirement: one component, or several joined by '+', all aboard and without a present fault.</summary>
+    private bool AlternativeWorks(string alternative) => alternative.Split('+').All(id => UpgradeWorks(id));
+
+    /// <summary>Every component id an anyWorking or working requirement can be about.</summary>
+    private static IEnumerable<string> RequirementComponents(RequirementRule r) =>
+        r.Components.SelectMany(a => a.Split('+')).Append(r.Component).Where(id => id.Length > 0).Distinct();
 
     // ------------------------------------------------------------------ made, failed
 
@@ -80,14 +101,17 @@ public sealed partial class Game
         int year = new GameClock(Day).Year;
         foreach (var e in EventRules)
         {
-            if (e.Overnight || e.Port != _portId) continue;
+            if (e.Overnight || e.Pick is not null || e.Port != _portId) continue;
             if (WindowOf(e, year) is not { } w || Day < w.From || Day > w.To) continue;
-            if (e.Pick is not null && Day != w.From) continue;
+            if (e.MadeBy is { } by && Past(w.From + by.Day, by.Hour)) continue;
             var rec = RecordFor(e, year);
-            if (rec.Closed || rec.Status is EventStatus.Made or EventStatus.Missed) continue;
+            if (rec.Status is EventStatus.Made or EventStatus.Missed) continue;
             Judge(t, e, rec, w);
         }
     }
+
+    /// <summary>Now is after this hour of this day.</summary>
+    private bool Past(int day, int hour) => Day > day || Day == day && HourOfDay > hour;
 
     private void Judge(Turn t, EventRule e, EventRecord rec, (int From, int To) w)
     {
@@ -96,22 +120,28 @@ public sealed partial class Game
         {
             rec.Status = EventStatus.Made;
             rec.Story = e.MadeLines.Count > 0 ? e.MadeLines[0] : "";
+            // Early (the Friday evening of the club cruise): her own lines come before the story of the event.
+            if (e.Early is { } early && !Past(w.From + early.Day, early.Hour))
+            {
+                rec.Early = true;
+                t.Narrative.AddRange(early.Lines);
+            }
             t.Narrative.AddRange(e.MadeLines);
             _log.Add(new LogEntry(Day, TimeOfDay, $"Made it: {e.Name}."));
+            if (rec.Early && e.Early!.Log.Length > 0) _log.Add(new LogEntry(Day, TimeOfDay, e.Early.Log));
             Raise($"event-{e.Id}", rec.Story.Length > 0 ? rec.Story : $"Made it: {e.Name}.", 0, onPassage: false);
-            if (e.Pick is not null) ChargeFriendWeek(t, w);
             return;
         }
         if (rec.Status == EventStatus.Failed && rec.FailedRequirement == failing.Text) return; // told once
         rec.Status = EventStatus.Failed;
         rec.FailedRequirement = failing.Text;
-        if (e.Pick is not null) rec.Closed = true;
-        t.Narrative.Add(e.FailedLines.TryGetValue(failing.Component, out var line)
+        t.Narrative.Add(e.FailedLines.TryGetValue(failing.Key, out var line)
             ? line
             : $"{e.Name}: {failing.Text} was not there, and it showed.");
         // The event is a symptom: the truth showed itself, and the fault behind it is found.
-        if (_boat.TryGet(failing.Component, out var c))
-            foreach (var f in c.ActiveFaults.ToList()) DiscoverNow(t, f);
+        foreach (var id in RequirementComponents(failing))
+            if (_boat.TryGet(id, out var c))
+                foreach (var f in c.ActiveFaults.ToList()) DiscoverNow(t, f);
         _log.Add(new LogEntry(Day, TimeOfDay, $"Missed: {e.Name} ({failing.Text})."));
     }
 
@@ -126,67 +156,21 @@ public sealed partial class Game
         {
             if (WindowOf(e, year) is not { } w || day < w.From || day > w.To) continue;
             var rec = RecordFor(e, year);
-            if (e.Overnight && day == w.From && !rec.Closed && rec.Status is EventStatus.Open or EventStatus.Failed
+            if (e.Pick is not null)
+            {
+                WeekDaily(t, e, rec, w, day);
+                continue;
+            }
+            if (e.Overnight && day == w.From && rec.Status is EventStatus.Open or EventStatus.Failed
                 && Afloat && !AtSea && e.Port == _portId && _workMinutesToday > 0)
                 Judge(t, e, rec, w);
 
-            // The friend is only there on the first day; the others are open to their last.
-            int lastChance = e.Pick is not null ? w.From : w.To;
-            if (day == lastChance && rec.Status == EventStatus.Open)
+            if (day == w.To && rec.Status == EventStatus.Open)
             {
                 rec.Status = EventStatus.Missed;
                 Raise($"event-missed-{e.Id}", e.MissedText.Length > 0 ? e.MissedText : $"{e.Name} came and went without you.", 0, onPassage: false);
             }
-            if (e.Pick is not null && day == w.To && rec.Status == EventStatus.Made && _boat.TryGet(FuelTankId, out var tank)
-                && tank.State.ContainsKey(FuelLitresProperty) && FuelLitres < TankCapacity)
-            {
-                tank.State[FuelLitresProperty] = TankCapacity;
-                Raise("friend-tank", "Your friend topped up the tank before they went, and wouldn't hear about paying.", 0, onPassage: false);
-            }
         }
-    }
-
-    /// <summary>The friend's week is on: fuel is free (the friend pays).</summary>
-    private bool FriendPays
-    {
-        get
-        {
-            if (EventRules.FirstOrDefault(e => e.Pick is not null) is not { } e) return false;
-            int year = new GameClock(Day).Year;
-            return WindowOf(e, year) is { } w && Day >= w.From && Day <= w.To
-                && _eventRecords.Any(r => r.Id == e.Id && r.Year == year && r.Status == EventStatus.Made);
-        }
-    }
-
-    /// <summary>Every weekday of the friend's week costs a vacation day (or unpaid leave) at once, in one line.</summary>
-    private void ChargeFriendWeek(Turn t, (int From, int To) w)
-    {
-        var rules = _boat.Calendar;
-        if (!rules.ChargesDays) return;
-        int vacation = 0, unpaid = 0;
-        for (int d = w.From; d <= w.To; d++)
-        {
-            if (new GameClock(d).IsWeekend || d == _chargedDay || _prepaid.Contains(d)) continue;
-            _prepaid.Add(d);
-            if (_vacationLeft > 0)
-            {
-                _vacationLeft--;
-                _vacationUsed++;
-                vacation++;
-                continue;
-            }
-            _unpaidDays++;
-            unpaid++;
-            _prepaidUnpaid.Add(d);
-            Spend(rules.UnpaidLeaveNok, LedgerUnpaid, $"Unpaid leave: {new GameClock(d).WeekdayName}, day {d}.");
-        }
-        if (vacation + unpaid == 0) return;
-        var parts = new List<string>();
-        if (vacation > 0) parts.Add($"{Counted(vacation, "vacation day", "vacation days")} ({_vacationLeft} left this year)");
-        if (unpaid > 0) parts.Add($"{Counted(unpaid, "day", "days")} of unpaid leave ({unpaid * rules.UnpaidLeaveNok} NOK off your pay)");
-        string line = $"The week costs {string.Join(" and ", parts)}.";
-        t.Narrative.Add(line);
-        _log.Add(new LogEntry(Day, TimeOfDay, line, unpaid * rules.UnpaidLeaveNok));
     }
 
     // ------------------------------------------------------------------ the friend
@@ -212,7 +196,48 @@ public sealed partial class Game
         _friendStart[year] = startDay;
         var clock = new GameClock(startDay);
         t.Narrative.Add($"You ring your friend. They'll come on {clock.WeekdayName}, day {startDay}, for a week.");
+        if (e.InviteCostLine.Length > 0) t.Narrative.Add(e.InviteCostLine);
         return Accept(t, action, _boat.Orders.PhoneMinutes, 0, null, $"Asked a friend aboard for a week from day {startDay}.", work: false);
+    }
+
+    // ------------------------------------------------------------------ going
+
+    /// <summary>
+    /// Mark an event as going, or take the mark off (free, no time, anywhere). Only an event that can still be made this listing: not made,
+    /// missed or gone. The friend's week is going from the moment the friend is asked and cannot be un-asked.
+    /// </summary>
+    private CommandResult DoPlanEvent(Turn t, string name, bool going)
+    {
+        string action = going ? "plan-event" : "unplan-event";
+        if (EventRules.Count == 0) return Reject(action, "There's nothing on the calendar.");
+        var r = NameResolver.Resolve(EventRules, name, e => e.Id, e => e.Name, _ => []);
+        if (r.Match is not { } e)
+            return r.Kind == ResolutionKind.Ambiguous
+                ? RejectResolution(action, r, name, x => x.Name)
+                : Reject(action, $"There's nothing on the calendar called '{name.Trim()}'.");
+
+        int year = ListedYear();
+        var window = WindowOf(e, year);
+        var rec = _eventRecords.FirstOrDefault(x => x.Id == e.Id && x.Year == year);
+        string when = WhenWords(e, year);
+        int end = window?.To ?? year * GameClock.DaysPerYear + (e.Pick?.ToDayOfYear ?? e.FromDayOfYear);
+        if (rec is { Status: EventStatus.Made }) return Reject(action, $"{e.Name} is made already: {when}.");
+        if (rec is { Status: EventStatus.Missed } || Day > end) return Reject(action, $"{e.Name} has gone: {when}.");
+        if (e.Pick is not null)
+        {
+            if (window is null)
+                return Reject(action, $"You haven't asked your friend yet: invite friend <day> ({when}).");
+            return Reject(action, going
+                ? $"Your friend is coming on day {window.Value.From}: that one is going already."
+                : $"Your friend is coming on day {window.Value.From}: you can't take that back now.");
+        }
+        if (going == _going.Contains((e.Id, year)))
+            return Reject(action, going ? $"{e.Name} is marked already: {when}." : $"{e.Name} isn't marked.");
+        if (going) _going.Add((e.Id, year)); else _going.Remove((e.Id, year));
+        t.Narrative.Add(going
+            ? $"You mark it on the calendar: {e.Name}, {when}. A wait will stop on its morning."
+            : $"You take the mark off: {e.Name}, {when}. A wait will not stop for it, but it still happens, and it still counts if you are there.");
+        return Accept(t, action, 0, 0, null, null, work: false);
     }
 
     // ------------------------------------------------------------------ views
@@ -258,17 +283,28 @@ public sealed partial class Game
             { Status: EventStatus.Missed } => "missed",
             _ => Day > to ? "missed" : window is { } w && Day >= w.From ? "on now" : "ahead",
         };
+        string outcome = rec is { Outcome.Length: > 0 } && e.WeekOutcomes.TryGetValue(rec.Outcome, out var o) ? o.Short : "";
         return new EventView(e.Name, PlaceName(e.Port), from, to, WhenWords(e, year), status,
-            e.Requires.Select(r => RequirementView(r, window)).ToList(), rec?.Story ?? "");
+            e.Requires.Select(r => RequirementView(r, window)).ToList(), rec?.Story ?? "", IsGoing(e, year),
+            window is not null && e.Beats.Count > 0 ? BeatViews(e, rec, window.Value) : null, e.Pick is not null && window is null, outcome);
     }
 
     /// <summary>What the player can tell of a requirement: what is fitted, the problems they have found, the dry days, the forecast. Never the truth they have not seen.</summary>
     private Requirement RequirementView(RequirementRule r, (int From, int To)? window)
     {
-        var known = KnownOpenFaults().FirstOrDefault(f => f.ComponentId == r.Component);
+        var ids = RequirementComponents(r).ToHashSet();
+        var known = KnownOpenFaults().FirstOrDefault(f => ids.Contains(f.ComponentId));
         bool aboard = _boat.TryGet(r.Component, out _) && !_gone.Contains(r.Component);
         switch (r.Kind)
         {
+            case "anyWorking":
+            {
+                // An alternative is open to the player when all of it is aboard and no problem they know of is on it.
+                bool Open(string alt) => alt.Split('+').All(id => _boat.TryGet(id, out _) && !_gone.Contains(id))
+                    && !KnownOpenFaults().Any(f => alt.Split('+').Contains(f.ComponentId));
+                return r.Components.Any(Open) ? new(r.Text, true, "no known problem")
+                    : known is not null ? new(r.Text, false, known.Name) : new(r.Text, false, "not aboard");
+            }
             case "fitted":
                 return !aboard ? new(r.Text, false, "not aboard")
                     : known is not null ? new(r.Text, false, known.Name) : new(r.Text, true, "fitted");
@@ -282,8 +318,8 @@ public sealed partial class Game
                     : new(r.Text, true, "dry");
             case "warm":
                 if (aboard && known is null) return new(r.Text, true, "heater fitted");
-                if (window is { } w && w.From >= Day && w.From - Day <= _boat.ForecastRules.MaxLeadDays)
-                    return _weather[w.From].TempC >= r.BelowC
+                if (window is { } w && w.To >= Day && w.To - Day <= _boat.ForecastRules.MaxLeadDays)
+                    return _weather[w.To].NightC >= r.BelowC
                         ? new(r.Text, true, "the forecast is warm enough")
                         : new(r.Text, false, "the forecast is cold and there is no heater");
                 return new(r.Text, null, "depends on the weather");
@@ -301,7 +337,7 @@ public sealed partial class Game
     }
 
     /// <summary>The first day of every event window that is still open from today on (a made or missed event is not ahead).</summary>
-    private IEnumerable<(int Day, string Name)> OpenWindowStarts()
+    private IEnumerable<(int Day, string Name, bool Going)> OpenWindowStarts()
     {
         int year = new GameClock(Day).Year;
         foreach (int y in new[] { year, year + 1 })
@@ -310,7 +346,7 @@ public sealed partial class Game
                 if (WindowOf(e, y) is not { } w || w.From < Day) continue;
                 var rec = _eventRecords.FirstOrDefault(r => r.Id == e.Id && r.Year == y);
                 if (rec is { Status: EventStatus.Made or EventStatus.Missed or EventStatus.Failed }) continue;
-                yield return (w.From, e.Name);
+                yield return (w.From, e.Name, IsGoing(e, y));
             }
     }
 

@@ -116,7 +116,7 @@ public class PlanTripTests
                     {
                         Assert.Equal(real.WindForce, f.WindForce);
                         Assert.Equal(real.RainMm > 0, f.Rain);
-                        Assert.Equal(WeatherWords.Describe(real), f.Text);
+                        Assert.Equal(WeatherWords.Describe(real) + " " + WeatherWords.SkyLine(real), f.Text);
                     }
                 }
             }

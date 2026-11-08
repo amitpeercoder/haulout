@@ -34,7 +34,7 @@ public sealed partial class Game
             var r = _boat.Reputation;
             int bills = r.OnTimeBillsPerPoint > 0 ? _billsOnTime / r.OnTimeBillsPerPoint : 0;
             int raw = bills + r.SlotKept * _slotsKept + r.Tow * _tows + r.MooringParted * _partings
-                + r.SlotMissed * _slotsMissed + r.BillPastLimit * _billsPastLimit + r.PatrolFine * _patrolFines;
+                + r.SlotMissed * _slotsMissed + r.BillPastLimit * _billsPastLimit + r.FerryReport * _ferryReports;
             return Math.Clamp(raw, r.Min, r.Max);
         }
     }
@@ -84,7 +84,15 @@ public sealed partial class Game
         {
             var rec = _eventRecords.FirstOrDefault(r => r.Id == e.Id && r.Year == year);
             string name = Lower(e.Name);
-            if (rec is { Status: EventStatus.Made }) { made.Add(name); continue; }
+            if (rec is { Status: EventStatus.Made })
+            {
+                // Which beats happened (the friend's week), or that she made the Friday (the club cruise): the data's own words.
+                var extras = new List<string>();
+                if (e.WeekOutcomes.TryGetValue(rec.Outcome, out var outcome) && outcome.Short.Length > 0) extras.Add(outcome.Short);
+                if (rec.Early && e.Early is { Short.Length: > 0 } early) extras.Add(early.Short);
+                made.Add(extras.Count == 0 ? name : $"{name} ({string.Join(", ", extras)})");
+                continue;
+            }
             var window = WindowOf(e, year);
             int end = window?.To ?? (e.Pick is { } p ? year * GameClock.DaysPerYear + p.ToDayOfYear : int.MaxValue);
             if (rec is { Status: EventStatus.Failed, FailedRequirement: { } why }) missed.Add($"{name} ({why})");
@@ -133,8 +141,8 @@ public sealed partial class Game
         if (charges) work.Add(vacation == 0 ? "no vacation days" : Counted(vacation, "vacation day", "vacation days"));
         if (unpaid > 0) work.Add($"{Counted(unpaid, "day", "days")} of unpaid leave");
         lines.Add(string.Join(", ", work) + ".");
-        string cost = $"She cost you {spent} NOK this season" + (income > 0 ? $"; paydays put {income} NOK into her account" : "");
-        lines.Add($"{cost}. The broker would put her at {value} NOK.");
+        string cost = $"She cost you {Money(spent)} this season" + (income > 0 ? $"; paydays put {Money(income)} into her account" : "");
+        lines.Add($"{cost}. The broker would put her at {Money(value)}.");
         if (reputation.Length > 0) lines.Add(reputation);
 
         return new SeasonPageView(number, from, toDay, Math.Round(miles, 1), _nightsAway, places, made, missed, hours, vacation, unpaid,

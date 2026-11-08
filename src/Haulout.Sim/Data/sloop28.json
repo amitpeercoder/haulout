@@ -315,7 +315,9 @@
     { "id": "tank", "verbs": ["inspect", "replace"] },
     { "id": "pump", "verbs": ["inspect", "replace"] },
     { "id": "hose", "verbs": ["inspect", "replace"] },
-    { "id": "fitting", "verbs": ["inspect", "replace"] }
+    { "id": "fitting", "verbs": ["inspect", "replace"] },
+    { "id": "instrument", "verbs": ["inspect", "clean", "replace"] },
+    { "id": "appliance", "verbs": ["inspect"] }
   ],
   "components": [
     {
@@ -986,7 +988,7 @@
       "replaceCostNok": 5200,
       "replaceMinutes": 360,
       "properties": {
-        "litres": 60,
+        "litres": 45,
         "fuelLitres": 27
       },
       "faults": [
@@ -2699,6 +2701,7 @@
     },
     {
       "id": "mooring-lines",
+      "noPoorJob": true,
       "kind": "fitting",
       "name": "Mooring lines",
       "subsystem": "hull",
@@ -2877,6 +2880,7 @@
             "kind": "none",
             "value": 0
           },
+          "dormant": true,
           "reveals": [
             {
               "action": "inspect",
@@ -2901,20 +2905,149 @@
             "nok": 2400,
             "leadDays": 1
           },
-          "note": "UNVERIFIED (design note 010): that a 28-footer of this age has rusted-solid chain, and what a new length costs."
+          "note": "UNVERIFIED (design note 010, second pass F): that a 28-footer of this age has chain that seizes, and what a new length costs. Woken only by the escalation of anchor-shackle-frozen."
+        }
+      ]
+    },
+    {
+      "id": "old-heads",
+      "kind": "appliance",
+      "name": "Hand-pump heads",
+      "subsystem": "hull",
+      "position": "heads-forward",
+      "reach": [
+        { "place": "forepeak", "cover": null, "visible": true, "reachable": true }
+      ],
+      "aliases": ["heads", "toilet", "marine toilet", "old heads", "hand-pump heads"],
+      "description": "A hand-pump marine toilet bolted to the forepeak sole, the bowl stained, the pump handle stiff, a joker valve in the outlet hose behind the pump.",
+      "condition": 0.35,
+      "wearYears": 25,
+      "seriesOhms": null,
+      "replaceMinutes": 0,
+      "faults": []
+    },
+    {
+      "id": "joker-valve",
+      "noPoorJob": true,
+      "kind": "fitting",
+      "name": "Joker valve",
+      "subsystem": "hull",
+      "position": "heads-forward",
+      "reach": [
+        { "place": "forepeak", "cover": null, "visible": true, "reachable": true }
+      ],
+      "aliases": ["joker valve", "outlet valve", "duckbill valve"],
+      "description": "A rubber duckbill valve in the heads' outlet hose, just behind the pump, grey and stiff with age.",
+      "condition": 0.3,
+      "wearYears": 5,
+      "seriesOhms": null,
+      "replaceMinutes": 60,
+      "replaceText": "You pinch off the outlet hose, cut the old valve out, push a new joker valve into the hose and clamp it. The forepeak smells of nothing at all by evening.",
+      "faults": [
+        {
+          "id": "joker-valve-weeping",
+          "atSea": { "text": "The heads smell, and will on any passage; nobody will want to use them." },
+          "name": "Weeping joker valve",
+          "effect": { "kind": "none", "value": 0 },
+          "reveals": [
+            {
+              "action": "look",
+              "text": "A faint smell of sewage hangs in the forepeak, sweetish and stale, strongest by the heads.",
+              "discovers": false
+            },
+            {
+              "action": "inspect",
+              "text": "A bead of damp at the pump's outlet, and the rubber flap of the joker valve is worn thin and does not seat: it weeps back into the pump.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": ["replace"],
+          "onHardOnly": false,
+          "consequence": "The heads smell, and a guest will not use them.",
+          "costLaterNok": 600,
+          "laterNote": null,
+          "diy": { "how": "Fit a new joker valve", "partsNok": 200, "minutes": 60 },
+          "yard": { "how": "The yard fits a new joker valve", "nok": 600, "leadDays": 1 },
+          "note": "UNVERIFIED (design note 010, second pass F): that a joker valve of this age weeps, how long one lasts, and what the yard charges for an hour."
+        }
+      ]
+    },
+    {
+      "id": "spirit-stove",
+      "kind": "appliance",
+      "name": "Spirit stove",
+      "subsystem": "hull",
+      "position": "galley",
+      "reach": [
+        { "place": "companionway", "cover": null, "visible": true, "reachable": true }
+      ],
+      "aliases": ["stove", "galley stove", "cooker", "spirit stove", "alcohol stove", "two burner stove"],
+      "description": "An old two-burner alcohol stove in a gimbal by the companionway, the brass burners blackened. It works, but slowly: the kettle takes its time.",
+      "condition": 0.4,
+      "wearYears": 30,
+      "seriesOhms": null,
+      "replaceMinutes": 0,
+      "faults": []
+    },
+    {
+      "id": "anchor-shackle",
+      "noPoorJob": true,
+      "kind": "fitting",
+      "name": "Anchor shackle",
+      "subsystem": "hull",
+      "position": "at-the-bow",
+      "reach": [
+        { "place": "on-deck", "cover": null, "visible": true, "reachable": true }
+      ],
+      "aliases": ["shackle", "anchor shackle"],
+      "description": "The galvanised shackle that joins the chain to the anchor's eye, its pin furred with rust.",
+      "condition": 0.3,
+      "wearYears": 12,
+      "seriesOhms": null,
+      "replaceMinutes": 60,
+      "replaceText": "You knock out the rusted pin with a punch, shackle the chain to the anchor with a new shackle and seize the pin with wire.",
+      "faults": [
+        {
+          "id": "anchor-shackle-frozen",
+          "atSea": { "text": "The chain will run, but the shackle is rusted solid at the anchor's eye and the whole rode is going the same way." },
+          "name": "Rusted chain with a frozen shackle",
+          "effect": { "kind": "none", "value": 0 },
+          "reveals": [
+            {
+              "action": "look",
+              "text": "The chain where it leaves the roller is brown with rust.",
+              "discovers": false
+            },
+            {
+              "action": "inspect",
+              "text": "The shackle pin is rusted into the anchor's eye; the chain is brown with rust but the links still move.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": ["replace"],
+          "escalation": {
+            "to": "anchor-chain-seized",
+            "onLaunch": false,
+            "text": "The anchor chain has seized: the rust has locked the links solid in the locker and it will not run."
+          },
+          "progression": {
+            "baseRatePerDay": 0.0072,
+            "factors": ["exposure"],
+            "exposedBy": [],
+            "spread": [0.8, 1.2]
+          },
+          "onHardOnly": false,
+          "consequence": "Left alone through a wet season the rust works up the chain until it seizes solid.",
+          "costLaterNok": 1800,
+          "laterNote": "a whole new length of chain, not a shackle",
+          "diy": { "how": "Fit a new shackle", "partsNok": 200, "minutes": 60 },
+          "yard": { "how": "The yard fits a new shackle", "nok": 500, "leadDays": 1 },
+          "note": "UNVERIFIED (design note 010, second pass F): how fast galvanised chain with no zinc left seizes in a wet season; the rate is rain-weighted exposure with its own spread."
         }
       ]
     }
   ],
-  "economy": {
-    "startingBalanceNok": 25000,
-    "launchDeadlineDay": 96,
-    "emergencyLiftNok": 9000,
-    "launchMinutes": 120,
-    "emergencyLiftDays": 2
-  },
   "survey": {
-    "nokPerFoot": 200,
     "lengthFeet": 28,
     "days": 1,
     "surveyor": "Hallvard Brekke, marine surveyor, Skjærvik",
@@ -3184,15 +3317,21 @@
     { "id": "hose-clamps", "name": "hose clamps (10)", "aliases": ["hose clamps", "clamps"], "priceNok": 120, "minutes": 15, "forComponent": "cockpit-drains" },
     { "id": "fuses", "name": "fuses (5)", "aliases": ["fuses", "fuse"], "priceNok": 60, "minutes": 15 },
     { "id": "hose", "name": "hose (2 m)", "aliases": ["hose", "2 m hose", "length of hose"], "priceNok": 250, "minutes": 15 },
+    { "id": "joker-valve", "name": "joker valve", "aliases": ["spare joker valve", "heads valve"], "priceNok": 200, "minutes": 15, "forComponent": "joker-valve" },
+    { "id": "chain-shackle", "name": "galvanised shackle", "aliases": ["shackle", "spare shackle", "chain shackle"], "priceNok": 200, "minutes": 15, "forComponent": "anchor-shackle" },
     { "id": "mooring-lines", "name": "mooring lines", "aliases": ["lines", "mooring line", "bow lines", "warps", "mooring warps"], "priceNok": 600, "minutes": 30, "forComponent": "mooring-lines" },
     { "id": "diesel-heater", "name": "diesel heater", "aliases": ["heater", "cabin heater", "bulkhead heater"], "priceNok": 14000, "minutes": 15, "stocked": false, "upgrade": "diesel-heater" },
-    { "id": "marine-heads", "name": "marine heads", "aliases": ["heads", "toilet", "marine toilet"], "priceNok": 6500, "minutes": 15, "stocked": false, "upgrade": "marine-heads" },
-    { "id": "galley-stove", "name": "two-burner stove", "aliases": ["stove", "galley stove", "cooker", "two burner stove"], "priceNok": 4500, "minutes": 15, "stocked": false, "upgrade": "galley-stove" },
+    { "id": "marine-heads", "name": "marine heads with holding tank", "aliases": ["heads", "toilet", "marine toilet", "holding tank"], "priceNok": 6500, "minutes": 15, "stocked": false, "upgrade": "marine-heads" },
+    { "id": "galley-stove", "name": "gas stove", "aliases": ["stove", "galley stove", "cooker", "gas stove", "oven"], "priceNok": 4500, "minutes": 15, "stocked": false, "upgrade": "galley-stove" },
     { "id": "chartplotter", "name": "chart plotter", "aliases": ["chartplotter", "plotter", "gps plotter"], "priceNok": 9000, "minutes": 15, "stocked": false, "upgrade": "chartplotter" },
     { "id": "radar", "name": "marine radar", "aliases": ["radar", "radar set"], "priceNok": 24000, "minutes": 15, "stocked": false, "upgrade": "radar" },
     { "id": "bunk-cushions", "name": "bunk cushions", "aliases": ["cushions", "berth cushions", "saloon cushions"], "priceNok": 5500, "minutes": 15, "stocked": false, "upgrade": "bunk-cushions" },
     { "id": "cockpit-varnish", "name": "varnish and brushes", "aliases": ["varnish", "brushes", "teak varnish"], "priceNok": 900, "minutes": 15, "stocked": false, "upgrade": "cockpit-varnish" }
   ],
+  "instruments": {
+    "plotterPlug": { "rainPerDay": 1.0, "sprayPerHourAtSea": 0.05, "sprayFromForce": 4 },
+    "scannerCable": { "fromForce": 5, "perHourByForce": [0.05, 0.1, 0.2, 0.35], "underWayFactor": 3.0 }
+  },
   "trips": {
     "home": "skjaervik",
     "ports": [
@@ -3240,7 +3379,7 @@
       { "from": "skjaervik", "to": "storholmen", "shelter": [ { "name": "Måkeskjær", "atNm": 12 } ] },
       { "from": "kvitnes", "to": "hestholmen", "shelter": [] }
     ],
-    "tow": { "nok": 6000, "hours": 6, "lostHours": 18 }
+    "tow": { "hours": 6, "lostHours": 18 }
   },
   "sea": {
     "stateByForce": [0, 1, 1, 2, 3, 4, 5, 6, 7, 8],
@@ -3249,14 +3388,14 @@
     "heaveToDriftKnots": 0.5, "anchorWithinNm": 1, "towKnots": 3,
     "slopPerSeaState": 0.5, "sprayFromSeaState": 2, "sprayLitresPerHourPerSeaState": 2,
     "stirFromSeaState": 3, "stirHoursToBite": 2,
-    "impellerShedPerLoadHour": 0.3, "overheatStopMinutes": 90,
+    "impellerShedPerLoadHour": 0.3, "impellerSetFromWear": 0.6, "impellerWeakFlowFromWear": 0.75, "overheatStopMinutes": 90,
     "underWayDrawPerHour": 0.05,
     "departMinutes": 10, "heaveToMinutes": 5, "anchorMinutes": 15, "turnBackMinutes": 2
   },
   "forecast": { "maxLeadDays": 3, "forceErrorChance": [0, 0.3, 0.5, 0.7], "rainFlipChance": [0, 0.1, 0.2, 0.3] },
   "yard": {
     "windowFromDayOfYear": 255, "windowToDayOfYear": 300, "driftFromDayOfYear": 240, "driftMaxDaysPerWeek": 7, "minLeadDays": 1,
-    "liftNok": 7000, "storageNok": 9000, "changeFeeNok": 500, "washNok": 1200, "washMinutes": 120, "hauloutMinutes": 120,
+    "washMinutes": 120, "hauloutMinutes": 120,
     "autumnFromDayOfYear": 240
   },
   "fouling": {
@@ -3284,7 +3423,7 @@
   },
   "mooring": {
     "startChafe": 0.4, "fromForce": 7, "chafeByForce": [0.05, 0.09, 0.14],
-    "spread": [0.6, 1.6], "partAt": 1.0, "warnFrom": 0.25, "partedRepairNok": 4000,
+    "spread": [0.6, 1.6], "partAt": 1.0, "warnFrom": 0.25,
     "chafeWords": [
       { "under": 0.25, "text": "The lines are sound: the lay is tight and the eyes are clean at the cleats." },
       { "under": 0.5, "text": "A little fuzz where the lines run through the fairleads, nothing that matters yet." },
@@ -3293,7 +3432,7 @@
     ]
   },
   "layup": {
-    "winteriseMinutes": 90, "antifreezeNok": 250, "fillMinutes": 30, "dieselNokPerLitre": 22, "fullAt": 0.9,
+    "winteriseMinutes": 90, "antifreezeNok": 250, "fillMinutes": 30, "fullAt": 0.9,
     "batteryMinutes": 30, "batteryRoomNok": 400, "chargerMinutes": 20, "chargerNok": 600, "coverMinutes": 120, "coverNok": 2500,
     "drawPerDay": 0.006, "frostHoursPerDegree": 3, "maxFrostHoursPerNight": 14, "condensationBelowNightC": 5,
     "freezeBelowCharge": 0.25, "snowBelowC": 1, "springDayOfYear": 75, "seasonFromDayOfYear": 60
@@ -3306,12 +3445,7 @@
     "serviceComponents": ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"]
   },
   "calendar": {
-    "eveningMinutes": 180, "vacationDaysPerYear": 25, "unpaidLeaveNok": 1500, "payNok": 6000,
-    "overdraftLimitNok": 20000, "interestPerMonth": 0.015, "aheadDays": 42,
-    "bills": [
-      { "id": "berth", "text": "Berth and mooring at Skjærvik, the quarter", "short": "the berth invoice", "nok": 3000, "daysOfYear": [0, 90, 180, 270], "fromDay": 90 },
-      { "id": "insurance", "text": "Insurance for the year", "short": "the insurance renewal", "nok": 8000, "daysOfYear": [90], "fromDay": 450 }
-    ],
+    "aheadDays": 42,
     "events": [
       {
         "id": "regatta", "name": "The regatta party at Hestholmen", "port": "hestholmen",
@@ -3336,28 +3470,71 @@
         "fromDayOfYear": 180, "days": 7,
         "pick": { "fromDayOfYear": 180, "toDayOfYear": 203, "noticeDays": 3 },
         "requires": [
-          { "kind": "fitted", "component": "marine-heads", "text": "a heads that works" },
-          { "kind": "fitted", "component": "galley-stove", "text": "a stove that works" },
+          { "kind": "anyWorking", "id": "heads", "components": ["old-heads+joker-valve", "marine-heads"], "text": "a heads that works" },
+          { "kind": "anyWorking", "id": "stove", "components": ["spirit-stove", "galley-stove"], "text": "a stove" },
           { "kind": "dryBunks", "component": "bunk-cushions", "days": 30, "text": "dry bunks" },
-          { "kind": "warm", "component": "diesel-heater", "belowC": 12, "text": "warm enough below, if the week is cold" }
+          { "kind": "warm", "component": "diesel-heater", "belowC": 10, "text": "warm enough below on the last night, if it is cold" }
         ],
-        "madeLines": [
-          "Your friend comes down the pontoon with a rucksack and a bag of oranges, looks round the saloon, and says that it is better than they remembered.",
-          "You spend the week the way you meant to: a trip round the islands, a swim off the quarter in water that takes your breath, the stove ticking, the nights long and light."
+        "beats": [
+          {
+            "id": "arrival", "kind": "arrival", "text": "Your friend comes aboard", "hour": 17,
+            "requires": ["heads", "stove", "bunk-cushions"],
+            "comeBackLine": "You come back for your friend: the ferry is in, and someone is coming down the pontoon.",
+            "madeLines": [
+              "Your friend comes down the pontoon with a rucksack and a bag of oranges, looks round the saloon, and says that it is better than they remembered."
+            ],
+            "failedLines": {
+              "heads": "Your friend opens the forepeak door, takes one breath, shuts it again, and books the hotel by the ferry.",
+              "stove": "Your friend looks round the galley for something to cook on, says nothing at all, and goes ashore to find something hot to eat.",
+              "bunk-cushions": "Your friend lies down on the saloon berth, sits up again at once, and says the cushions are damp. The week goes home with them."
+            }
+          },
+          {
+            "id": "trip", "kind": "trip", "text": "A day trip to Hestholmen", "port": "hestholmen",
+            "ask": "any day of the week: a passage to Hestholmen with your friend aboard, made in the normal way (a tow does not count)",
+            "announceLines": [ "Your friend has looked at the chart and wants to see Hestholmen." ],
+            "madeLines": [
+              "Your friend stands in the bow all the way in, pointing at things, and on the quay at Hestholmen buys two ice creams and a postcard of the harbour you are standing in."
+            ],
+            "missedText": "The week goes by without Hestholmen. Your friend is polite about it, and looks at the chart a little longer than necessary."
+          },
+          {
+            "id": "night", "kind": "night", "text": "The last night aboard", "hour": 22,
+            "requires": ["diesel-heater"],
+            "comeBackLine": "You come back for the evening: it is your friend's last night aboard.",
+            "morningLine": "You come back: it is your friend's last night aboard tonight.",
+            "madeLines": [
+              "The heater ticks and glows below, and your friend sits in the warm with a mug and says it is the best last night of any holiday."
+            ],
+            "passLines": [
+              "The last night is mild enough to sit out in the cockpit till late, and nobody thinks about the heater at all."
+            ],
+            "failedLines": {
+              "diesel-heater": "By the last evening your friend is in two jumpers and a hat, below, and asks gently whether there is heating. There is not."
+            },
+            "missedText": "The last night finds her at sea, and your friend's farewell supper is a sandwich at the chart table."
+          }
         ],
-        "failedLines": {
-          "marine-heads": "Your friend looks at the bucket in the forepeak, and then at you, and books the hotel by the ferry.",
-          "galley-stove": "Your friend watches you light the camping burner on the saloon table, says nothing at all, and goes ashore to find something hot to eat.",
-          "bunk-cushions": "Your friend lies down on the saloon berth, sits up again at once, and says the cushions are damp. The week goes home with them.",
-          "diesel-heater": "By the second evening your friend is in two jumpers and a hat, below, and asks gently whether there is heating. There is not."
+        "weekOutcomes": {
+          "good": { "line": "A good week: the island trip and the last night both came off, and your friend goes home talking about it.", "short": "a good week: the day trip and the last night" },
+          "made": { "line": "A week, and one of the two things your friend wanted came off.", "short": "a week: one of the day trip and the last night" },
+          "thin": { "line": "A thin week: your friend came aboard, and the island trip and the last night came to nothing.", "short": "a thin week: neither the day trip nor the last night" }
         },
+        "walkLine": "Your friend goes walking on the island while you are at work.",
+        "inviteCostLine": "Weekdays you spend with your friend cost vacation days as usual.",
         "missedText": "Your friend waited on the quay at Skjærvik and took the evening ferry home."
       },
       {
         "id": "club-cruise", "name": "The club cruise to Kvitnes", "port": "kvitnes",
-        "fromDayOfYear": 215, "weekday": "saturday", "days": 2,
+        "fromDayOfYear": 214, "weekday": "friday", "days": 3,
+        "madeBy": { "day": 1, "hour": 20 },
+        "early": {
+          "day": 0, "hour": 20,
+          "lines": [ "You come in on the Friday evening as the raft is forming: the club skipper waves you into the line with a boat hook, and you spend the first night in the middle of it, hearing the whole bay settle." ],
+          "log": "She made the Friday evening raft-up at Kvitnes.", "short": "she made the Friday"
+        },
         "requires": [
-          { "kind": "working", "component": "anchor-gear", "text": "anchor gear in order" },
+          { "kind": "working", "component": "anchor-gear", "components": ["anchor-shackle"], "text": "anchor gear in order" },
           { "kind": "working", "component": "bilge-pump", "text": "a bilge pump that works" }
         ],
         "madeLines": [
@@ -3373,7 +3550,28 @@
     ]
   },
   "fuel": {
-    "motorLitresPerHour": 2.5, "idleLitresPerHour": 0.6, "gaugeStepLitres": 5, "emptyBelowLitres": 0.5,
+    "ratedHp": 18, "hullSpeedKn": 6.3, "litresPerHpHour": 0.2, "loadMin": 0.15, "loadMax": 1.0, "idleLoad": 0.15,
+    "foulingMaxAdd": 0.4, "chargingAdd": 0.05, "chargingBelowStateOfCharge": 0.7,
+    "faultAdds": { "primary-filter-clogged": 0.15 },
+    "causeWords": {
+      "primary-filter-clogged": "a clogged fuel filter",
+      "charging": "a flat battery charging"
+    },
+    "foulingWords": [
+      { "under": 0.3, "text": "a little fouling" },
+      { "under": 0.6, "text": "fouling" },
+      { "under": null, "text": "heavy fouling" }
+    ],
+    "addWords": [
+      { "under": 0.075, "text": "a little" },
+      { "under": 0.17, "text": "a tenth" },
+      { "under": 0.23, "text": "a fifth" },
+      { "under": 0.29, "text": "a quarter" },
+      { "under": 0.43, "text": "a third" },
+      { "under": 0.55, "text": "nearly half" },
+      { "under": null, "text": "half again" }
+    ],
+    "gaugeStepLitres": 5, "emptyBelowLitres": 0.5,
     "gaugeWords": [
       { "under": 0.1, "text": "nearly empty" },
       { "under": 0.3, "text": "about a quarter of a tank" },
@@ -3384,10 +3582,41 @@
       { "under": null, "text": "a full tank" }
     ]
   },
-  "night": { "solarNoonHour": 13, "noLightsFineNok": 2000, "fogKnots": 2.0, "fogKnotsWithPlotter": 3.5 },
-  "orders": { "leadDays": [3, 10], "deliverTo": "skjaervik", "phoneMinutes": 5 },
+  "night": { "solarNoonHour": 13, "fogKnots": 2.0, "fogKnotsWithPlotter": 3.5 },
+  "closeCalls": {
+    "ferries": ["Skarvøy", "Havørn", "Sildebris", "Kråkevær"],
+    "letterBillText": "The harbourmaster's letter: the cost of a ferry's report.",
+    "letterAlert": "A letter from the harbourmaster's office: the ferry {ferry} reported you at about {hour} on day {day}. It bills {nok}, and the letter is in the logbook.",
+    "causes": {
+      "fog": {
+        "chancePerHour": 0.1, "reportChance": 0.3,
+        "narrations": [
+          { "ferry": true,  "text": "A ferry's horn, close and getting closer; then her wake slaps the hull and she is gone into the grey." },
+          { "ferry": true,  "text": "A wall of white steel slides past a boat length off, a man on her bridge wing looking down at you. Her wash rolls the boat for a minute after." },
+          { "ferry": false, "text": "A rock you never saw goes past close enough to touch, white water round it." },
+          { "ferry": false, "text": "A moored fishing float comes out of the grey dead ahead. You put the helm over and it scrapes down the side." }
+        ],
+        "reportLine": "She was a ferry, and her master will have written you into his log: the harbour will hear of it."
+      },
+      "night": {
+        "chancePerHour": 0.15, "reportChance": 0.6,
+        "narrations": [
+          { "ferry": true,  "text": "A searchlight comes swinging across the water from a ferry's bridge and stops on you. You put a hand up against the glare. Her horn gives one long blast, and she slides past close enough to read her name." },
+          { "ferry": true,  "text": "A wall of lit windows is suddenly there, a ferry you never saw, her bow wave already lifting you. A man on her bridge wing looks down at your dark boat." },
+          { "ferry": false, "text": "A fishing boat's bow comes out of the dark with its deck lamps glaring, and swings away a boat length off. Her wash slaps the hull, and a man shouts something you cannot make out." },
+          { "ferry": false, "text": "Something low and black is dead ahead: a fishing boat at her nets, and you saw no light until you were on her. You put the helm hard over and her warp scrapes down the side." }
+        ],
+        "reportLine": "She was a ferry, and her master will have called you in: the harbour will hear of it.",
+        "letter": true,
+        "letterDiscovers": "nav-lights",
+        "letterText": "Dear owner, the ferry {ferry} reported an unlit sailing boat in the fairway at about {hour} on day {day}, her sail number matching yours. A boat under way after dark shows her navigation lights. The harbour keeps every such report on file and bills the cost of answering it, {nok}. Please have her lights seen to before you sail after dark again. Yours, the harbourmaster's office.",
+        "planLine": "without them a ferry may not see her, and ferries report."
+      }
+    }
+  },
+  "orders": { "deliverTo": "skjaervik", "phoneMinutes": 5 },
   "reputation": {
-    "onTimeBillsPerPoint": 2, "slotKept": 1, "tow": -1, "mooringParted": -2, "slotMissed": -1, "billPastLimit": -1, "patrolFine": -1,
+    "onTimeBillsPerPoint": 2, "slotKept": 1, "tow": -1, "mooringParted": -2, "slotMissed": -1, "billPastLimit": -1, "ferryReport": -1,
     "min": -5, "max": 5, "towFactorPerPoint": 0.05, "slotDaysPerPoint": 1,
     "words": [
       { "under": -2, "text": "The yard has started asking for payment before the work." },
@@ -3409,31 +3638,63 @@
       "installText": "You cut the flue through the deck, seal it, bolt the heater to the bulkhead and tee its fuel line into the tank feed. You light it once to burn off the oil, and the saloon smells of hot paint for an hour."
     },
     {
-      "component": { "id": "marine-heads", "kind": "fitting", "name": "Marine heads", "subsystem": "hull", "position": "heads-forward", "reach": [{"place":"forepeak","cover":null,"visible":true,"reachable":true}],
-        "aliases": ["heads", "toilet", "marine toilet"],
-        "description": "A manual marine toilet bolted to the forepeak sole, with its seacock and two hoses.",
+      "component": { "id": "marine-heads", "kind": "fitting", "name": "Marine heads with holding tank", "subsystem": "hull", "position": "heads-forward", "reach": [{"place":"forepeak","cover":null,"visible":true,"reachable":true}],
+        "aliases": ["heads", "toilet", "marine toilet", "holding tank"],
+        "description": "A marine toilet bolted to the forepeak sole, its outlet piped to a holding tank under the V-berth, with its seacock and hoses.",
         "condition": 1, "wearYears": 10, "replaceMinutes": 480,
         "replaceText": "You pull the old heads and fit a new pump on the same hoses." },
       "place": "forepeak", "installMinutes": 480, "yardNok": 3000, "yardDays": 2, "valueNok": 3500,
-      "opens": "the friend's week",
-      "installText": "You clear the bucket out of the forepeak, bolt the heads to the sole, fit the inlet and outlet hoses on their seacocks and pump it through twice with the seacocks open. It works, and nothing leaks."
+      "replaces": ["old-heads", "joker-valve"],
+      "opens": "a heads that does not smell, for the friend's week",
+      "installText": "You unbolt the old hand-pump heads and carry it up through the hatch, valve and all, then bolt the new heads to the sole, set the holding tank under the V-berth, fit the hoses and pump it through twice with the seacocks open. It works, and nothing leaks, and nothing smells."
     },
     {
-      "component": { "id": "galley-stove", "kind": "fitting", "name": "Two-burner stove", "subsystem": "hull", "position": "galley", "reach": [{"place":"companionway","cover":null,"visible":true,"reachable":true}],
-        "aliases": ["stove", "galley stove", "cooker", "two burner stove"],
-        "description": "A two-burner gimballed stove by the companionway, on its own gas bottle with a shut-off at the locker.",
+      "component": { "id": "galley-stove", "kind": "fitting", "name": "Gas stove", "subsystem": "hull", "position": "galley", "reach": [{"place":"companionway","cover":null,"visible":true,"reachable":true}],
+        "aliases": ["stove", "galley stove", "cooker", "gas stove", "oven"],
+        "description": "A gimballed gas stove with two burners and an oven by the companionway, on its own gas bottle with a shut-off at the locker.",
         "condition": 1, "wearYears": 10, "replaceMinutes": 240,
         "replaceText": "You swap the old stove for a new one on the same gas hose." },
       "place": "companionway", "installMinutes": 240, "yardNok": 1500, "yardDays": 1, "valueNok": 2000,
-      "opens": "the friend's week",
-      "installText": "You lift the camping burner off the saloon table for good and fit the stove in the galley recess, gimbals on their pins, the gas hose run to the locker and tested with soapy water."
+      "replaces": ["spirit-stove"],
+      "opens": "a quick kettle, and an oven",
+      "installText": "You lift the old spirit stove out of its gimbal and fit the gas stove in the galley recess, gimbals on their pins, the gas hose run to the locker and tested with soapy water."
     },
     {
-      "component": { "id": "chartplotter", "kind": "fitting", "name": "Chart plotter", "subsystem": "electrical", "position": "cockpit", "reach": [{"place":"cockpit","cover":null,"visible":true,"reachable":true}],
+      "component": { "id": "chartplotter", "kind": "instrument", "name": "Chart plotter", "subsystem": "electrical", "position": "cockpit", "reach": [{"place":"cockpit","cover":null,"visible":true,"reachable":true}],
         "aliases": ["chartplotter", "plotter", "gps plotter"],
-        "description": "A small chart plotter on a bracket by the companion hatch, wired to the nav panel with an inline fuse.",
+        "description": "A small chart plotter on a bracket by the companion hatch, wired to the nav panel with an inline fuse; its power lead plugs into a socket behind the binnacle.",
         "condition": 1, "wearYears": 10, "replaceMinutes": 240,
-        "replaceText": "You swap the plotter on its bracket and re-key the boat's details." },
+        "replaceText": "You swap the plotter on its bracket and re-key the boat's details.",
+        "faults": [
+          {
+            "id": "plotter-plug-corroded",
+            "name": "Corroded plotter plug",
+            "effect": { "kind": "none", "value": 0 },
+            "failsWhen": "rain",
+            "symptom": "The plotter screen has gone blank; it comes back when you jiggle the plug behind the binnacle, then goes again.",
+            "atSea": { "text": "The plotter screen goes blank whenever it rains, so on a wet day it is no plotter at all; on a dry day it works." },
+            "dormant": true,
+            "spawn": {
+              "when": "deck.plugWetness",
+              "atLeast": 7,
+              "spread": true,
+              "repeats": true,
+              "cause": "The plotter's power plug has corroded. It came on from the cockpit rain and the spray at sea that reach the socket behind the binnacle."
+            },
+            "reveals": [
+              { "action": "inspect", "text": "The pins of the power plug behind the binnacle are furred with green corrosion, and the socket is damp.", "discovers": true },
+              { "action": "clean", "text": "You pull the plug, scrape the green off the pins with a small screwdriver and spray them with contact cleaner.", "discovers": true }
+            ],
+            "fixedBy": ["clean"],
+            "onHardOnly": false,
+            "consequence": "The plotter blanks in the rain, which is just when you want it, and works on a dry day, which is when you don't need it.",
+            "costLaterNok": 0,
+            "laterNote": "nothing worse; the screen only blanks more often",
+            "diy": { "how": "Clean the plug's pins and refit it", "partsNok": 0, "minutes": 30 },
+            "yard": { "how": "The yard cleans the plug and puts a dab of grease on the pins", "nok": 400, "leadDays": 1 },
+            "note": "UNVERIFIED (design note 010, second pass G): how fast an unsealed plug in a cockpit corrodes in rain and spray, and that it blanks the screen only when wet. Cleaning is the fix because a new plotter for a dirty plug would be absurd; it can corrode again."
+          }
+        ] },
       "place": "cockpit", "installMinutes": 240, "yardNok": 1500, "yardDays": 1, "valueNok": 5000,
       "opens": "leaving the harbour in fog; 3.5 knots in fog instead of 2",
       "installText": "You bolt the bracket to the cockpit coaming, run the power lead to the panel with its own fuse and key in the boat's details. The screen comes up blue with the coast drawn on it, and a small boat where you are."
@@ -3441,9 +3702,47 @@
     {
       "component": { "id": "radar", "kind": "fitting", "name": "Marine radar", "subsystem": "electrical", "position": "mast", "reach": [{"place":"on-deck","cover":null,"visible":true,"reachable":true},{"place":"cockpit","cover":null,"visible":true,"reachable":false}],
         "aliases": ["radar", "radar set"],
-        "description": "A small radome on the mast above the spreaders, the cable run down inside to a display at the companionway.",
+        "description": "A small radome on the mast above the spreaders, the cable run down the outside of the mast to a display at the companionway.",
         "condition": 1, "wearYears": 10, "replaceMinutes": 480,
         "replaceText": "You lower the old radome and fit a new one on the same bracket." },
+      "also": [
+        {
+          "id": "scanner-cable", "kind": "fitting", "name": "Scanner cable", "subsystem": "electrical", "position": "mast",
+          "reach": [{"place":"on-deck","cover":null,"visible":true,"reachable":true},{"place":"cockpit","cover":null,"visible":true,"reachable":false}],
+          "aliases": ["scanner cable", "radar cable", "mast cable", "cable run"],
+          "description": "The radar's cable where it runs down the mast, taped to the spar with a loop at each spreader.",
+          "condition": 1, "wearYears": 8, "replaceMinutes": 120, "replaceCostNok": 700, "noPoorJob": true,
+          "replaceText": "You go up the mast on a halyard, cut out the old cable run, lead a new one down from the radome and tape it to the spar with a drip loop at the spreader.",
+          "faults": [
+            {
+              "id": "scanner-cable-chafed",
+              "name": "Chafed scanner cable",
+              "effect": { "kind": "none", "value": 0 },
+              "symptom": "The radar sweeps, but the screen stays empty: not even the shore paints.",
+              "atSea": { "text": "The radar paints nothing: it is no help in fog." },
+              "dormant": true,
+              "spawn": {
+                "when": "mast.scannerChafe",
+                "atLeast": 35,
+                "spread": true,
+                "repeats": true,
+                "cause": "The scanner cable has chafed through where it passes the spreader. It came on from the mast working in the wind, most of all under way."
+              },
+              "reveals": [
+                { "action": "inspect", "text": "Where the cable runs past the spreader the outer sheath is worn through and the braid shows, shiny from rubbing on the spar.", "discovers": true }
+              ],
+              "fixedBy": ["replace"],
+              "onHardOnly": false,
+              "consequence": "The radar paints nothing, so in fog she is no better off than without it.",
+              "costLaterNok": 0,
+              "laterNote": "nothing worse; the radar stays blind until the cable is renewed",
+              "diy": { "how": "Run a new scanner cable down the mast", "partsNok": 700, "minutes": 120 },
+              "yard": { "how": "The yard runs a new scanner cable", "nok": 1800, "leadDays": 1 },
+              "note": "UNVERIFIED (design note 010, second pass G): how fast a radar cable chafes where it passes a spreader, how much faster under way than at the mooring, and what a cable run costs."
+            }
+          ]
+        }
+      ],
       "place": "on-deck", "installMinutes": 480, "yardNok": 5000, "yardDays": 3, "valueNok": 12000,
       "opens": "fog at full speed",
       "installText": "You go up the mast on a halyard with the bracket and the radome, bolt it on above the spreaders and tape the cable down the mast. Below, the display sweeps round and shows the pontoon, the boats beside her and the shore."
@@ -3471,6 +3770,8 @@
     }
   ],
   "placeholders": [
+    "PLACEHOLDER (design note 010, second pass C: rule of thumb about 0.2 L per hp-hour at full load; owners of 18-20 hp two-cylinder auxiliaries report 1.0-1.5 L/h at cruising revs; forum and trade figures, UNVERIFIED): fuel { ratedHp 18, hullSpeedKn 6.3 (about a 22 ft waterline), litresPerHpHour 0.2, loadMin 0.15, loadMax 1.0, idleLoad 0.15, foulingMaxAdd 0.4, chargingAdd 0.05 below state of charge 0.7, faultAdds primary-filter-clogged 0.15 } and the words for them; the tank is 45 L.",
+    "NOTE (design note 010, second pass A): every money and time knob of the economy (pay, vacation, evening, unpaid leave, overdraft, bills, the yard's lift, storage, change fee and wash prices, the tow price, the emergency lift, starting balance, order lead days, the mooring repair, diesel per litre, the survey fee per foot, the harbourmaster's letter) now lives in economy.json; the figures quoted in the placeholders below for those knobs are the first values and may have moved there.",
     "PLACEHOLDER (design note 008): water.harbourmasterLitres (the bilge level at which the harbourmaster rings about a boat on her mooring, default the sole level) and water.harbourmasterText (what he says) are placeholders for Amit.",
     "PLACEHOLDER (decision 007/6): the harbour shop at Hestholmen stocks only filter elements and impellers, at 1.3 times the yard chandlery price.",
     "PLACEHOLDER (design note 006): rates.weatherGates (the wind force from which nobody goes on deck or launches, the rain in mm from which a paint job is refused) are placeholders for Amit to calibrate.",
@@ -3505,20 +3806,27 @@
     "PLACEHOLDER (design note 008): sale { base value 180000 NOK (the insured value); less the yard price of every finding of the buyer's surveyor (else the parts, else the cost later; heavy growth on the hull, 0.2 or more, at the yard's wash); 3000 NOK for each of 4 undocumented years at purchase and for each season of her ownership without an engine service entry (the current one until it has one); plus 600 NOK for each maintenance entry this season, at most 12; plus 4 percent for a sale in March to June, minus 4 percent from September to February; never below 30 percent of the base }.",
     "PLACEHOLDER (design note 008): buyers { a viewing on 0.2 of the days she is listed on the hard, times 1 plus 3 times how far the broker's value is over the ask (between 0.1 and 2), times 1.3 in spring, 1.0 in summer, 0.6 in autumn and winter; the buyer's surveyor finds each detectable fault with chance 0.85; the offer is 0.88 to 1.02 of the value found, rounded to 100 NOK and never over the ask; it holds 7 days; listing takes 30 min; the broker is Holm & Datter }.",
     "UNVERIFIED (design note 008): the valuation practice (that a buyer takes the yard price of every defect off, that undocumented engine years and a kept logbook move the price, that a spring sale beats an autumn one by about 8 percent) and the viewing rates are not checked against real brokers or buyers.",
-    "PLACEHOLDER (design note 010): calendar { day 0 is a Monday; a weekday evening aboard is free up to 180 minutes, past that the day costs a vacation day; 25 vacation days a year (the calendar year, no pro rata); with none left a weekday aboard is unpaid leave and 1500 NOK comes off the boat account; a weekday at sea is always a day }.",
-    "PLACEHOLDER (design note 010): money { pay 6000 NOK on the first of every month (day of year divisible by 30), the figure the single economic knob; overdraft limit 20000 NOK at 1.5 percent a month, charged on the first of the month before the pay, ceil(owed * 0.015); bills the player did not choose may pass the limit; the Calendar looks 42 days ahead }.",
-    "PLACEHOLDER (design note 010): standing bills { berth and mooring at Skjærvik 3000 NOK on days of year 0, 90, 180 and 270, the first on day 90 (the spring quarter was paid with the boat); insurance 8000 NOK on day of year 90, the first renewal on day 450 (it runs to next spring); the yard's lift 7000 and storage 9000 stay as in design note 008 }.",
-    "PLACEHOLDER (design note 010): orders { a part the yard chandlery does not keep on the shelf (starter motor, injection pump, injectors, heat exchanger, raw-water pump, alternator, fuel tank, exhaust elbow, sprayhood, engine block) is ordered by phone (5 minutes) and arrives in 3 to 10 days, drawn per order, at the yard in Skjærvik; the price is the part's replace price }.",
     "PLACEHOLDER (design note 010): fuel { the tank holds 60 litres (27 aboard at the start, the same fraction as before); the engine burns 2.5 litres an hour motoring under way and 0.6 an hour running at a mooring, on the hard or hove-to; the gauge reads to 5 litres and says a fraction of a tank in words; empty below 0.5 litre }.",
     "UNVERIFIED (design note 010): that a 20 hp diesel burns 2.5 L/h at 5 knots and 0.6 L/h at idle, and that a 28-footer carries a 60 litre tank (domain, Amit).",
-    "PLACEHOLDER (design note 010): night { dark when an hour is more than half the day's length from 13:00; the harbour patrol fines a boat running dark with the bow light out 2000 NOK, once a passage; in fog she creeps at 2 knots, 3.5 with a chartplotter, uncapped with radar; the harbourmaster does not let a boat out in fog without a plotter or radar }. Daylight and fog are in weather.json.",
-    "UNVERIFIED (design note 010): the patrol and its fine, the harbourmaster's fog rule, and the speeds in fog are not checked against real practice (domain, Amit).",
-    "PLACEHOLDER (design note 010): the anchor-gear component (a plough on a galvanised chain, appended as the last component so no fault index moves; its id is not 'anchor' because that is also the command) starts with a seized chain, 1800 NOK and an hour to replace, 2400 NOK and a day at the yard; it governs anchoring at sea and arriving at Kvitnes, where the arrival lines change.",
+    "PLACEHOLDER (design note 010): night { dark when an hour is more than half the day's length from 13:00; a boat running dark without her navigation lights rolls a close call every whole hour (see closeCalls); in fog she creeps at 2 knots, 3.5 with a chartplotter, uncapped with radar; the harbourmaster lets her out in fog and it is a risk, not a rule (design note 010, second pass D) }. Daylight, humidity, sea temperature and fog are in weather.json.",
+    "UNVERIFIED (design note 010): the speeds in fog are not checked against real practice (domain, Amit).",
+    "PLACEHOLDER (design note 010, second pass E): closeCalls.causes.night { an hour under way after dark without working navigation lights: 0.15 chance of a close call, 0.6 that a ferry reports it (a ferry that nearly runs down an unlit boat calls it in); fog and night in one hour roll once each; a reported night call brings the harbourmaster's letter with the next morning's post (or on arrival if she is at sea), billing economy.json closeCalls.letterNok as a bill; the ferries' names are fictional }.",
+    "UNVERIFIED (design note 010, second pass E): that a ferry reports an unlit sailing boat, that a harbourmaster writes to the owner and bills the cost of answering it, and the chance of a close call in the dark.",
+    "PLACEHOLDER (design note 010, second pass D): closeCalls.fog { each whole hour under way in fog without a working plotter or radar rolls a close call with chance 0.1; with a plotter she keeps to the marked route and with radar she sees what is there, so neither rolls; 0.3 of close calls are a ferry that reports her (one reputation mark, ferryReport -1); the narration is picked from the list by the roll, the ferry ones when she reports }.",
+    "UNVERIFIED (design note 010, second pass D): the chance per hour, the share of ferries that report, and that a ferry's report costs standing at the harbour (domain, Amit).",
+    "PLACEHOLDER (design note 010): the anchor-gear component (a plough on a galvanised chain, appended after the others so no fault index moves; its id is not 'anchor' because that is also the command), 1800 NOK and an hour to replace, 2400 NOK and a day at the yard; its seized-chain fault starts dormant (design note 010, second pass F) and governs anchoring at sea and arriving at Kvitnes, where the arrival lines change.",
     "PLACEHOLDER (design note 010): calendar.events { the regatta party at Hestholmen on the first Saturday on or after day 150; Midsummer at Storholmen on days 172 to 173, overnight; a friend's week aboard of seven days starting between day 180 and 203, at least 3 days after the invitation, needing a heads, a stove, dry bunks (no water over the sole in 30 days) and, below 12 degrees, a heater; the club cruise to Kvitnes on the first Saturday on or after day 215, two days, needing the anchor and the bilge pump } and the stories they tell.",
     "UNVERIFIED (design note 010): that these four events and their requirements are the right first list, and the 12 degree line for the heater (domain, Amit).",
-    "UNVERIFIED (design note 010): that these parts are not kept on a small yard's shelf, and the 3 to 10 day lead time; the berth and insurance prices and their billing dates; the share of a salary left over for the boat.",
     "PLACEHOLDER (design note 010): upgrades { diesel heater 14000 NOK, 600 minutes of your own work in the quarter berth, or the yard's 4000 NOK and 3 days, adds 8000 NOK to the broker's letter; marine heads 6500, 480 minutes in the forepeak, yard 3000 and 2 days, 3500; two-burner stove 4500, 240 minutes at the companionway, yard 1500 and 1 day, 2000; chart plotter 9000, 240 minutes in the cockpit, yard 1500 and 1 day, 5000; marine radar 24000, 480 minutes on deck, yard 5000 and 3 days, 12000; bunk cushions 5500, 30 minutes in the saloon, no yard route, 2000; varnish and brushes 900, 480 minutes in the cockpit on a dry day, no yard route, 4000 }. All are ordered (not kept on the yard's shelf), have no faults this round, and wear in 10 years (varnish 3). The names are generic and fictional.",
     "UNVERIFIED (design note 010): that a 28-footer of this age may have neither a heads nor a stove (a bucket in the forepeak, a camping burner) and so needs them fitted for a friend; the prices, install hours and yard days of the upgrades, and what each adds to a broker's letter (domain, Amit).",
-    "PLACEHOLDER (design note 010): reputation { one point for every 2 standing bills paid within the bank's limit, +1 for a haulout on the booked day, -1 for a tow, -2 for a parted mooring, -1 for a forfeited slot, -1 for a bill that left the balance past the limit, -1 for a patrol fine; clamped to -5..5; each point takes 5 % off the tow (a negative point adds 5 %) and one day off the yard's first free slot (a negative point adds one) }. It is never shown as a number: five sentences by band."
+    "PLACEHOLDER (design note 010, second pass I): impeller wear { with the pump cover off the vanes read as having taken a set from 60 percent wear (1 minus condition); the flow at the exhaust reads weaker from 75 percent wear; both before the vanes shed }.",
+    "PLACEHOLDER (design note 010, second pass F): the boat as sold, four components appended after anchor-gear so no fault index moves: old-heads (a hand-pump marine toilet, kind appliance, no fault), joker-valve (kind fitting, a weeping joker valve from the start: a smell on first looking round the forepeak, inspect finds the damp and the worn flap; a new valve is 200 NOK, 60 minutes by hand or 600 NOK and 1 day by the yard), spirit-stove (a two-burner alcohol stove, kind appliance, works, slow) and anchor-shackle (kind fitting; a frozen shackle on rusted chain from the start: inspect on deck finds it; a new shackle is 200 NOK, 60 minutes by hand or 500 NOK and 1 day by the yard).",
+    "PLACEHOLDER (design note 010, second pass F): the frozen shackle's escalation into the seized chain: progression { baseRatePerDay 0.0072, factor exposure (rain weighted 0.5 per 10 mm of the day, frost 0.3 a night), its own seeded spread 0.8 to 1.2 drawn on salt 12 and not from the world stream }. Over the seeds 1 to 10, left alone from day 75, the chain seizes on day 185, 189, 225, 194, 184, 224, 197, 202, 201 and 221 (7 of 10 by the club cruise on day 215; none before day 184, and 179 over 60 seeds); a shackle fitted by midsummer (day 172) is never followed by a seized chain.",
+    "UNVERIFIED (design note 010, second pass F): how fast a galvanised chain whose zinc is gone seizes in a wet season, that a frozen shackle starts it, the joker valve's life (5 years here) and what a joker valve, a shackle and an hour of labour cost (domain, Amit).",
+    "PLACEHOLDER (design note 010, second pass F): upgrades that replace (replaces) take the old components off the boat with their faults: the marine heads with holding tank (6500 NOK, as before) replace old-heads and joker-valve, the gas stove (4500 NOK, two burners and an oven) replaces spirit-stove; the friend's week asks for a heads that works (the old heads with a sound valve, or the new heads) and a stove (the old one or the new one), dry bunks, and warmth if the week is cold; the club cruise asks for anchor gear in order, which now means no open fault on the shackle or the chain.",
+    "PLACEHOLDER (design note 010, second pass G): instruments { the plotter's plug counts wetness from the day the plotter is fitted: 1.0 a day of full rain (times the exposure rain term, so a winter cover keeps it off) and 0.05 an hour at sea in force 4 or more; the corroded-plug fault wakes at 7 times the house's seeded spread (0.6 to 1.6) and blanks the screen on a day of rain only; cleaning the pins (30 min, free) is the fix, the yard 400 NOK and a day. The radar's scanner cable counts chafe from the day the radar is fitted, afloat, in force 5 or more: 0.05, 0.1, 0.2, 0.35 an hour for force 5 to 8 and over, times 3 at sea; the chafed-cable fault wakes at 35 times the seeded spread and the radar paints nothing; a new cable run is 700 NOK and 120 min, the yard 1800 NOK and a day }. The cable is a part that comes aboard with the radar (upgrades.also), not an upgrade and not on the shelf (bought at 700 NOK when it is replaced): no price or value moves.",
+    "UNVERIFIED (design note 010, second pass G): how fast an unsealed plotter plug corrodes in cockpit rain and spray, that it blanks the screen only when wet, how fast a scanner cable chafes at a spreader, how much faster under way, and the price of a cable run (domain, Amit).",
+    "PLACEHOLDER (design note 010): reputation { one point for every 2 standing bills paid within the bank's limit, +1 for a haulout on the booked day, -1 for a tow, -2 for a parted mooring, -1 for a forfeited slot, -1 for a bill that left the balance past the limit, -1 for a ferry's report after a close call in fog or at night; clamped to -5..5; each point takes 5 % off the tow (a negative point adds 5 %) and one day off the yard's first free slot (a negative point adds one) }. It is never shown as a number: five sentences by band.",
+    "PLACEHOLDER (design note 010, second pass H): the friend's week as three beats { the arrival at Skjaervik at 17:00 of the first day (a heads, a stove and dry bunks; failing one ends the week), a day trip to Hestholmen made on a passage the player makes with the friend aboard (a tow does not count), the last night judged at 22:00 of the last day, afloat at any port, with a diesel heater if the night's low is under 10 degrees; a good week is both of the trip and the night, a week one of them, a thin week the arrival only; the week charges no fixed block: the weekday rule charges what the player does, and a wait leaves the friend ashore } and the club cruise { the first Friday on or after day 214, Friday to Sunday; made if she is at Kvitnes by 20:00 on the Saturday, and with the Friday line if by 20:00 on the Friday }"
   ]
 }

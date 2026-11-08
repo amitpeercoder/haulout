@@ -1,3 +1,4 @@
+using Haulout.Sim.Data;
 using Haulout.Sim.Components;
 using Haulout.Sim.Faults;
 using Haulout.Sim.Weather;
@@ -29,7 +30,7 @@ public sealed partial class Game
     private bool Afloat => !_onTheHard;
 
     private string EmergencyLiftLine =>
-        $"She's afloat: that's below the waterline. It needs her lifted out: an 'emergency lift', {_boat.Economy.EmergencyLiftNok} NOK and {Days(_boat.Economy.EmergencyLiftDays)}.";
+        $"She's afloat: that's below the waterline. It needs her lifted out: an 'emergency lift', {Money(_boat.Economy.EmergencyLiftNok)} and {Days(_boat.Economy.EmergencyLiftDays)}.";
 
     /// <summary>Do-it-yourself work on a part that sits below the waterline, or on a known problem that needs her out of the water.</summary>
     private string? AfloatRefusal(Component c) =>
@@ -45,6 +46,12 @@ public sealed partial class Game
     internal FaultState StateOf(string faultId) => FaultById(faultId)!.State;
 
     private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+
+    /// <summary>How money is written for this boat (display only; one abstract unit). Adapters read the label here, never from the JSON.</summary>
+    public Currency Currency => _boat.Currency;
+
+    /// <summary>An amount with the currency label, the one way the sim writes money.</summary>
+    private string Money(int units) => MoneyWords.Amount(units, _boat.Currency);
 
     private string LaunchIn()
     {
@@ -65,7 +72,7 @@ public sealed partial class Game
     {
         var seen = new List<Fault>();
         var cur = f;
-        while (cur.Escalation?.To is { } to && _boat.Get(cur.ComponentId).Faults.FirstOrDefault(x => x.Id == to) is { } next && !seen.Contains(next))
+        while (cur.Escalation?.To is { } to && FaultById(to) is { } next && !seen.Contains(next))
         {
             seen.Add(next);
             cur = next;
@@ -169,8 +176,11 @@ public sealed partial class Game
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
         ShutDownEngine(t);
         _weekEvents.Clear();
-        days = StopAtCalendar(t, days * 1440) / 1440;
-        if (Afloat) return DoWaitMoored(t, "wait", days * 1440, $"leave her for {Days(days)}", $"You leave her for {Days(days)}.", null);
+        int minutes = StopAtCalendar(t, days * 1440);
+        days = minutes / 1440;
+        // A wait cut at the hour of a beat of the friend's week is not whole days: it ends at the hour.
+        if (Afloat) return DoWaitMoored(t, "wait", minutes, $"leave her for {Days(Math.Max(1, (minutes + 1439) / 1440))}",
+            minutes % 1440 == 0 ? $"You leave her for {Days(days)}." : null, null);
         t.Narrative.Add($"You leave her for {Days(days)}.");
         // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
         var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();
@@ -194,7 +204,7 @@ public sealed partial class Game
     {
         var esc = f.Escalation;
         if (esc is null) return;
-        var next = _boat.Get(f.ComponentId).Faults.FirstOrDefault(x => x.Id == esc.To);
+        var next = FaultById(esc.To); // usually on the same component; the frozen shackle's successor is the chain's
         if (next is null) return;
         bool known = f.State is FaultState.Discovered or FaultState.Deferred;
         f.MarkEscalated();
@@ -299,7 +309,7 @@ public sealed partial class Game
         }
         int liftDay = Day;
         return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok + storage, card,
-            autumn ? $"Emergency lift for the winter: back on the hard, storage {storage} NOK." : "Emergency lift: back on the hard.", work: false,
+            autumn ? $"Emergency lift for the winter: back on the hard, storage {Money(storage)}." : "Emergency lift: back on the hard.", work: false,
             afterTick: autumn && card is not null ? () => { WriteSeasonPage(t, liftDay); return card with { Lines = t.Narrative.ToList() }; } : null);
     }
 

@@ -38,7 +38,7 @@ public class SecondPassTests(ITestOutputHelper output)
     }
 
     private static Boat RichBoat() =>
-        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", "\"startingBalanceNok\": 90000"));
+        BoatLoader.Load(Sloop28Json(), economyJson: TestEconomy.Replace("\"startingBalanceNok\": 25000", "\"startingBalanceNok\": 90000"));
 
     private static WeatherSeries Calm(double tempC = 12) =>
         WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, tempC, 8));

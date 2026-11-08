@@ -37,9 +37,13 @@ public sealed class WeatherSeries
     {
         climate ??= Climate.Default;
         var rng = new SeededRandom(seed * 31 + 7);
-        // Fog has its own stream, two draws a day whatever the outcome, so the main stream (and the golden hash of the series) never moves.
-        var fogRng = new SeededRandom(seed * 7349 + 101);
-        var (liftLo, liftHi) = climate.FogLifts;
+        // Humidity has its own stream, two draws a day (one normal), so the main stream (and the golden hash of the series) never moves.
+        var humRng = new SeededRandom(seed * 9187 + 211);
+        var humidity = climate.HumidityRule;
+        var seaRule = climate.SeaRule;
+        var fogRule = climate.FogRule;
+        double humAnomaly = 0, seaAnomalyAverage = 0;
+        double persistence = Math.Clamp(humidity.Persistence, 0, 0.999);
         var days = new WeatherDay[LastDay + 1];
 
         double tempAnomaly = 0, windAnomaly = 0;
@@ -83,26 +87,32 @@ public sealed class WeatherSeries
                 else dir = (int)(rng.NextDouble() * 8);
             }
 
-            double fogRoll = fogRng.NextDouble(), lengthRoll = fogRng.NextDouble();
-            int fogUntil = 0;
-            if (fogRoll < c.FogChance)
-            {
-                if (lengthRoll < climate.FogAllDayFraction) fogUntil = 24;
-                else
-                {
-                    double u = climate.FogAllDayFraction >= 1 ? 0 : (lengthRoll - climate.FogAllDayFraction) / (1 - climate.FogAllDayFraction);
-                    fogUntil = Math.Min(liftHi, liftLo + (int)(u * (liftHi - liftLo + 1)));
-                }
-            }
+            double roundedTemp = Math.Round(temp, 1), roundedNight = Math.Round(night, 1);
 
-            days[day] = new WeatherDay(day, force, Directions[dir], rain, Math.Round(temp, 1), Math.Round(night, 1), Math.Round(c.Daylight, 2), fogUntil);
+            // Humidity: a unit AR(1) walk scaled to the month's band, held in the band, raised on a wet day (and never past 100).
+            humAnomaly = persistence * humAnomaly + Math.Sqrt(1 - persistence * persistence) * Normal(humRng);
+            double humMid = (c.HumidityLo + c.HumidityHi) / 2, humHalf = (c.HumidityHi - c.HumidityLo) / 2;
+            double hum = Math.Clamp(humMid + humAnomaly * humHalf, c.HumidityLo, c.HumidityHi);
+            if (wet) hum += humidity.WetAddPercent;
+            hum = Math.Round(Math.Min(100, hum), 1);
+
+            // The dew point is the air mass's: the Magnus value at the day's mean air temperature, constant through the day.
+            double dew = Math.Round(DewPoint((roundedTemp + roundedNight) / 2, hum), 1);
+
+            // The sea: the month's curve plus a slow average of the air's anomaly, clamped to the season's range. No draws.
+            seaAnomalyAverage += (tempAnomaly - seaAnomalyAverage) / Math.Max(1, seaRule.AnomalyAverageDays);
+            double sea = Math.Round(c.SeaTemp + SeaAnomaly(seaAnomalyAverage, seaRule), 1);
+
+            var weather = new WeatherDay(day, force, Directions[dir], rain, roundedTemp, roundedNight, Math.Round(c.Daylight, 2), 0,
+                hum, dew, sea);
+            days[day] = ApplyFog(weather, fogRule);
         }
         return new WeatherSeries(days);
     }
 
     private readonly record struct Curve(
         double TempLo, double TempHi, double NightDrop, double RainChance, double RainAfterRain,
-        double RainMean, double WindMean, double GaleChance, double Daylight, double FogChance);
+        double RainMean, double WindMean, double GaleChance, double Daylight, double HumidityLo, double HumidityHi, double SeaTemp);
 
     /// <summary>Interpolates between month centres so no parameter jumps at a month boundary.</summary>
     private static Curve Blend(Climate climate, int day)
@@ -118,7 +128,41 @@ public sealed class WeatherSeries
             L(a.TempC[0], b.TempC[0]), L(a.TempC[1], b.TempC[1]), L(a.NightDropC, b.NightDropC),
             L(a.RainChance, b.RainChance), L(a.RainAfterRainChance, b.RainAfterRainChance),
             L(a.RainMeanMm, b.RainMeanMm), L(a.WindMeanForce, b.WindMeanForce), L(a.GaleChance, b.GaleChance),
-            L(a.DaylightHours, b.DaylightHours), L(a.FogChance, b.FogChance));
+            L(a.DaylightHours, b.DaylightHours), L(Hum(a, 0), Hum(b, 0)), L(Hum(a, 1), Hum(b, 1)), L(a.SeaTempC, b.SeaTempC));
+    }
+
+    private static double Hum(MonthClimate m, int i) => m.Humidity is { Count: 2 } h ? h[i] : (i == 0 ? 60 : 80);
+
+    /// <summary>The dew point in degrees C by the Magnus formula (a = 17.62, b = 243.12 C) from the air temperature and the relative humidity in percent.</summary>
+    public static double DewPoint(double airC, double humidityPercent)
+    {
+        const double a = 17.62, b = 243.12;
+        double gamma = Math.Log(Math.Max(humidityPercent, 1) / 100.0) + a * airC / (b + airC);
+        return b * gamma / (a - gamma);
+    }
+
+    /// <summary>The sea's departure from the month's curve: gain times the slow average of the air's anomaly, clamped to plus or minus the clamp.</summary>
+    public static double SeaAnomaly(double airAnomalyAverageC, SeaTempRules rule) =>
+        Math.Clamp(rule.AnomalyGain * airAnomalyAverageC, -rule.AnomalyClampC, rule.AnomalyClampC);
+
+    /// <summary>
+    /// The day's fog from its numbers. Sea (advection) fog: the dew point at or above the sea temperature less the margin and a wind of at most
+    /// the fog's force: fog from the start of the day, lifting at the first hour from dawn when the hour's air temperature is more than the lift
+    /// above the dew point (24 when none is; if the night minimum is already that warm it never forms). Radiation fog in the harbour: a dry day
+    /// with wind at most the radiation force and a night minimum at or below the dew point, until the clear-by hour. Sea fog wins.
+    /// </summary>
+    public static WeatherDay ApplyFog(WeatherDay d, FogRules rule)
+    {
+        if (d.WindForce <= rule.MaxWindForce && d.DewPointC >= d.SeaTempC - rule.MarginC)
+        {
+            int lift = 24;
+            for (int h = rule.DawnHour; h < 24; h++)
+                if (d.AirTempAt(h) > d.DewPointC + rule.LiftAboveDewC) { lift = h; break; }
+            if (lift > rule.DawnHour) return d with { FogStartHour = 0, FogUntilHour = lift, Kind = FogKind.Sea };
+        }
+        if (d.RainMm <= 0 && d.WindForce <= rule.RadiationMaxWindForce && d.NightC <= d.DewPointC)
+            return d with { FogStartHour = 0, FogUntilHour = rule.RadiationClearByHour, Kind = FogKind.Harbour };
+        return d;
     }
 
     /// <summary>Standard normal via Box-Muller.</summary>

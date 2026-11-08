@@ -55,11 +55,15 @@ public class UpgradeTests
         return BoatLoader.Load(node.ToJsonString(), withCalendar);
     }
 
+    /// <summary>The boat as shipped in an economy edited by <paramref name="edit"/> (the money knobs live in economy.json).</summary>
+    private static Boat EditedEconomy(Action<JsonNode> edit, bool withCalendar = true) =>
+        BoatLoader.Load(Sloop28Json(), withCalendar, TestEconomy.Edited(edit));
+
     /// <summary>Afloat at Skjærvik on <paramref name="day"/> with the engine running (terminal cleaned, seacock and impeller new).</summary>
-    private static Game Afloat(int day, Boat? boat = null, WeatherSeries? weather = null, bool lightsFixed = false)
+    private static Game Afloat(int day, Boat? boat = null, WeatherSeries? weather = null, bool lightsFixed = false, int worldSeed = Game.DefaultSeed)
     {
         boat ??= BoatLoader.LoadSloop28();
-        var g = new Game(boat, day, new FixedRandom(0.99), Game.DefaultSeed, weather ?? Clear());
+        var g = new Game(boat, day, new FixedRandom(0.99), worldSeed, weather ?? Clear());
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
         Ok(Walk.Do(g, "impeller", c => new Replace(c)));
@@ -101,7 +105,7 @@ public class UpgradeTests
     public void Seven_upgrades_load_are_not_components_until_fitted_and_each_has_one_chandlery_item()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(48, boat.Components.Count);
+        Assert.Equal(52, boat.Components.Count);
         Assert.Equal(UpgradeIds.OrderBy(i => i), boat.Upgrades.Select(u => u.Component.Id).OrderBy(i => i));
         foreach (var id in UpgradeIds)
         {
@@ -134,9 +138,12 @@ public class UpgradeTests
     {
         var node = JsonNode.Parse(Sloop28Json())!;
         var friend = node["calendar"]!["events"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "friend-week")!;
-        var needed = friend["requires"]!.AsArray().Select(r => r!["component"]!.GetValue<string>()).ToList();
-        Assert.Equal(["marine-heads", "galley-stove", "bunk-cushions", "diesel-heater"], needed);
-        Assert.All(needed, id => Assert.Contains(id, UpgradeIds));
+        // Each requirement names one component, or alternatives (a '+' joins the parts of one alternative): the old heads with its valve, or the new heads.
+        var needed = friend["requires"]!.AsArray().SelectMany(r =>
+            r!["components"] is JsonArray alts ? alts.SelectMany(a => a!.GetValue<string>().Split('+')) : [r["component"]!.GetValue<string>()]).ToList();
+        Assert.Equal(["old-heads", "joker-valve", "marine-heads", "spirit-stove", "galley-stove", "bunk-cushions", "diesel-heater"], needed);
+        var boat = BoatLoader.LoadSloop28();
+        Assert.All(needed, id => Assert.True(UpgradeIds.Contains(id) || boat.TryGet(id, out _), id));
     }
 
     [Fact]
@@ -144,9 +151,9 @@ public class UpgradeTests
     {
         var boat = BoatLoader.LoadSloop28();
         var last = boat.Components[^1];
-        Assert.Equal("anchor-gear", last.Id);
+        Assert.Equal("anchor-shackle", last.Id);   // the old heads, its valve, the spirit stove and the shackle came after the chain
         boat.Fit("bunk-cushions");
-        Assert.Equal(49, boat.Components.Count);
+        Assert.Equal(53, boat.Components.Count);
         Assert.Equal("bunk-cushions", boat.Components[^1].Id);
         Assert.True(boat.IsFitted("bunk-cushions"));
         Assert.Same(boat.Components[^1], boat.Get("bunk-cushions"));
@@ -171,8 +178,25 @@ public class UpgradeTests
         Assert.Contains("more than one chandlery item", twoItems.Message);
 
         var strayEvent = Assert.Throws<InvalidOperationException>(() => Edited(n =>
-            n["calendar"]!["events"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "friend-week")!["requires"]!.AsArray()[0]!["component"] = "sauna"));
+            n["calendar"]!["events"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "friend-week")!["requires"]!.AsArray()[2]!["component"] = "sauna"));
         Assert.Contains("neither a component nor an upgrade", strayEvent.Message);
+        // (the dry bunks are the third requirement: the first two are alternatives)
+
+        var strayAlternative = Assert.Throws<InvalidOperationException>(() => Edited(n =>
+            n["calendar"]!["events"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "friend-week")!["requires"]!.AsArray()[0]!["components"]!.AsArray()[0] = "old-heads+sauna"));
+        Assert.Contains("'sauna', which is neither a component nor an upgrade", strayAlternative.Message);
+
+        var replacesNothing = Assert.Throws<InvalidOperationException>(() => Edited(n =>
+            n["upgrades"]!.AsArray().Single(u => u!["component"]!["id"]!.GetValue<string>() == "marine-heads")!["replaces"] = new JsonArray("old-heads", "no-such-heads")));
+        Assert.Contains("replaces 'no-such-heads', which is not a component of the boat", replacesNothing.Message);
+
+        var replacesAnUpgrade = Assert.Throws<InvalidOperationException>(() => Edited(n =>
+            n["upgrades"]!.AsArray().Single(u => u!["component"]!["id"]!.GetValue<string>() == "marine-heads")!["replaces"] = "radar"));
+        Assert.Contains("replaces 'radar'", replacesAnUpgrade.Message);
+
+        var replacedTwice = Assert.Throws<InvalidOperationException>(() => Edited(n =>
+            n["upgrades"]!.AsArray().Single(u => u!["component"]!["id"]!.GetValue<string>() == "galley-stove")!["replaces"] = "old-heads"));
+        Assert.Contains("is replaced by both", replacedTwice.Message);
 
         var badPlace = Assert.Throws<ArgumentException>(() => Edited(n => n["upgrades"]!.AsArray()[0]!["place"] = "attic"));
         Assert.Contains("unknown place 'attic'", badPlace.Message);
@@ -215,7 +239,7 @@ public class UpgradeTests
         var card = Assert.IsType<RepairView>(r.Observation);
         Assert.Equal("Bunk cushions", card.ComponentName);
         Assert.True(boat.IsFitted("bunk-cushions"));
-        Assert.Equal(49, boat.Components.Count);
+        Assert.Equal(53, boat.Components.Count);
         Assert.Equal($"fitted on day {Status(g).Day}", Up(g, "bunk cushions").Status);
         Assert.Contains(Log(g).Entries, e => e.Text == "Fitted the bunk cushions.");
         Assert.DoesNotContain(((InventoryView)g.Ask(new Inventory())).Aboard, l => l.Name.Contains("cushions"));
@@ -235,7 +259,7 @@ public class UpgradeTests
         var g = Afloat(77);
         Walk.ToPlace(g, "forepeak");
         int entries = Log(g).Entries.Count;
-        No(g.Execute(new Install("marine heads")), "You don't have the marine heads aboard. Order one: order marine heads.");
+        No(g.Execute(new Install("marine heads with holding tank")), "You don't have the marine heads with holding tank aboard. Order one: order marine heads with holding tank.");
         No(g.Execute(new Install("impeller")), "The impeller is a spare to replace a worn part with: replace it.");
         No(g.Execute(new Install("remote start button")), "The remote start button is not something to fit to the boat.");
         No(g.Execute(new Install("anchor")), "The chandlery doesn't have 'anchor'.");
@@ -244,8 +268,8 @@ public class UpgradeTests
         var sea = Afloat(77);
         Walk.ToPlace(sea, "cockpit");
         Ok(sea.Execute(new Depart("hestholmen")));
-        No(sea.Execute(new Install("marine heads")), "You're at sea: fit it in harbour.");
-        No(sea.Execute(new YardInstall("marine heads")), "You're at sea.");
+        No(sea.Execute(new Install("marine heads with holding tank")), "You're at sea: fit it in harbour.");
+        No(sea.Execute(new YardInstall("marine heads with holding tank")), "You're at sea.");
 
         // Varnish needs a dry day.
         var rain = WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 4, 10, 6));
@@ -282,7 +306,7 @@ public class UpgradeTests
     public void The_same_install_on_a_saturday_costs_no_vacation_day()
     {
         var g = Afloat(75);   // Saturday
-        Deliver(g, "marine heads");
+        Deliver(g, "marine heads with holding tank");
         while (new GameClock(Status(g).Day).Weekday != 5) Ok(g.Execute(new WaitDays(1)));
         int left = Status(g).VacationDaysLeft;
         Walk.ToPlace(g, "forepeak");
@@ -297,7 +321,7 @@ public class UpgradeTests
         var items = Ups(g).Items;
         Assert.Equal(7, items.Count);
         Assert.Equal(
-            ["diesel heater", "marine heads", "two-burner stove", "chart plotter", "marine radar", "bunk cushions", "varnish and brushes"],
+            ["diesel heater", "marine heads with holding tank", "gas stove", "chart plotter", "marine radar", "bunk cushions", "varnish and brushes"],
             items.Select(i => i.Name));
         var radar = items.Single(i => i.Name == "marine radar");
         Assert.Equal((24000, 480, 5000, 3, "fog at full speed", 12000, "not aboard"),
@@ -305,11 +329,11 @@ public class UpgradeTests
         Assert.Null(items.Single(i => i.Name == "bunk cushions").YardNok);
 
         Ok(g.Execute(new Order("stove")));
-        Assert.StartsWith("on order, due day ", Up(g, "two-burner stove").Status);
-        for (int i = 0; i < 12 && !Up(g, "two-burner stove").Status.StartsWith("aboard", StringComparison.Ordinal); i++) Ok(g.Execute(new WaitDays(1)));
-        Assert.Equal("aboard, not fitted", Up(g, "two-burner stove").Status);
+        Assert.StartsWith("on order, due day ", Up(g, "gas stove").Status);
+        for (int i = 0; i < 12 && !Up(g, "gas stove").Status.StartsWith("aboard", StringComparison.Ordinal); i++) Ok(g.Execute(new WaitDays(1)));
+        Assert.Equal("aboard, not fitted", Up(g, "gas stove").Status);
         Install(g, "companionway", "stove");
-        Assert.StartsWith("fitted on day ", Up(g, "two-burner stove").Status);
+        Assert.StartsWith("fitted on day ", Up(g, "gas stove").Status);
         Assert.Equal(7, ((SeasonView)g.Ask(new Haulout.Sim.Play.Season())).Upgrades!.Count);
     }
 
@@ -318,14 +342,14 @@ public class UpgradeTests
     {
         var g = Afloat(77);
         Walk.ToPlace(g, "cockpit");
-        Ok(g.Execute(new Order("marine heads")));
-        int due = DueDay(g, "marine heads");
+        Ok(g.Execute(new Order("marine heads with holding tank")));
+        int due = DueDay(g, "marine heads with holding tank");
         Ok(g.Execute(new Depart("hestholmen")));
         var r = Ok(g.Execute(new Motor()));
         for (int i = 0; i < 20 && r.Observation is not TripResultView; i++) r = Ok(g.Execute(new Continue()));
         for (int i = 0; i < 12 && Status(g).Day < due; i++) Ok(g.Execute(new WaitDays(1)));
         Assert.True(Status(g).Day >= due);
-        Assert.Equal("waiting at the yard", Up(g, "marine heads").Status);
+        Assert.Equal("waiting at the yard", Up(g, "marine heads with holding tank").Status);
 
         Walk.ToPlace(g, "cockpit");
         Ok(Walk.Start(g));
@@ -333,7 +357,7 @@ public class UpgradeTests
         r = Ok(g.Execute(new Motor()));
         for (int i = 0; i < 20 && r.Observation is not TripResultView; i++) r = Ok(g.Execute(new Continue()));
         Ok(g.Execute(new Look()));
-        Assert.Equal("aboard, not fitted", Up(g, "marine heads").Status);
+        Assert.Equal("aboard, not fitted", Up(g, "marine heads with holding tank").Status);
     }
 
     // ------------------------------------------------------------------ the yard
@@ -344,19 +368,19 @@ public class UpgradeTests
         // Step 4a review fix: the yard no longer supplies the part (money skipped the order's wait); the part must be aboard.
         var boat = BoatLoader.LoadSloop28();
         var g = Afloat(77, boat);
-        Deliver(g, "two-burner stove");
+        Deliver(g, "gas stove");
         int balance = Status(g).BalanceNok;
         int day = Status(g).Day;
-        var r = Ok(g.Execute(new YardInstall("two-burner stove")));
+        var r = Ok(g.Execute(new YardInstall("gas stove")));
         Assert.Equal(1500, r.CostNok);
         Assert.Equal(1440, r.MinutesTaken);
         Assert.Equal(balance - 1500, Status(g).BalanceNok);
         Assert.Equal(day + 1, Status(g).Day);
         Assert.True(boat.IsFitted("galley-stove"));
-        Assert.Contains("The yard fits the two-burner stove you brought: 1500 NOK of labour. 1 day later it's done.", Text(r));
-        Assert.Contains(Log(g).Entries, e => e.Text == "The yard fitted the two-burner stove." && e.CostNok == 1500);
-        Assert.Equal($"fitted on day {Status(g).Day}", Up(g, "two-burner stove").Status);
-        No(g.Execute(new YardInstall("stove")), "Already fitted: the two-burner stove.");
+        Assert.Contains("The yard fits the gas stove you brought: 1500 NOK of labour. 1 day later it's done.", Text(r));
+        Assert.Contains(Log(g).Entries, e => e.Text == "The yard fitted the gas stove." && e.CostNok == 1500);
+        Assert.Equal($"fitted on day {Status(g).Day}", Up(g, "gas stove").Status);
+        No(g.Execute(new YardInstall("stove")), "Already fitted: the gas stove.");
 
         // A bigger job: labour only, and 3 days.
         Deliver(g, "marine radar");
@@ -370,7 +394,7 @@ public class UpgradeTests
         Assert.Equal(d2 + 3, Status(g).Day);
         Assert.Contains("The yard fits the marine radar you brought: 5000 NOK of labour. 3 days later it's done.", Text(radar));
         Assert.True(boat.IsFitted("radar"));
-        Assert.Equal(49 + 1, boat.Components.Count);
+        Assert.Equal(52, boat.Components.Count - 2);   // 52 aboard at the start: the gas stove took the spirit stove's place, the radar and its scanner cable were added
     }
 
     [Fact]
@@ -421,10 +445,25 @@ public class UpgradeTests
 
     private static Game FoggyAfloat(out Boat boat, params string[] fitted)
     {
-        boat = Edited(n => n["economy"]!["startingBalanceNok"] = 60000, withCalendar: false);   // a radar is 24000
+        boat = EditedEconomy(n => n["start"]!["startingBalanceNok"] = 60000, withCalendar: false);   // a radar is 24000
+        return FoggyAfloat(boat, fitted);
+    }
+
+    /// <summary>The boat as shipped, with the fog's close calls set (chance an hour, share a ferry reports) and 60000 to start with.</summary>
+    private static Boat FogBoat(double chance, double report, bool withCalendar = false)
+    {
+        var node = JsonNode.Parse(Sloop28Json())!;
+        var cause = node["closeCalls"]!["causes"]!["fog"]!;
+        cause["chancePerHour"] = chance;
+        cause["reportChance"] = report;
+        return BoatLoader.Load(node.ToJsonString(), withCalendar, TestEconomy.Edited(n => n["start"]!["startingBalanceNok"] = 60000));
+    }
+
+    private static Game FoggyAfloat(Boat boat, string[] fitted, int worldSeed = Game.DefaultSeed, FogKind kind = FogKind.None)
+    {
         // Launched in the clear (the fog starts on day 102), and the lights mended so that the dark costs nothing.
-        var weather = WeatherSeries.From(d => new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: d >= 102 ? 24 : 0));
-        var g = Afloat(100, boat, weather, lightsFixed: true);
+        var weather = WeatherSeries.From(d => new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: d >= 102 ? 24 : 0, Kind: d >= 102 ? kind : FogKind.None));
+        var g = Afloat(100, boat, weather, lightsFixed: true, worldSeed: worldSeed);
         foreach (var f in fitted)
         {
             Ok(g.Execute(new Buy(f)));
@@ -448,17 +487,13 @@ public class UpgradeTests
     }
 
     [Fact]
-    public void Without_a_plotter_or_radar_the_harbourmaster_holds_her_and_a_fitted_plotter_or_radar_lets_her_out()
+    public void The_harbourmaster_lets_her_out_in_fog_with_or_without_instruments()
     {
-        var held = FoggyAfloat(out _);
-        var wall = held.Execute(new Depart());
-        Assert.False(wall.Accepted);
-        Assert.Contains("harbourmaster won't let a boat out without a plotter or radar", Text(wall));
-
+        Ok(FoggyAfloat(out _).Execute(new Depart()));
         foreach (var item in new[] { "chart plotter", "marine radar" })
         {
             var g = FoggyAfloat(out var boat, item);
-            Assert.Equal(item == "chart plotter" ? "chartplotter" : "radar", boat.Components[^1].Id);
+            Assert.Equal(item == "chart plotter" ? "chartplotter" : "radar", boat.Components.First(c => c.Id is "chartplotter" or "radar").Id);
             Ok(g.Execute(new Depart()));
         }
     }
@@ -486,6 +521,93 @@ public class UpgradeTests
         Assert.DoesNotContain("creep", Text(Ok(radar.Execute(new Continue()))));
     }
 
+    /// <summary>Under way in the fog from the mooring to the card; every result on the way.</summary>
+    private static List<CommandResult> FogPassage(Game g)
+    {
+        Ok(g.Execute(new Depart()));
+        var results = new List<CommandResult> { Ok(g.Execute(new Motor())) };
+        for (int i = 0; i < 30 && results[^1].Observation is not TripResultView; i++) results.Add(Ok(g.Execute(new Continue())));
+        Assert.IsType<TripResultView>(results[^1].Observation);
+        return results;
+    }
+
+    private static readonly string[] CloseCallStarts = ["A ferry's horn", "A wall of white steel", "A rock you never saw", "A moored fishing float"];
+
+    private static List<string> CloseCalls(IEnumerable<CommandResult> rs) =>
+        rs.SelectMany(r => r.Narrative).Where(l => CloseCallStarts.Any(s => l.StartsWith(s, StringComparison.Ordinal))).ToList();
+
+    [Fact]
+    public void Each_hour_in_fog_without_instruments_rolls_a_close_call_that_is_told_in_the_hour_and_written_in_the_logbook()
+    {
+        var g = FoggyAfloat(FogBoat(chance: 1, report: 0), []);
+        int before = Log(g).Entries.Count;
+        var results = FogPassage(g);
+        var hours = results.Count(r => r.Observation is LegView || r.Observation is TripResultView);
+        var calls = CloseCalls(results);
+        Assert.Equal(hours, calls.Count);                                        // chance 1: one a whole hour under way
+        Assert.All(calls, c => Assert.True(c.StartsWith("A rock", StringComparison.Ordinal) || c.StartsWith("A moored", StringComparison.Ordinal)));
+        Assert.All(calls, c => Assert.Contains(Log(g).Entries, e => e.Text == c));   // in the logbook too
+        Assert.True(Log(g).Entries.Count > before);
+        Assert.DoesNotContain(calls, c => c.Contains("ferry"));                  // no report line when no ferry saw her
+    }
+
+    [Fact]
+    public void A_close_call_a_ferry_reports_marks_her_reputation_and_says_so()
+    {
+        var g = FoggyAfloat(FogBoat(chance: 1, report: 1, withCalendar: true), []);
+        int before = g.ReputationPoints;
+        Ok(g.Execute(new Depart()));
+        var first = Ok(g.Execute(new Motor()));
+        string line = Assert.Single(CloseCalls([first]));
+        Assert.True(line.StartsWith("A ferry's horn", StringComparison.Ordinal) || line.StartsWith("A wall of white steel", StringComparison.Ordinal));
+        Assert.Contains("the harbour will hear of it", Text(first));
+        Assert.Equal(before - 1, g.ReputationPoints);
+        Assert.Contains(Log(g).Entries, e => e.Text.Contains("the harbour will hear of it"));
+    }
+
+    [Fact]
+    public void A_close_call_nobody_reports_costs_no_standing()
+    {
+        var g = FoggyAfloat(FogBoat(chance: 1, report: 0, withCalendar: true), []);
+        int before = g.ReputationPoints;
+        FogPassage(g);
+        Assert.Equal(before, g.ReputationPoints);
+    }
+
+    [Fact]
+    public void The_close_calls_of_a_passage_are_the_same_for_the_same_world_and_differ_between_worlds()
+    {
+        List<string> Run(int seed) => CloseCalls(FogPassage(FoggyAfloat(FogBoat(chance: 0.5, report: 0.5), [], worldSeed: seed)));
+        Assert.Equal(Run(7), Run(7));
+        var runs = Enumerable.Range(1, 8).Select(s => string.Join("|", Run(s))).Distinct().ToList();
+        Assert.True(runs.Count > 1, "different worlds, different fogs");
+    }
+
+    [Fact]
+    public void A_working_plotter_or_radar_rolls_no_close_calls_even_at_a_chance_of_one()
+    {
+        foreach (var item in new[] { "chart plotter", "marine radar" })
+        {
+            var g = FoggyAfloat(FogBoat(chance: 1, report: 1), [item]);
+            Assert.Empty(CloseCalls(FogPassage(g)));
+        }
+    }
+
+    [Fact]
+    public void Harbour_fog_rolls_only_in_the_first_hour_under_way_sea_fog_in_every_hour()
+    {
+        var harbour = FogPassage(FoggyAfloat(FogBoat(chance: 1, report: 0), [], kind: FogKind.Harbour));
+        Assert.Single(CloseCalls(harbour));
+        var sea = FogPassage(FoggyAfloat(FogBoat(chance: 1, report: 0), [], kind: FogKind.Sea));
+        Assert.True(CloseCalls(sea).Count > 3);
+        // And the harbour's mist slows her for that first hour only.
+        double p = 0;
+        var g = FoggyAfloat(FogBoat(chance: 0, report: 0), [], kind: FogKind.Harbour);
+        Ok(g.Execute(new Depart()));
+        Assert.Equal(2.0, Leg(Ok(g.Execute(new Motor())), ref p), 6);
+        Assert.InRange(Leg(Ok(g.Execute(new Continue())), ref p), 4.5, 5.0);
+    }
+
     [Fact]
     public void A_fitted_plotter_with_a_fault_on_it_is_no_plotter_at_all()
     {
@@ -506,28 +628,33 @@ public class UpgradeTests
         while (Status(g).Day < 102) Ok(g.Execute(new WaitDays(1)));
         Walk.ToPlace(g, "cockpit");
         Ok(Walk.Start(g));
-        Assert.False(g.Execute(new Depart()).Accepted);   // fitted, but with a present fault: the harbourmaster is not impressed
-        Ok(g.Execute(new Replace("chart plotter")));
-        if (!Status(g).EngineRunning) Ok(Walk.Start(g));
-        Assert.True(g.Execute(new Depart()).Accepted);
+        Ok(g.Execute(new Depart()));                         // she may go: fog is a risk, not a wall
+        double p = 0;
+        Assert.Equal(2.0, Leg(Ok(g.Execute(new Motor())), ref p), 6);   // fitted, but with a present fault: no better than none
     }
 
     // ------------------------------------------------------------------ what they open: the friend's week
 
-    private static (string Status, Game Game) FriendWeek(WeatherSeries weather, params string[] items)
+    private static (string Status, Game Game) FriendWeek(WeatherSeries weather, params string[] items) =>
+        FriendWeekAfter(weather, _ => { }, items);
+
+    /// <summary>The friend's week after <paramref name="before"/> has been done to her (a valve put right, say) and the items are fitted.</summary>
+    private static (string Status, Game Game) FriendWeekAfter(WeatherSeries weather, Action<Game> before, params string[] items)
     {
         var g = Afloat(180, weather: weather);
+        before(g);
         foreach (var i in items) Ok(g.Execute(new Order(i)));
         for (int i = 0; i < 12 && items.Any(n => Up(g, n).Status != "aboard, not fitted"); i++) Ok(g.Execute(new WaitDays(1)));
         foreach (var i in items)
         {
             Assert.Equal("aboard, not fitted", Up(g, i).Status);
-            var place = i switch { "marine heads" => "forepeak", "two-burner stove" => "companionway", "bunk cushions" => "saloon", _ => "quarter-berth" };
+            var place = i switch { "marine heads with holding tank" => "forepeak", "gas stove" => "companionway", "bunk cushions" => "saloon", _ => "quarter-berth" };
             Install(g, place, i);
         }
         int start = Math.Max(Status(g).Day + 3, 190);
         Ok(g.Execute(new InviteFriend(start)));
-        Ok(g.Execute(new WaitDays(Math.Min(60, start - Status(g).Day + 1))));
+        Ok(g.Execute(new WaitDays(Math.Min(60, start - Status(g).Day + 1))));   // cut on the morning the friend comes
+        Ok(g.Execute(new WaitDays(1)));                                          // and again at the hour the friend comes
         var ev = Cal(g).Events!.Single(e => e.Name == "A friend's week aboard");
         return (ev.Status, g);
     }
@@ -535,28 +662,76 @@ public class UpgradeTests
     [Fact]
     public void Heads_stove_and_cushions_make_the_friends_week_on_the_shipped_data_in_a_mild_july()
     {
-        var (status, g) = FriendWeek(Clear(), "marine heads", "two-burner stove", "bunk cushions");
+        var (status, g) = FriendWeek(Clear(), "marine heads with holding tank", "gas stove", "bunk cushions");
         Assert.Equal("made", status);
         Assert.Contains(Log(g).Entries, e => e.Text == "Made it: A friend's week aboard.");
-        Assert.All(Cal(g).Events!.Single(e => e.Name == "A friend's week aboard").Requirements, r => Assert.True(r.Met));
+        // The last night's warmth is out of the forecast's reach on the day she comes: the other three are met.
+        Assert.All(Cal(g).Events!.Single(e => e.Name == "A friend's week aboard").Requirements.Take(3), r => Assert.True(r.Met));
     }
 
     [Fact]
-    public void Without_one_of_the_three_the_friend_goes_home_and_the_fault_in_the_week_is_named()
+    public void Without_the_new_heads_the_old_one_still_weeps_and_the_friend_goes_home_and_the_fault_in_the_week_is_named()
     {
-        var (status, g) = FriendWeek(Clear(), "marine heads", "bunk cushions");
-        Assert.Equal("failed: a stove that works", status);
-        Assert.Contains(Log(g).Entries, e => e.Text == "Missed: A friend's week aboard (a stove that works).");
+        var (status, g) = FriendWeek(Clear(), "gas stove", "bunk cushions");
+        Assert.Equal("failed: a heads that works", status);
+        Assert.Contains(Log(g).Entries, e => e.Text == "Missed: A friend's week aboard (a heads that works).");
+        Assert.Contains(Log(g).Entries, e => e.Text == "Found: Weeping joker valve.");   // the week is a symptom: the fault behind it is found
     }
 
     [Fact]
-    public void In_a_cold_july_the_week_needs_the_heater_too()
+    public void The_old_heads_makes_the_week_once_its_valve_is_new_and_the_requirement_says_what_the_player_knows()
+    {
+        Requirement Heads(Game g) => Cal(g).Events!.Single(e => e.Name == "A friend's week aboard").Requirements[0];
+        var (status, g) = FriendWeekAfter(Clear(), g =>
+        {
+            Assert.Equal(new Requirement("a heads that works", true, "no known problem"), Heads(g));   // nobody has looked: the valve weeps unseen
+            Walk.Near(g, "joker valve");
+            Ok(g.Execute(new Look()));
+            Ok(g.Execute(new Inspect("joker valve")));
+            Assert.Equal(new Requirement("a heads that works", false, "Weeping joker valve"), Heads(g));
+            Ok(Walk.Do(g, "joker valve", c => new Replace(c)));
+            Assert.Equal(new Requirement("a heads that works", true, "no known problem"), Heads(g));
+        }, "bunk cushions");
+        Assert.Equal("made", status);
+        Assert.Equal(new Requirement("a heads that works", true, "no known problem"), Heads(g));
+        Assert.Equal(new Requirement("a stove", true, "no known problem"), Cal(g).Events!.Single(e => e.Name == "A friend's week aboard").Requirements[1]);
+    }
+
+    [Fact]
+    public void The_new_heads_is_a_heads_that_works_while_the_old_valve_weeps_unfixed()
+    {
+        var (status, _) = FriendWeek(Clear(), "marine heads with holding tank", "bunk cushions");   // the old valve was never touched: it went with the old heads
+        Assert.Equal("made", status);
+    }
+
+    [Fact]
+    public void The_old_stove_will_do_for_the_week_and_the_cushions_are_what_the_friend_needs_besides_a_heads()
+    {
+        var (status, g) = FriendWeek(Clear(), "marine heads with holding tank", "bunk cushions");
+        Assert.Equal("made", status);
+        Assert.Contains(Log(g).Entries, e => e.Text == "Made it: A friend's week aboard.");
+        var (noCushions, _) = FriendWeek(Clear(), "marine heads with holding tank", "gas stove");
+        Assert.Equal("failed: dry bunks", noCushions);
+    }
+
+    [Fact]
+    public void In_a_cold_july_the_last_night_needs_the_heater_and_the_week_is_made_either_way()
     {
         var cold = WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 6, 3));
-        var (without, _) = FriendWeek(cold, "marine heads", "two-burner stove", "bunk cushions");
-        Assert.Equal("failed: warm enough below, if the week is cold", without);
-        var (with, _) = FriendWeek(cold, "marine heads", "two-burner stove", "bunk cushions", "diesel heater");
+        BeatView LastNight(Game g) => Cal(g).Events!.Single(e => e.Name == "A friend's week aboard").Beats!.Single(b => b.Text == "The last night aboard");
+        void ThroughTheLastNight(Game g)
+        {
+            Ok(g.Execute(new WaitDays(10)));   // cut on the morning of the last day
+            Ok(g.Execute(new WaitDays(1)));    // cut at the last night
+        }
+        var (without, g1) = FriendWeek(cold, "marine heads with holding tank", "gas stove", "bunk cushions");
+        Assert.Equal("made", without);         // the arrival asks for no heater
+        ThroughTheLastNight(g1);
+        Assert.Equal("failed: warm enough below on the last night, if it is cold", LastNight(g1).Status);
+        var (with, g2) = FriendWeek(cold, "marine heads with holding tank", "gas stove", "bunk cushions", "diesel heater");
         Assert.Equal("made", with);
+        ThroughTheLastNight(g2);
+        Assert.Equal("made", LastNight(g2).Status);
     }
 
     // ------------------------------------------------------------------ the broker's letter
@@ -648,9 +823,9 @@ public class UpgradeTests
     {
         var g = Afloat(77);
         var ids = UpgradeIds.Where(i => i.Contains('-')).ToList();
-        Ok(g.Execute(new Order("marine heads")));
-        Deliver(g, "two-burner stove");
-        var yard = Ok(g.Execute(new YardInstall("two-burner stove")));
+        Ok(g.Execute(new Order("marine heads with holding tank")));
+        Deliver(g, "gas stove");
+        var yard = Ok(g.Execute(new YardInstall("gas stove")));
         string[] json =
         [
             JsonSerializer.Serialize<QueryResult>(Ups(g)),
@@ -696,7 +871,7 @@ public class UpgradeTests
     {
         var g = OnTheHard();
         Walk.ToPlace(g, "forepeak");
-        No(g.Execute(new Install("heads")), "You don't have the marine heads aboard. Buy one: buy marine heads.");
+        No(g.Execute(new Install("heads")), "You don't have the marine heads with holding tank aboard. Buy one: buy marine heads with holding tank.");
         var buy = Ok(g.Execute(new Buy("heads")));
         Assert.Equal(6500, buy.CostNok);
         Ok(g.Execute(new Install("heads")));

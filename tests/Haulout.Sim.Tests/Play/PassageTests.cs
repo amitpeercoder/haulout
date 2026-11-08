@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Haulout.Sim.Data;
 using Haulout.Sim.Play;
 using Haulout.Sim.Time;
@@ -6,7 +7,7 @@ using Haulout.Sim.Weather;
 
 namespace Haulout.Sim.Tests.Play;
 
-/// <summary>Fuel, daylight, fog, the patrol, the passage plan and the anchor (design note 010, step 2).</summary>
+/// <summary>Fuel, daylight, fog, the night under way, the passage plan and the anchor (design note 010, step 2; the night close calls and the harbourmaster's letter, second pass E).</summary>
 public class PassageTests
 {
     private sealed class FixedRandom(double value) : IRandom
@@ -29,11 +30,11 @@ public class PassageTests
     private static WeatherSeries Clear() => WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8));
 
     /// <summary>A fresh boat afloat at Skjærvik with the engine running (terminal cleaned, seacock replaced, started, launched).</summary>
-    private static Game Afloat(WeatherSeries weather, int startDay = 100, Boat? boat = null, bool anchorFixed = false, bool lightsFixed = false, bool newImpeller = false)
+    private static Game Afloat(WeatherSeries weather, int startDay = 100, Boat? boat = null, bool anchorFixed = false, bool lightsFixed = false, bool newImpeller = false, int worldSeed = Game.DefaultSeed)
     {
         boat ??= BoatLoader.LoadSloop28(withCalendar: false);
-        if (anchorFixed) boat.Get("anchor-gear").Replace(); // she starts with a seized anchor chain
-        var g = new Game(boat, startDay, new FixedRandom(0.99), Game.DefaultSeed, weather);
+        if (anchorFixed) { boat.Get("anchor-gear").Replace(); boat.Get("anchor-shackle").Replace(); } // she starts with a seized anchor chain
+        var g = new Game(boat, startDay, new FixedRandom(0.99), worldSeed, weather);
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
         if (lightsFixed) Ok(Walk.Do(g, "navigation lights", c => new Replace(c)));
@@ -43,6 +44,15 @@ public class PassageTests
         if (!Status(g).EngineRunning) Ok(Walk.Start(g));
         Assert.True(Status(g).EngineRunning);
         return g;
+    }
+
+    /// <summary>The frozen shackle has had its wet season: it has escalated and the chain is seized (design note 010, second pass F).</summary>
+    private static Boat WithSeizedChain()
+    {
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
+        boat.Get("anchor-shackle").Faults.Single().MarkEscalated();
+        boat.AllFaults.Single(f => f.Id == "anchor-chain-seized").Wake(100);
+        return boat;
     }
 
     private static CommandResult Depart(Game g, string? to = null)
@@ -62,6 +72,15 @@ public class PassageTests
 
     private static double Litres(Boat boat) => boat.Get("fuel-tank").State["fuelLitres"];
 
+    /// <summary>The rule's own number for the boat as sold: <paramref name="knots"/> null is idle; the filter she starts with (undiscovered) adds its share.</summary>
+    private static double Burn(Boat boat, double? knots, bool filter = false, double fouling = 0)
+    {
+        var adds = new List<FuelAdd>();
+        if (fouling > 0) adds.Add(new FuelAdd("fouling", boat.Fuel.FoulingMaxAdd * fouling));
+        if (filter) adds.Add(new FuelAdd("filter", boat.Fuel.FaultAdds["primary-filter-clogged"]));
+        return FuelBurn.Of(boat.Fuel, knots, adds).LitresPerHour;
+    }
+
     private static string Sloop28Json()
     {
         using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream("Haulout.Sim.Data.sloop28.json")!;
@@ -70,61 +89,6 @@ public class PassageTests
     }
 
     // ------------------------------------------------------------------ the weather series
-
-    [Fact]
-    public void Fog_is_its_own_stream_the_same_seed_gives_the_same_fog_and_the_main_weather_does_not_move()
-    {
-        var a = WeatherSeries.Generate(4);
-        var b = WeatherSeries.Generate(4);
-        for (int d = 0; d <= 1080; d++) Assert.Equal(a[d], b[d]);
-        Assert.Contains(Enumerable.Range(0, 1081), d => a[d].FogUntilHour > 0);
-        // A climate without fog draws the same wind, rain and temperature: the golden hash of SeasonTests pins the rest.
-        var noFog = WeatherSeries.Generate(4, Climate.Load(NoFogJson()));
-        for (int d = 0; d <= 720; d++)
-            Assert.Equal((a[d].WindForce, a[d].WindFrom, a[d].RainMm, a[d].TempC, a[d].NightC), (noFog[d].WindForce, noFog[d].WindFrom, noFog[d].RainMm, noFog[d].TempC, noFog[d].NightC));
-        Assert.All(Enumerable.Range(0, 1081), d => Assert.Equal(0, noFog[d].FogUntilHour));
-    }
-
-    private static string NoFogJson()
-    {
-        // The shipped climate with every fogChance set to zero.
-        using var stream = typeof(Climate).Assembly.GetManifestResourceStream("Haulout.Sim.Data.weather.json")!;
-        using var reader = new StreamReader(stream);
-        return System.Text.RegularExpressions.Regex.Replace(reader.ReadToEnd(), "\"fogChance\": [0-9.]+", "\"fogChance\": 0");
-    }
-
-    [Fact]
-    public void A_foggy_day_is_all_day_or_lifts_at_a_whole_hour_between_nine_and_thirteen()
-    {
-        var hours = new HashSet<int>();
-        for (int seed = 1; seed <= 20; seed++)
-        {
-            var s = WeatherSeries.Generate(seed);
-            for (int d = 0; d <= 1080; d++)
-                if (s[d].FogUntilHour > 0) hours.Add(s[d].FogUntilHour);
-        }
-        Assert.Contains(24, hours);
-        Assert.All(hours.Where(h => h != 24), h => Assert.InRange(h, 9, 13));
-        Assert.True(hours.Count(h => h != 24) >= 3, "the lifting hour should vary");
-    }
-
-    [Fact]
-    public void Fog_days_per_month_over_twenty_seeds_stay_near_the_chance_of_the_month()
-    {
-        var chance = Climate.Default.Months.Select(m => m.FogChance).ToList();
-        var counts = new int[12];
-        for (int seed = 1; seed <= 20; seed++)
-        {
-            var s = WeatherSeries.Generate(seed);
-            for (int d = 0; d < 360; d++) if (s[d].FogUntilHour > 0) counts[new GameClock(d).Month]++;
-        }
-        for (int m = 0; m < 12; m++)
-        {
-            double expected = chance[m] * 30 * 20; // roughly: the blend between month centres moves it a little
-            Assert.InRange(counts[m], expected * 0.4, expected * 1.9);
-        }
-        Assert.True(counts[4] > counts[0], "May is foggier than January");
-    }
 
     [Fact]
     public void Daylight_follows_the_month_centres_long_in_June_short_in_December()
@@ -173,20 +137,175 @@ public class PassageTests
     // ------------------------------------------------------------------ fuel
 
     [Fact]
-    public void The_tank_is_sixty_litres_with_twenty_seven_aboard_and_the_gauge_reads_to_five()
+    public void The_tank_is_forty_five_litres_with_twenty_seven_aboard_and_the_gauge_reads_to_five()
     {
         var boat = BoatLoader.LoadSloop28(withCalendar: false);
-        Assert.Equal(60, boat.Get("fuel-tank").State["litres"]);
+        Assert.Equal(45, boat.Get("fuel-tank").State["litres"]);
         Assert.Equal(27, Litres(boat));
         var g = new Game(boat, 75, new FixedRandom(0.99), Game.DefaultSeed, Clear());
-        Assert.Equal("Fuel: about 25 litres (a little under half a tank).", Status(g).Fuel);
+        Assert.Equal("Fuel: about 25 litres (a little over half a tank).", Status(g).Fuel);
         Assert.DoesNotContain("27", Status(g).Fuel!);
-        boat.Get("fuel-tank").State["fuelLitres"] = 58;
-        Assert.Equal("Fuel: about 60 litres (a full tank).", Status(g).Fuel);
+        boat.Get("fuel-tank").State["fuelLitres"] = 44;
+        Assert.Equal("Fuel: about 45 litres (a full tank).", Status(g).Fuel);
         boat.Get("fuel-tank").State["fuelLitres"] = 0.2;
         Assert.Equal("Fuel: the needle lies on empty.", Status(g).Fuel);
         boat.Get("fuel-tank").State["fuelLitres"] = 1.0;
         Assert.Equal("Fuel: almost nothing, the needle just off empty.", Status(g).Fuel);
+    }
+
+    // ------------------------------------------------------------------ fuel by horsepower and load (design note 010, second pass C)
+
+    [Fact]
+    public void The_load_is_the_cube_of_the_speed_over_the_hull_speed_clamped_and_the_idle_load_when_going_nowhere()
+    {
+        var rules = BoatLoader.LoadSloop28(withCalendar: false).Fuel;
+        Assert.Equal(Math.Pow(5 / rules.HullSpeedKn, 3), FuelBurn.Load(rules, 5), 9);
+        Assert.Equal(rules.LoadMin, FuelBurn.Load(rules, 1.0), 9);                    // crawling: the floor
+        Assert.Equal(rules.LoadMin, FuelBurn.Load(rules, 0), 9);
+        Assert.Equal(rules.LoadMax, FuelBurn.Load(rules, rules.HullSpeedKn * 1.2), 9); // above hull speed: full load
+        Assert.Equal(rules.LoadMax, FuelBurn.Load(rules, rules.HullSpeedKn), 9);
+        Assert.Equal(rules.IdleLoad, FuelBurn.Load(rules, null), 9);
+        Assert.True(FuelBurn.Load(rules, 4) < FuelBurn.Load(rules, 5));              // monotonic between the clamps
+    }
+
+    [Fact]
+    public void Clean_at_five_knots_she_burns_about_one_point_eight_litres_an_hour_and_heavy_fouling_makes_it_about_two_and_a_half()
+    {
+        var rules = BoatLoader.LoadSloop28(withCalendar: false).Fuel;
+        Assert.Equal(18, rules.RatedHp);
+        var clean = FuelBurn.Of(rules, 5, []);
+        Assert.InRange(clean.LitresPerHour, 1.79, 1.81);
+        Assert.Empty(clean.Adds);
+        var heavy = FuelBurn.Of(rules, 5, [new FuelAdd("heavy fouling", rules.FoulingMaxAdd)]);
+        Assert.InRange(heavy.LitresPerHour, 2.5, 2.55);
+        Assert.Equal(clean.LitresPerHour * (1 + rules.FoulingMaxAdd), heavy.LitresPerHour, 9);
+    }
+
+    [Fact]
+    public void Idling_burns_the_idle_load_at_the_rating_and_each_multiplier_multiplies()
+    {
+        var rules = BoatLoader.LoadSloop28(withCalendar: false).Fuel;
+        double idle = rules.RatedHp * rules.LitresPerHpHour * rules.IdleLoad;
+        Assert.Equal(idle, FuelBurn.Of(rules, null, []).LitresPerHour, 9);
+        Assert.InRange(idle, 0.53, 0.55);
+        var both = FuelBurn.Of(rules, null, [new FuelAdd("a", 0.4), new FuelAdd("b", 0.15)]);
+        Assert.Equal(idle * 1.4 * 1.15, both.LitresPerHour, 9);
+    }
+
+    [Fact]
+    public void The_adds_are_in_words_from_data_a_tenth_a_fifth_a_third_nearly_half()
+    {
+        var rules = BoatLoader.LoadSloop28(withCalendar: false).Fuel;
+        string Add(double a) => FuelBurn.Words(rules, [new FuelAdd("heavy fouling", a)]);
+        Assert.Equal("heavy fouling adds a little", Add(0.05));
+        Assert.Equal("heavy fouling adds a tenth", Add(0.10));
+        Assert.Equal("heavy fouling adds a tenth", Add(0.15));
+        Assert.Equal("heavy fouling adds a fifth", Add(0.20));
+        Assert.Equal("heavy fouling adds a quarter", Add(0.25));
+        Assert.Equal("heavy fouling adds a third", Add(0.32));
+        Assert.Equal("heavy fouling adds a third", Add(0.40));
+        Assert.Equal("heavy fouling adds nearly half", Add(0.50));
+        Assert.Equal("heavy fouling adds a third; a clogged fuel filter adds a tenth",
+            FuelBurn.Words(rules, [new FuelAdd("heavy fouling", 0.32), new FuelAdd("a clogged fuel filter", 0.15)]));
+    }
+
+    [Fact]
+    public void Fouling_adds_in_proportion_to_the_growth_up_to_the_data_maximum_in_the_true_burn()
+    {
+        foreach (double growth in new[] { 0.25, 0.5, 1.0 })
+        {
+            var boat = BoatLoader.LoadSloop28(withCalendar: false);
+            boat.Get("primary-filter").Replace();                       // no filter fault: the fouling alone
+            var g = Afloat(Clear(), boat: boat);
+            g.FoulingGrowth = growth;
+            Depart(g);
+            double start = Litres(boat);
+            Ok(g.Execute(new Motor()));
+            Assert.Equal(Burn(boat, 5, fouling: growth), start - Litres(boat), 6);
+        }
+    }
+
+    [Fact]
+    public void A_clogged_filter_the_player_has_not_found_burns_a_share_more_and_none_is_burned_extra_once_it_is_replaced()
+    {
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
+        var g = Afloat(Clear(), boat: boat);
+        Depart(g);
+        double start = Litres(boat);
+        Ok(g.Execute(new Motor()));
+        double burned = start - Litres(boat);
+        Assert.Equal(Burn(boat, 5) * (1 + boat.Fuel.FaultAdds["primary-filter-clogged"]), burned, 6);
+
+        var fixedBoat = BoatLoader.LoadSloop28(withCalendar: false);
+        fixedBoat.Get("primary-filter").Replace();
+        var h = Afloat(Clear(), boat: fixedBoat);
+        Depart(h);
+        double start2 = Litres(fixedBoat);
+        Ok(h.Execute(new Motor()));
+        Assert.Equal(Burn(fixedBoat, 5), start2 - Litres(fixedBoat), 6);
+    }
+
+    [Fact]
+    public void A_flat_battery_charging_adds_five_percent_while_the_engine_runs_and_a_full_one_does_not()
+    {
+        var rules = BoatLoader.LoadSloop28(withCalendar: false).Fuel;
+        Assert.Equal(0.05, rules.ChargingAdd);
+        double Hour(double soc)
+        {
+            var boat = BoatLoader.LoadSloop28(withCalendar: false);
+            boat.Get("primary-filter").Replace();
+            boat.Get("alternator-belt").Replace();
+            foreach (var f in boat.Get("start-battery").ActiveFaults.ToList()) f.Clear();   // a weak battery caps the charge she can show                       // a slipping belt charges nothing
+            var g = Afloat(Clear(), boat: boat);
+            boat.Get("start-battery").State["stateOfCharge"] = soc;
+            double start = Litres(boat);
+            for (int i = 0; i < 4; i++) Ok(g.Execute(new PumpBilge()));  // an hour with the engine running, going nowhere
+            return start - Litres(boat);
+        }
+        double full = Hour(0.95), flat = Hour(0.4);
+        Assert.Equal(Burn(BoatLoader.LoadSloop28(withCalendar: false), null), full, 6);
+        Assert.Equal(full * (1 + rules.ChargingAdd), flat, 6);
+    }
+
+    [Fact]
+    public void The_plan_names_only_the_multipliers_the_player_knows_and_the_truth_burns_the_rest()
+    {
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
+        var g = Afloat(Clear(), boat: boat);        // she starts with a half-clogged filter nobody has found
+        g.FoulingGrowth = 0.8;                      // and the hull has fouled unseen
+        var blind = Plan(g, "hestholmen");
+        Assert.Contains("at about 1.8 L/h. ", blind.Fuel);
+        Assert.DoesNotContain("adds", blind.Fuel);
+        int blindNeed = int.Parse(System.Text.RegularExpressions.Regex.Match(blind.Fuel!, @"needs about (\d+) litres").Groups[1].Value);
+
+        // The passage burns what is true; the gauge shows it.
+        Depart(g);
+        double start = Litres(boat);
+        Ok(g.Execute(new Motor()));
+        double burned = start - Litres(boat);
+        double truth = Burn(boat, 5, filter: true, fouling: 0.8);
+        Assert.Equal(truth, burned, 6);
+        Assert.True(burned > 1.3 * Burn(boat, 5), "the gauge fell faster than the plan said");
+        Assert.True(blindNeed < 14 / 3.8 * truth);
+    }
+
+    [Fact]
+    public void Once_the_player_has_seen_the_hull_and_found_the_filter_the_plan_names_both()
+    {
+        var boat = BoatLoader.LoadSloop28(withCalendar: false);
+        var g = Afloat(Clear(), boat: boat);
+        g.FoulingGrowth = 0.8;
+        Ok(g.Execute(new Look()));                  // she sees the growth at the waterline
+        var seen = Plan(g, "hestholmen");
+        Assert.Contains("at about 2.4 L/h (heavy fouling adds a third)", seen.Fuel);
+        Assert.DoesNotContain("filter", seen.Fuel!);
+
+        Ok(Walk.Do(g, "primary filter", c => new Inspect(c)));   // she finds the filter, then opens its bowl
+        Ok(g.Execute(new CheckFilterBowl()));
+        var both = Plan(g, "hestholmen");
+        Assert.Contains("(heavy fouling adds a third; a clogged fuel filter adds a tenth)", both.Fuel);
+        double expect = Burn(boat, 5, filter: true, fouling: 0.8);
+        Assert.Contains($"at about {expect.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} L/h", both.Fuel);
     }
 
     [Fact]
@@ -204,18 +323,18 @@ public class PassageTests
     }
 
     [Fact]
-    public void An_hour_idling_at_the_mooring_burns_six_tenths_of_a_litre_and_an_hour_motoring_two_and_a_half()
+    public void An_hour_idling_at_the_mooring_and_an_hour_motoring_burn_the_rate_of_the_load_with_the_undiscovered_filter_in_it()
     {
         var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = Afloat(Clear(), boat: boat);
         double idleStart = Litres(boat);
         for (int i = 0; i < 4; i++) Ok(g.Execute(new PumpBilge())); // four times 15 minutes with the engine running
-        Assert.Equal(0.6, idleStart - Litres(boat), 6);
+        Assert.Equal(Burn(boat, null, filter: true), idleStart - Litres(boat), 6);
 
         Depart(g);
         double motorStart = Litres(boat);
         Ok(g.Execute(new Motor()));
-        Assert.Equal(2.5, motorStart - Litres(boat), 6);
+        Assert.Equal(Burn(boat, 5, filter: true), motorStart - Litres(boat), 6);
     }
 
     [Fact]
@@ -228,7 +347,7 @@ public class PassageTests
         Ok(g.Execute(new HeaveTo()));
         double before = Litres(boat);
         Ok(g.Execute(new Continue())); // an hour hove-to, engine running
-        Assert.Equal(0.6, before - Litres(boat), 6);
+        Assert.Equal(Burn(boat, null, filter: true), before - Litres(boat), 6);
         Ok(g.Execute(new StopEngine()));
         before = Litres(boat);
         Ok(g.Execute(new Continue()));
@@ -241,8 +360,8 @@ public class PassageTests
         var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = Afloat(Clear(), boat: boat);
         boat.Get("fuel-tank").State["fuelLitres"] = 3.2;
-        Depart(g);                                   // ten minutes idling: 3.1 litres
-        var first = Ok(g.Execute(new Motor()));      // 2.5 litres gone, 0.6 left
+        Depart(g);                                   // ten minutes idling: about 0.1 litre
+        var first = Ok(g.Execute(new Motor()));      // about 2.1 litres gone, about 1 left
         Assert.True(Status(g).EngineRunning);
         var second = Ok(g.Execute(new Continue()));  // the rest
         Assert.False(Status(g).EngineRunning);
@@ -275,7 +394,7 @@ public class PassageTests
         var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = Afloat(Clear(), boat: boat);
         var tank = Ok(Walk.Do(g, "fuel tank", c => new Inspect(c)));
-        Assert.Contains("In the tank: about 25 litres (a little under half a tank).", Text(tank));
+        Assert.Contains("In the tank: about 25 litres (a little over half a tank).", Text(tank));
         Ok(Walk.Do(g, "primary filter", c => new Inspect(c)));
         // The tired fuel system has water in the bowl; put it right so the bowl itself can be read.
         foreach (var id in new[] { "primary-filter", "fuel-tank" })
@@ -285,68 +404,195 @@ public class PassageTests
         Assert.Contains("The bowl is half air. Nothing is coming through from the tank.", Text(g.Execute(new CheckFilterBowl())));
     }
 
-    // ------------------------------------------------------------------ night and the patrol
+    // ------------------------------------------------------------------ night and the close calls
 
     /// <summary>An hour of light a day, 12:30 to 13:30: the preparations take until the middle of the afternoon, so she casts off in the dark.</summary>
     private static WeatherSeries ShortDays() => WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8, DaylightHours: 1));
 
-    [Fact]
-    public void Running_in_the_dark_with_a_cracked_lens_meets_the_patrol_once_and_finds_the_fault()
+    /// <summary>Dark all day and fog all day at sea, so that a passage meets both in every hour.</summary>
+    private static WeatherSeries DarkFog() =>
+        WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8, DaylightHours: 1, FogUntilHour: 24, Kind: FogKind.Sea));
+
+    /// <summary>The boat as shipped with the close calls of the fog and of the night set (chance an hour, share a ferry reports).</summary>
+    private static Boat CloseCallBoat(double night, double nightReport, double fog = 0, double fogReport = 0, bool withCalendar = false, string? economy = null)
     {
-        var boat = BoatLoader.LoadSloop28(withCalendar: false);
-        var g = Afloat(ShortDays(), boat: boat);
-        int balance = Status(g).BalanceNok;
-        Depart(g);
-        var hour = Ok(g.Execute(new Motor()));
-        string patrol = "A patrol boat's searchlight finds you: your bow light is out. They take your name and a fine of 2000 NOK, and tell you to get it seen to.";
-        Assert.Contains(hour.Alerts, a => a.Text == patrol);
-        Assert.Contains(hour.NewlyDiscovered, k => k.Name == "Cracked navigation light lens");
-        Assert.Equal(balance - 2000, Status(g).BalanceNok);
-        Assert.Contains(Log(g).Entries, e => e.Text == "Found: Cracked navigation light lens.");
-        Assert.Contains(Log(g).Entries, e => e.Text == patrol && e.CostNok == 2000 && e.Alert);
-
-        var next = Ok(g.Execute(new Continue()));
-        Assert.DoesNotContain(next.Alerts, a => a.Text == patrol);
-        Assert.Equal(balance - 2000, Status(g).BalanceNok);
-
-        var card = Assert.IsType<TripResultView>(MotorToArrival(g).Observation);
-        Assert.Contains(patrol, card.Failures);
+        var node = JsonNode.Parse(Sloop28Json())!;
+        var causes = node["closeCalls"]!["causes"]!;
+        causes["night"]!["chancePerHour"] = night;
+        causes["night"]!["reportChance"] = nightReport;
+        causes["fog"]!["chancePerHour"] = fog;
+        causes["fog"]!["reportChance"] = fogReport;
+        return BoatLoader.Load(node.ToJsonString(), withCalendar, economy ?? TestEconomy.Text());
     }
 
-    [Fact]
-    public void With_the_lights_mended_or_by_day_the_patrol_does_not_come()
-    {
-        var mended = Afloat(ShortDays(), lightsFixed: true);
-        int balance = Status(mended).BalanceNok;
-        Depart(mended);
-        Assert.DoesNotContain(Ok(mended.Execute(new Motor())).Alerts, a => a.Text.Contains("patrol"));
-        MotorToArrival(mended);
-        Assert.Equal(balance, Status(mended).BalanceNok);
+    private static readonly string[] NightStarts = ["A searchlight comes", "A wall of lit windows", "A fishing boat's bow", "Something low and black"];
+    private static readonly string[] FogStarts = ["A ferry's horn", "A wall of white steel", "A rock you never saw", "A moored fishing float"];
 
-        var day = Afloat(Clear());
-        balance = Status(day).BalanceNok;
-        Depart(day);
-        MotorToArrival(day);
-        Assert.Equal(balance, Status(day).BalanceNok);
+    private static List<string> Calls(IEnumerable<CommandResult> rs, string[] starts) =>
+        rs.SelectMany(r => r.Narrative).Where(l => starts.Any(x => l.StartsWith(x, StringComparison.Ordinal))).ToList();
+
+    /// <summary>From the mooring to the trip card, every result on the way.</summary>
+    private static List<CommandResult> Passage(Game g)
+    {
+        Depart(g);
+        var results = new List<CommandResult> { Ok(g.Execute(new Motor())) };
+        for (int i = 0; i < 80 && results[^1].Observation is not TripResultView; i++) results.Add(Ok(g.Execute(new Continue())));
+        Assert.IsType<TripResultView>(results[^1].Observation);
+        return results;
     }
 
+    private static int Hours(IEnumerable<CommandResult> rs) => rs.Count(r => r.Observation is LegView or TripResultView);
+
+    private static List<LedgerEntry> Bills(Game g) =>
+        ((CalendarView)g.Ask(new Calendar())).Money.Recent.Where(e => e.Kind == "bill").ToList();
+
     [Fact]
-    public void At_anchor_the_patrol_does_not_fine_her_and_a_tow_in_the_dark_is_not_running_dark_either()
+    public void There_is_no_patrol_and_no_fine_anywhere_in_the_data()
     {
-        var g = Afloat(ShortDays(), anchorFixed: true);
+        string boat = Sloop28Json(), economy = TestEconomy.Text();
+        foreach (var text in new[] { boat, economy })
+        {
+            Assert.DoesNotContain("patrol", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("noLightsFine", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("patrolFine", text, StringComparison.OrdinalIgnoreCase);
+        }
+        // The running of her dark without lights is a risk now, never a fine: with the shipped data, no bill before any letter has come.
+        var g = Afloat(ShortDays());
         int balance = Status(g).BalanceNok;
-        Depart(g);
-        Ok(g.Execute(new Anchor()));       // in the dark, but lying to her anchor
-        Assert.Equal("at anchor", Trip(g).Mode);
-        var hour = Ok(g.Execute(new Continue()));
-        Assert.DoesNotContain(hour.Alerts, a => a.Text.Contains("patrol"));
+        var results = Passage(g);
+        Assert.DoesNotContain(results.SelectMany(r => r.Alerts), a => a.Text.Contains("patrol", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(balance, Status(g).BalanceNok);
+    }
 
-        var towed = Afloat(ShortDays());
-        int towedBalance = Status(towed).BalanceNok;
+    [Fact]
+    public void Every_whole_hour_under_way_in_the_dark_without_working_lights_rolls_a_night_close_call_and_the_lights_fault_is_not_found_by_it()
+    {
+        var g = Afloat(ShortDays(), boat: CloseCallBoat(night: 1, nightReport: 0));
+        var results = Passage(g);
+        var calls = Calls(results, NightStarts);
+        Assert.True(Hours(results) >= 2);
+        Assert.Equal(Hours(results), calls.Count);                       // chance 1: one every whole hour under way
+        Assert.All(calls, c => Assert.True(c.StartsWith("A fishing boat's bow", StringComparison.Ordinal) || c.StartsWith("Something low", StringComparison.Ordinal)));
+        Assert.All(calls, c => Assert.Contains(Log(g).Entries, e => e.Text == c));
+        Assert.DoesNotContain(calls, c => c.Contains("the harbour will hear"));   // nobody reported her
+        Assert.Empty(Log(g).Entries.Where(e => e.Document is not null && e.Document.StartsWith("letter", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void With_working_lights_or_by_day_no_night_close_call_is_rolled_even_at_a_chance_of_one()
+    {
+        var mended = Afloat(ShortDays(), boat: CloseCallBoat(1, 1), lightsFixed: true);
+        Assert.Empty(Calls(Passage(mended), NightStarts));
+        var day = Afloat(Clear(), boat: CloseCallBoat(1, 1));
+        Assert.Empty(Calls(Passage(day), NightStarts));
+    }
+
+    [Fact]
+    public void At_anchor_and_under_tow_in_the_dark_no_night_close_call_is_rolled()
+    {
+        var g = Afloat(ShortDays(), boat: CloseCallBoat(1, 1), anchorFixed: true);
+        Depart(g);
+        Ok(g.Execute(new Anchor()));
+        var hour = Ok(g.Execute(new Continue()));
+        Assert.Empty(Calls([hour], NightStarts));
+        var towed = Afloat(ShortDays(), boat: CloseCallBoat(1, 1));
         Depart(towed);
-        Ok(towed.Execute(new CallTow()));  // the towboat carries her home: no patrol for a boat under tow
-        Assert.Equal(towedBalance - 6000, Status(towed).BalanceNok);
+        Assert.Empty(Calls([Ok(towed.Execute(new CallTow()))], NightStarts));   // the towboat carries her home: nobody is running dark
+    }
+
+    [Fact]
+    public void In_a_dark_fog_hour_fog_and_night_each_roll_once_and_the_fog_calls_do_not_move_for_the_night_cause()
+    {
+        var both = Passage(Afloat(DarkFog(), boat: CloseCallBoat(night: 1, nightReport: 0, fog: 1, fogReport: 0), newImpeller: true));
+        Assert.Equal(Hours(both), Calls(both, NightStarts).Count);
+        Assert.Equal(Hours(both), Calls(both, FogStarts).Count);
+
+        // The fog's own calls, with the night cause on and off, in the same world.
+        List<string> Fog(double night) =>
+            Calls(Passage(Afloat(DarkFog(), boat: CloseCallBoat(night, nightReport: 0.5, fog: 0.5, fogReport: 0.5), newImpeller: true, worldSeed: 9)), FogStarts);
+        var off = Fog(0);
+        Assert.NotEmpty(off);
+        Assert.Equal(off, Fog(1));
+    }
+
+    [Fact]
+    public void A_reported_night_call_marks_her_reputation_and_brings_a_letter_with_the_next_morning_post_billed_as_a_bill()
+    {
+        var g = Afloat(ShortDays(), boat: CloseCallBoat(night: 1, nightReport: 1, withCalendar: true));
+        int before = g.ReputationPoints;
+        int balance = Status(g).BalanceNok;
+        Depart(g);
+        var first = Ok(g.Execute(new Motor()));
+        var call = Assert.Single(Calls([first], NightStarts));
+        Assert.True(call.StartsWith("A searchlight", StringComparison.Ordinal) || call.StartsWith("A wall of lit", StringComparison.Ordinal));
+        Assert.Contains("the harbour will hear of it", Text(first));
+        Assert.Equal(before - 1, g.ReputationPoints);                      // the ferry's mark, the same as the fog's
+        Assert.Equal(balance, Status(g).BalanceNok);                       // the story first: no bill at sea
+        Assert.DoesNotContain(first.Alerts, a => a.Text.Contains("harbourmaster's office"));
+
+        var results = new List<CommandResult> { first };
+        for (int i = 0; i < 30 && results[^1].Observation is not TripResultView; i++) results.Add(Ok(g.Execute(new Continue())));
+        int calls = Calls(results, NightStarts).Count(c => !c.StartsWith("A fishing", StringComparison.Ordinal) && !c.StartsWith("Something", StringComparison.Ordinal));
+        Assert.Equal(Hours(results), calls);                               // report chance 1: every call a ferry's
+        Assert.DoesNotContain(results.SelectMany(r => r.Alerts), a => a.Text.Contains("harbourmaster's office"));   // nothing came at sea
+
+        // The morning post: the letters come at the midnight, each billed 2 000 through the ledger.
+        int arrivedBalance = Status(g).BalanceNok;
+        var wait = Ok(g.Execute(new WaitDays(1)));
+        int letters = wait.Alerts.Count(a => a.Text.StartsWith("A letter from the harbourmaster's office: the ferry ", StringComparison.Ordinal) && a.Text.Contains("It bills 2000 NOK"));
+        Assert.Equal(calls, letters);
+        Assert.Equal(calls, Bills(g).Count(e => e.Nok == -2000 && e.Text == "The harbourmaster's letter: the cost of a ferry's report."));
+        Assert.True(Status(g).BalanceNok <= arrivedBalance - 2000 * calls);
+        var documents = Log(g).Entries.Where(e => e.Document is { } d && d.StartsWith("letter", StringComparison.Ordinal)).ToList();
+        Assert.Equal(calls, documents.Count);
+        Assert.StartsWith("Dear owner, the ferry ", documents[0].Text, StringComparison.Ordinal);
+        Assert.Contains("an unlit sailing boat", documents[0].Text);
+        Assert.Contains("2000 NOK", documents[0].Text);
+        Assert.Contains(new[] { "Skarvøy", "Havørn", "Sildebris", "Kråkevær" }, f => documents[0].Text.Contains(f));
+        Assert.Contains(Log(g).Entries, e => e.Text == "Found: Cracked navigation light lens.");   // the letter says she was unlit
+    }
+
+    [Fact]
+    public void A_letter_is_billed_even_past_the_overdraft_and_is_never_refused()
+    {
+        var economy = TestEconomy.Edited(n =>
+        {
+            n["closeCalls"]!["letterNok"] = 60000;
+            n["start"]!["startingBalanceNok"] = 1000;
+        });
+        var g = Afloat(ShortDays(), boat: CloseCallBoat(night: 1, nightReport: 1, withCalendar: true, economy: economy));
+        Passage(g);
+        Ok(g.Execute(new WaitDays(1)));
+        Assert.True(Status(g).BalanceNok < -20000);   // beyond the overdraft limit: a bill the player did not choose
+        Assert.Contains(Bills(g), e => e.Nok == -60000);
+    }
+
+    [Fact]
+    public void A_reported_fog_call_brings_no_letter()
+    {
+        var g = Afloat(WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: 24, Kind: FogKind.Sea)),
+            boat: CloseCallBoat(night: 0, nightReport: 0, fog: 1, fogReport: 1, withCalendar: true), lightsFixed: true, newImpeller: true);
+        int balance = Status(g).BalanceNok;
+        var results = Passage(g);
+        Assert.NotEmpty(Calls(results, FogStarts));
+        Ok(g.Execute(new WaitDays(2)));
+        Assert.Equal(balance, Status(g).BalanceNok);
+        Assert.Empty(Bills(g));
+        Assert.DoesNotContain(Log(g).Entries, e => e.Document is not null && e.Document.StartsWith("letter", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_night_close_calls_and_their_ferries_are_the_same_for_the_same_world_and_differ_between_worlds()
+    {
+        string Run(int seed)
+        {
+            var g = Afloat(ShortDays(), boat: CloseCallBoat(0.5, 0.7, withCalendar: true), worldSeed: seed);
+            var results = Passage(g);
+            Ok(g.Execute(new WaitDays(1)));
+            return string.Join("|", Calls(results, NightStarts)) + "#" + string.Join("|", Log(g).Entries.Where(e => e.Document is not null).Select(e => e.Text));
+        }
+        Assert.Equal(Run(7), Run(7));
+        Assert.True(Enumerable.Range(1, 8).Select(Run).Distinct().Count() > 1);
     }
 
     // ------------------------------------------------------------------ fog
@@ -356,24 +602,24 @@ public class PassageTests
         WeatherSeries.From(d => new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: d >= 101 ? 24 : 0));
 
     [Fact]
-    public void Fog_in_the_harbour_refuses_the_departure_in_plain_words_free_and_unlogged_until_it_lifts()
+    public void A_harbour_mist_day_is_planned_as_a_creep_out_for_the_first_hour_not_a_fog_all_morning()
+    {
+        var weather = WeatherSeries.From(d => new WeatherDay(0, 1, "southwest", 0, 12, 8, FogUntilHour: d >= 101 ? 10 : 0, Kind: d >= 101 ? FogKind.Harbour : FogKind.None));
+        var plan = Plan(Afloat(weather), "hestholmen", 101);
+        Assert.Contains("Mist in the harbour in the morning: without a plotter or radar you creep out at 2 knots for the first hour.", plan.Warnings!);
+        Assert.DoesNotContain(plan.Warnings!, w => w.StartsWith("Fog forecast", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fog_in_the_harbour_does_not_refuse_the_departure_the_plan_names_it_a_risk()
     {
         var weather = WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: 14));
         var g = Afloat(weather);
-        int entries = Log(g).Entries.Count;
-        string wall = "Fog lies over the harbour, and the harbourmaster won't let a boat out without a plotter or radar. It often lifts by late morning.";
-        Walk.ToPlace(g, "cockpit");
-        var no = g.Execute(new Depart());
-        Assert.False(no.Accepted);
-        Assert.Equal(wall, Assert.Single(no.Narrative));
-        Assert.Equal((0, 0), (no.MinutesTaken, no.CostNok));
-        Assert.Equal(entries, Log(g).Entries.Count);
         Assert.Contains("Fog over the water.", Status(g).Weather);
-        Assert.Contains(wall, Plan(g).Blockers);
-
-        for (int i = 0; i < 30; i++) Ok(g.Execute(new PumpBilge())); // 7.5 hours of waiting for it to lift
-        Assert.DoesNotContain("Fog", Status(g).Weather);
-        Assert.Empty(Plan(g).Blockers);
+        var plan = Plan(g, "hestholmen");
+        Assert.Empty(plan.Blockers);
+        Assert.Contains("Fog forecast for the morning: without a plotter or radar you creep at 2 knots and listen for ferries.", plan.Warnings!);
+        Walk.ToPlace(g, "cockpit");
         Ok(g.Execute(new Depart()));
     }
 
@@ -387,7 +633,7 @@ public class PassageTests
         Walk.ToPlace(g, "cockpit");
         while (Status(g).Day == 100 && string.CompareOrdinal(Status(g).TimeOfDay, "21:50") < 0) Ok(g.Execute(new PumpBilge()));
         Assert.Equal(100, Status(g).Day);
-        boat.Get("fuel-tank").State["fuelLitres"] = 60;
+        boat.Get("fuel-tank").State["fuelLitres"] = 45;
         Ok(g.Execute(new Depart()));
 
         double position = 0;
@@ -422,7 +668,7 @@ public class PassageTests
         var weather = WeatherSeries.From(d => new WeatherDay(0, 3, "southwest", 0, 12, 8, FogUntilHour: d >= 101 ? 24 : 0));
         var g = Afloat(weather);
         var plan = Plan(g, "hestholmen", 101);
-        Assert.Contains(plan.Warnings!, w => w.StartsWith("The forecast says fog on day 101", StringComparison.Ordinal));
+        Assert.Contains(plan.Warnings!, w => w.StartsWith("Fog forecast for the day: without a plotter or radar you creep at 2 knots", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------------ the plan
@@ -433,12 +679,12 @@ public class PassageTests
         var boat = BoatLoader.LoadSloop28(withCalendar: false);
         var g = Afloat(Clear(), boat: boat);
         var plan = Plan(g, "hestholmen");
-        Assert.Equal("About 25 litres aboard: some 10 hours of motoring. This passage needs about 7 litres.", plan.Fuel);
+        Assert.Equal("About 25 litres aboard: some 14 hours of motoring at about 1.8 L/h. This passage needs about 5 litres.", plan.Fuel);
         Assert.DoesNotContain(plan.Warnings!, w => w.Contains("fuel", StringComparison.OrdinalIgnoreCase));
 
         boat.Get("fuel-tank").State["fuelLitres"] = 5;
         var thin = Plan(g, "hestholmen");
-        Assert.Equal("About 5 litres aboard: some 2 hours of motoring. This passage needs about 7 litres.", thin.Fuel);
+        Assert.Equal("About 5 litres aboard: some 3 hours of motoring at about 1.8 L/h. This passage needs about 5 litres.", thin.Fuel);
         Assert.Contains("The fuel aboard won't motor her all the way: fill the tank or count on the wind.", thin.Warnings!);
     }
 
@@ -457,7 +703,7 @@ public class PassageTests
 
         Ok(Walk.Do(g, "navigation lights", c => new Inspect(c)));
         var known = Assert.Single(Plan(g, "storholmen", 110).Warnings!, w => w.StartsWith("She'll arrive after dark", StringComparison.Ordinal));
-        Assert.Equal("She'll arrive after dark (the light goes at about 14:00), and you know the navigation lights have a problem: the patrol fines boats running without lights.", known);
+        Assert.Equal("She'll arrive after dark (the light goes at about 14:00), and you know the navigation lights have a problem: without them a ferry may not see her, and ferries report.", known);
     }
 
     [Fact]
@@ -477,7 +723,7 @@ public class PassageTests
         // Day 77 is a Monday: a passage from there touches one weekday.
         var monday = Plan(g, "hestholmen", 77);
         Assert.Equal(1, monday.VacationDays);
-        Assert.Contains("This passage costs 1 vacation day (Monday). You have 25 left.", monday.Warnings!);
+        Assert.Contains($"This passage costs 1 vacation day (Monday). You have {BoatLoader.LoadSloop28().Calendar.VacationDaysPerYear} left.", monday.Warnings!);
         var weekend = Plan(g, "hestholmen", 76);
         Assert.Equal(0, weekend.VacationDays);
         Assert.Contains("This passage falls on a weekend: no vacation days.", weekend.Warnings!);
@@ -493,8 +739,8 @@ public class PassageTests
         Assert.Equal(1, Plan(g, "hestholmen").VacationDays);
         // A long job today makes it a vacation day; the plan no longer counts it.
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
-        for (int i = 0; i < 40 && Status(g).VacationDaysLeft == 25; i++) Ok(g.Execute(new Inspect("negative terminal")));
-        Assert.Equal(24, Status(g).VacationDaysLeft);
+        for (int i = 0; i < 40 && Status(g).VacationDaysLeft == boat.Calendar.VacationDaysPerYear; i++) Ok(g.Execute(new Inspect("negative terminal")));
+        Assert.Equal(boat.Calendar.VacationDaysPerYear - 1, Status(g).VacationDaysLeft);
         Assert.Equal(0, Plan(g, "hestholmen").VacationDays);
         Assert.Equal(1, Plan(g, "hestholmen", 78).VacationDays);
     }
@@ -522,7 +768,7 @@ public class PassageTests
         var plan = Plan(g, "kvitnes");
         Assert.NotNull(plan.AtDestination);
         Assert.Equal(2, plan.AtDestination!.Count);
-        Assert.Equal("The club cruise to Kvitnes (Saturday and Sunday, days 215 to 216) asks for anchor gear in order (no known problem); a bilge pump that works (no known problem).", plan.AtDestination[0]);
+        Assert.Equal("The club cruise to Kvitnes (Friday to Sunday, days 214 to 216) asks for anchor gear in order (no known problem); a bilge pump that works (no known problem).", plan.AtDestination[0]);
         Assert.Equal("An anchorage: no shop, no fuel.", plan.AtDestination[1]);
         Assert.DoesNotContain("seized", string.Join(" ", plan.AtDestination), StringComparison.OrdinalIgnoreCase);
     }
@@ -530,9 +776,9 @@ public class PassageTests
     // ------------------------------------------------------------------ the anchor
 
     [Fact]
-    public void The_anchor_chain_is_seized_from_the_start_and_anchoring_at_sea_is_refused_and_finds_the_fault()
+    public void A_seized_anchor_chain_refuses_anchoring_at_sea_and_finds_the_fault()
     {
-        var g = Afloat(Clear());
+        var g = Afloat(Clear(), boat: WithSeizedChain());
         Depart(g);
         Assert.True(Trip(g).CanAnchor);
         int entries = Log(g).Entries.Count;
@@ -555,7 +801,7 @@ public class PassageTests
     [Fact]
     public void Arriving_at_Kvitnes_with_the_chain_seized_changes_the_anchoring_line_and_finds_the_fault()
     {
-        var g = Afloat(Clear(), startDay: 100);
+        var g = Afloat(Clear(), startDay: 100, boat: WithSeizedChain());
         Depart(g, "hestholmen");
         MotorToArrival(g);
         Walk.ToPlace(g, "cockpit");
@@ -585,9 +831,19 @@ public class PassageTests
     }
 
     [Fact]
+    public void A_frozen_shackle_does_not_stop_her_anchoring_the_chain_still_runs()
+    {
+        var g = Afloat(Clear());   // as sold: rusted chain, a frozen shackle, a chain that still runs
+        Depart(g);
+        var yes = Ok(g.Execute(new Anchor()));
+        Assert.Equal("at anchor", Trip(g).Mode);
+        Assert.Empty(yes.NewlyDiscovered);
+    }
+
+    [Fact]
     public void Replacing_the_chain_lets_her_anchor()
     {
-        var g = Afloat(Clear());
+        var g = Afloat(Clear(), boat: WithSeizedChain());
         Ok(Walk.Do(g, "anchor", c => new Inspect(c)));
         Assert.Contains("rusted solid", Text(Walk.Do(g, "anchor chain", c => new Inspect(c))));
         Ok(Walk.Do(g, "anchor chain", c => new Replace(c)));

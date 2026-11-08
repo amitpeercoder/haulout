@@ -4,7 +4,7 @@
 
 <section class="logbook">
     @{ var status = Session.Status; var entries = Session.Log.Entries; }
-    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @status.MoneySpentNok NOK · @MoneyWords.BalanceShort(status.BalanceNok) @if (status.Weather is not null) { <span class="weather"> · @status.Weather</span> }</header>
+    <header>Day @status.Day · @status.TimeOfDay · worked @(status.MinutesSpent / 60) h @(status.MinutesSpent % 60) min · money spent @Session.Money(status.MoneySpentNok) · @MoneyWords.BalanceShort(status.BalanceNok, Session.Currency) @if (status.Weather is not null) { <span class="weather"> · @status.Weather</span> }</header>
     @if (status.Week is { Length: > 0 } weekLine || status.Fuel is { Length: > 0 }) { <p class="weekline" data-week-line>@status.Week@(status.Week is { Length: > 0 } && status.Fuel is { Length: > 0 } ? " · " : "")@status.Fuel</p> }
     @if (status.Season is { Length: > 0 } seasonLine) { <p class="seasonline" data-season-line>@seasonLine</p> }
     <div class="scroll">
@@ -18,8 +18,8 @@
                 <li @key="i" class="@Kind(e)">
                     <span class="stamp">D@(e.Day) @e.TimeOfDay</span>
                     <span class="text">@e.Text</span>
-                    @if (e.Document is not null) { <button class="read" data-action="read-document" @onclick="() => ReadDocument(e.Document)">read</button> }
-                    @if (e.CostNok > 0) { <span class="amount">@e.CostNok NOK</span> }
+                    @if (e.Document is not null && !e.Document.StartsWith("letter", StringComparison.Ordinal)) { <button class="read" data-action="read-document" @onclick="() => ReadDocument(e.Document)">read</button> }
+                    @if (e.CostNok > 0) { <span class="amount">@Session.Money(e.CostNok)</span> }
                 </li>
             }
         </ol>

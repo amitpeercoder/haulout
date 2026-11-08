@@ -29,6 +29,10 @@ public sealed partial class Game
     private const int SaltBuyerSurvey = 6;
     private const int SaltOffer = 7;
     private const int SaltLayupDraw = 8;
+    // 9 is the order lead (Game.Orders.cs). 10 was the fog stream of the first 010 round, now gone. 11: close calls (Game.Passage.cs).
+    private const int SaltCloseCall = 11;
+    /// <summary>The own spread of a fault whose progression names its range (design note 010, second pass F).</summary>
+    private const int SaltFaultSpread = 12;
 
     /// <summary>The day the yard has her down for launch. Starts at the data's deadline; a later round moves it.</summary>
     private int _launchDeadlineDay;
@@ -169,7 +173,7 @@ public sealed partial class Game
         bool change = _bookedDay is not null;
         _bookedDay = day;
         t.Narrative.Add(change
-            ? $"You ring the yard and move your slot from day {old} to day {day}. The change costs {fee} NOK."
+            ? $"You ring the yard and move your slot from day {old} to day {day}. The change costs {Money(fee)}."
             : $"You ring the yard and book the crane for day {day}.");
         return Accept(t, action, 0, fee, null,
             change ? $"Moved the haulout slot from day {old} to day {day}." : $"Booked a haulout slot for day {day}.");
@@ -212,7 +216,7 @@ public sealed partial class Game
         var card = LiftCard(t, yard.LiftNok, storage);
         int liftDay = Day;
         return Accept(t, action, yard.HauloutMinutes, yard.LiftNok + storage, card,
-            autumn ? $"Hauled out for the winter: lift {yard.LiftNok} NOK, storage {storage} NOK." : $"Hauled out: lift {yard.LiftNok} NOK.",
+            autumn ? $"Hauled out for the winter: lift {Money(yard.LiftNok)}, storage {Money(storage)}." : $"Hauled out: lift {Money(yard.LiftNok)}.",
             // The autumn lift writes the season's page once the bill is booked: the card carries it.
             afterTick: autumn ? () => { WriteSeasonPage(t, liftDay); return card with { Lines = t.Narrative.ToList() }; } : null);
     }
@@ -395,7 +399,7 @@ public sealed partial class Game
         Spend(total, LedgerBill, "Her mooring parted: the tow, the repair and new lines.");
         lines.Replace();
         _log.Add(new LogEntry(Day, TimeOfDay,
-            $"Her mooring parted in the gale. The towboat brought her back and she is on new lines: {tow} NOK for the tow, {repair} NOK for the repair, {newLines} NOK for the lines.",
+            $"Her mooring parted in the gale. The towboat brought her back and she is on new lines: {Money(tow)} for the tow, {Money(repair)} for the repair, {Money(newLines)} for the lines.",
             total));
         Raise("mooring-parted",
             "The harbourmaster rang: she broke her mooring in the night's gale and fetched up against the next pontoon. The towboat brought her back and she's on new lines; the bill is in the logbook.");

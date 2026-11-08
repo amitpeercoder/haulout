@@ -41,25 +41,29 @@ season
 book haulout 264
 start
 launch
-order marine heads
-order two-burner stove
+calendar plan regatta
+calendar plan midsummer
+calendar plan club cruise
 order bunk cushions
 go on deck
 inspect anchor chain
-replace anchor chain
-inspect anchor chain
-replace anchor chain
-inspect anchor chain
+inspect shackle
+buy shackle
+replace shackle
+inspect shackle
 wait week
 wait week
 next weekend
 go cockpit
 go companionway
-install two-burner stove
 go saloon
 install bunk cushions
 go forepeak
-install marine heads
+look
+inspect heads
+inspect joker valve
+buy joker valve
+replace joker valve
 go saloon
 look
 inspect bilge
@@ -130,7 +134,7 @@ invite friend 187
 wait week
 wait week
 calendar
-wait week
+wait 1
 calendar
 start
 check flow
@@ -143,9 +147,8 @@ go cockpit
 start
 check flow
 stop
-wait week
-wait week
-wait week
+wait 1
+calendar
 start
 plan trip hestholmen
 depart hestholmen
@@ -153,14 +156,24 @@ motor
 motor
 motor
 motor
+calendar
+wait week
+wait 1
+calendar
+log
+wait week
+wait week
+wait week
 start
 plan trip kvitnes
 depart kvitnes
 motor
 motor
 motor
+motor
 status
 calendar
+wait 1
 wait 1
 start
 plan trip hestholmen

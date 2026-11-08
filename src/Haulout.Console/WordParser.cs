@@ -89,7 +89,7 @@ public static class WordParser
             "yard" => ParseYard(arg),
             "order" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunCommand(new OrderSurvey()),
             "order" => WithArg(arg, "order survey | order <item>", a => new Order(a)),
-            "calendar" or "week" => new RunQuery(new Calendar()),
+            "calendar" or "week" => ParseCalendar(arg),
             "install" => WithArg(arg, "install <item>", a => new Install(a)),
             "upgrades" => new RunQuery(new Upgrades()),
             "invite" => ParseInvite(arg),
@@ -214,6 +214,20 @@ public static class WordParser
         if (!words[0].Equals("page", StringComparison.OrdinalIgnoreCase)) return new RunQuery(new Season());
         if (words.Count == 1) return new RunQuery(new SeasonPage());
         return words.Count == 2 && int.TryParse(words[1], out var n) && n >= 1 ? new RunQuery(new SeasonPage(n)) : new Problem("Usage: season page [<season>]");
+    }
+
+    /// <summary>"calendar" is the week; "calendar plan <event>" marks an event as going, "calendar unplan <event>" takes the mark off.</summary>
+    private static Parsed ParseCalendar(string arg)
+    {
+        const string usage = "Usage: calendar | calendar plan <event> | calendar unplan <event>";
+        if (arg.Length == 0) return new RunQuery(new Calendar());
+        var (word, rest) = Split(arg);
+        return word switch
+        {
+            "plan" => rest.Length == 0 ? new Problem(usage) : new RunCommand(new PlanEvent(rest)),
+            "unplan" => rest.Length == 0 ? new Problem(usage) : new RunCommand(new UnplanEvent(rest)),
+            _ => new Problem(usage),
+        };
     }
 
     /// <summary>"invite friend 183", "invite friend day 183", "invite 183".</summary>

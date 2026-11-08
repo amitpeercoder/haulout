@@ -38,6 +38,7 @@ public sealed partial class Game
         int waited = 0;
         int left = minutes;
         var stoppedBy = new List<string>();
+        FriendWalks(t);
 
         _holdPumpCounter = true;
         _holdMorningReadings = true;
@@ -77,7 +78,7 @@ public sealed partial class Game
 
         int elapsed = Day - startDay;
         bool stopped = left > 0 && !_sunk;
-        string logText = !stopped && logComplete is not null ? logComplete : $"Waited {Days(elapsed)}.";
+        string logText = !stopped && logComplete is not null ? logComplete : elapsed == 0 ? $"Waited until {TimeOfDay}." : $"Waited {Days(elapsed)}.";
         _log.Insert(logAt, new LogEntry(startDay, stamp, logText));
 
         Observation? obs = null;

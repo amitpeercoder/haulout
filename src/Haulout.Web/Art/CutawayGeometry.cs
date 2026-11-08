@@ -431,6 +431,13 @@ public static class CutawayGeometry
             ["Cockpit"] = (150, 275),
             ["Deck"] = (594, 190),
             ["Hull, outside"] = (400, 480),
+            // The positions of the parts fitted later or added with the boat as sold (design note 010): no per-name table entry, so the
+            // fallback fan-out from these anchors places them. Coordinates are estimates from the place shapes, not checked by eye.
+            ["Heads, forward"] = (800, 372),
+            ["Galley, by the companionway"] = (410, 300),
+            ["At the bow"] = (838, 236),
+            ["Saloon berths"] = (640, 345),
+            ["On the mast"] = (594, 120),
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
     private const string EngFront = "Engine bay, front (under the steps)";

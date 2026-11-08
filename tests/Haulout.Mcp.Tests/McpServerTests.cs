@@ -16,7 +16,7 @@ public class McpServerTests
         "season", "book_haulout", "haul_out", "scrub", "yard_wash",
         "winterise_engine", "fill_tank", "battery_ashore", "battery_aboard", "winter_charger", "fit_winter_cover", "wait_until_spring",
         "list_for_sale", "accept_offer", "keep", "sale",
-        "calendar", "next_weekend", "wait_week", "order", "invite_friend",
+        "calendar", "next_weekend", "wait_week", "order", "invite_friend", "plan_event",
         "install", "yard_install", "upgrades", "season_page",
     ];
 
@@ -117,14 +117,18 @@ public class McpServerTests
     }
 
     [Fact]
-    public async Task Emergency_lift_tool_description_quotes_the_data_numbers()
+    public async Task No_tool_or_parameter_description_carries_an_economy_figure_or_the_currency_code()
     {
-        var eco = Haulout.Sim.Data.BoatLoader.LoadSloop28().Economy;
-        Assert.Equal(69, ExpectedTools.Length);
+        Assert.Equal(70, ExpectedTools.Length);
         await using var client = await Connect();
-        var tool = (await client.ListToolsAsync()).Single(t => t.Name == "emergency_lift");
-        Assert.Contains($"{eco.EmergencyLiftNok} NOK", tool.Description);
-        Assert.Contains($"{eco.EmergencyLiftDays} days", tool.Description);
+        var tools = await client.ListToolsAsync();
+        // Rule 5: the price is a query result, never a literal in the interface. A description may say "costs the tow"; it may not say how much.
+        var figures = new System.Text.RegularExpressions.Regex(@"\d+\s*(NOK|kr|nok)|NOK|\b\d{4,}\b");
+        foreach (var t in tools)
+        {
+            Assert.DoesNotMatch(figures, t.Description ?? "");
+            Assert.DoesNotMatch(figures, t.JsonSchema.GetRawText());
+        }
     }
 
     [Fact]
@@ -166,6 +170,9 @@ public class McpServerTests
             ("next_weekend", []),
             ("wait_week", []),
             ("invite_friend", new() { ["day"] = 190 }),
+            ("plan_event", new() { ["event"] = "regatta" }),
+            ("plan_event", new() { ["event"] = "regatta", ["going"] = false }),
+            ("plan_trip", new() { ["destination"] = "Kvitnes" }),
             ("calendar", []),
             ("depart", []),
             ("continue", []),
@@ -218,6 +225,61 @@ public class McpServerTests
     }
 
     [Fact]
+    public async Task Plan_event_marks_and_unmarks_an_event_and_the_calendar_and_the_plan_say_so()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("stops on the morning", tools["plan_event"]);
+        Assert.Contains("plan_event", tools["wait_week"]);
+        Assert.Contains("calendar plan = plan_event", TextOf(await Call(client, "help", [])));
+
+        Assert.Contains("not marked: a wait goes past it", TextOf(await Call(client, "calendar", [])));
+        var marked = TextOf(await Call(client, "plan_event", new() { ["event"] = "regatta" }));
+        Assert.Contains("You mark it on the calendar: The regatta party at Hestholmen, Saturday, day 152.", marked);
+        Assert.Contains("going: a wait stops on its morning", TextOf(await Call(client, "calendar", [])));
+        Assert.Contains("is marked already", TextOf(await Call(client, "plan_event", new() { ["event"] = "regatta" })));
+        var off = TextOf(await Call(client, "plan_event", new() { ["event"] = "the regatta party", ["going"] = false }));
+        Assert.Contains("You take the mark off", off);
+        Assert.DoesNotContain("going: a wait stops", TextOf(await Call(client, "calendar", [])));
+        Assert.Contains("There's nothing on the calendar called 'sailing'.", TextOf(await Call(client, "plan_event", new() { ["event"] = "sailing" })));
+    }
+
+    [Fact]
+    public async Task The_friends_week_over_the_wire_asks_the_friend_first_then_shows_three_beats()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("three beats", tools["invite_friend"]);
+        Assert.Contains("cost vacation days as usual", tools["invite_friend"]);
+
+        var before = TextOf(await Call(client, "calendar", []));
+        Assert.Contains("ask your friend first (invite friend <day>, days 180 to 203)", before);
+        Assert.DoesNotContain("A day trip to Hestholmen", before);
+
+        var invited = TextOf(await Call(client, "invite_friend", new() { ["day"] = 190 }));
+        Assert.Contains("Weekdays you spend with your friend cost vacation days as usual.", invited);
+        var after = TextOf(await Call(client, "calendar", []));
+        Assert.Contains("Your friend comes aboard, Tuesday, day 190, about 17:00: ahead", after);
+        Assert.Contains("A day trip to Hestholmen, any day of the week", after);
+        Assert.Contains("The last night aboard, Monday, day 196, about 22:00: ahead", after);
+        Assert.DoesNotContain("ask your friend first", after);
+    }
+
+    [Fact]
+    public async Task The_trip_tools_route_a_port_with_no_direct_route_by_the_port_in_between()
+    {
+        await using var client = await Connect();
+        var plan = TextOf(await Call(client, "plan_trip", new() { ["destination"] = "Kvitnes" }));
+        Assert.Contains("Skjærvik to Kvitnes by Hestholmen: 23 nm.", plan);
+        Assert.Contains("Skjærvik to Hestholmen, 14 nm on 040; then Hestholmen to Kvitnes, 9 nm on 120.", plan);
+        Assert.Contains("you depart again from Hestholmen", plan);
+        Assert.DoesNotContain("There's no route", plan);
+        var chart = TextOf(await Call(client, "chart", []));
+        Assert.Contains("(by Hestholmen: 23 nm along the routes)", chart);
+        Assert.DoesNotContain("(no route from here)", chart);
+    }
+
+    [Fact]
     public async Task Season_tools_book_refuse_and_answer_in_plain_words()
     {
         await using var client = await Connect();
@@ -256,18 +318,13 @@ public class McpServerTests
         var rules = Haulout.Sim.Data.BoatLoader.LoadSloop28().Layup;
         await using var client = await Connect();
         var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
-        Assert.Contains($"{rules.AntifreezeNok} NOK", tools["winterise_engine"]);
-        Assert.Contains($"{rules.DieselNokPerLitre} NOK", tools["fill_tank"]);
-        Assert.Contains($"{rules.BatteryRoomNok} NOK", tools["battery_ashore"]);
-        Assert.Contains($"{rules.ChargerNok} NOK", tools["winter_charger"]);
-        Assert.Contains($"{rules.CoverNok} NOK", tools["fit_winter_cover"]);
         Assert.Contains($"day {rules.SpringDayOfYear}", tools["wait_until_spring"]);
 
         Assert.Contains("steps off", TextOf(await Call(client, "winterise_engine", [])));
         Assert.Contains("The battery is aboard already.", TextOf(await Call(client, "battery_aboard", [])));
         Assert.Contains("from on deck", TextOf(await Call(client, "fit_winter_cover", [])));
         Assert.Contains("battery", TextOf(await Call(client, "battery_ashore", [])), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("726 NOK", TextOf(await Call(client, "fill_tank", []))); // 33 litres of the 60 litre tank at 22 NOK (design note 010)
+        Assert.Contains("396 NOK", TextOf(await Call(client, "fill_tank", []))); // 18 litres of the 45 litre tank at 22 NOK (design note 010)
         Assert.Contains("The tank is full.", TextOf(await Call(client, "fill_tank", [])));
         var help = TextOf(await Call(client, "help", []));
         Assert.Contains("wait until spring = wait_until_spring", help);

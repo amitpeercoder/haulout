@@ -1,10 +1,13 @@
 using Haulout.Sim.Play;
-using P = Haulout.Prose.Prose;
+using Haulout.Sim.Data;
+using ProseWriter = Haulout.Prose.Prose;
 
 namespace Haulout.Mcp.Tests;
 
 public class ProseTests
 {
+    private static readonly ProseWriter P = new(Currency.Default);
+
     [Fact]
     public void Aboard_renders_place_covers_and_known_problems_but_no_ids()
     {
@@ -67,7 +70,9 @@ public class ProseTests
         var game = Game.NewFirstFault();
         var weather = (WeatherView)game.Ask(new Haulout.Sim.Play.Weather());
         var log = P.Query(game.Ask(new Logbook())).Replace("\r\n", "\n");
-        Assert.StartsWith($"Day 75 \u00b7 {weather.Text}\n", log);
+        // The logbook's header keeps the day's weather short: the dew point and the sea are for the weather report and the status.
+        string header = weather.Text[..weather.Text.IndexOf(" Dew point", StringComparison.Ordinal)];
+        Assert.StartsWith($"Day 75 \u00b7 {header}\n", log);
         Assert.Contains(weather.Text, P.Query(game.Ask(new Status())));
         Assert.Equal(weather.Text + Environment.NewLine, P.Query(weather));
     }
@@ -88,6 +93,15 @@ public class ProseTests
         var status = (StatusView)game.Ask(new Status());
         var text = P.Result(result, status).Replace("\r\n", "\n");
         Assert.EndsWith("  [+1 min · 08:01]\n", text);
+    }
+
+    [Fact]
+    public void Money_is_written_with_the_games_currency_label()
+    {
+        var view = new SurveyReportView(true, 3, "Henrik Dahl, marine surveyor", "Sea Wren", 5600, ["Dear owner,"], [], ["Regards."]);
+        Assert.Contains("Fee: \u20ac5600.", new ProseWriter(new Currency("EUR", "\u20ac", true)).Query(view));
+        Assert.Contains("Fee: 5600 kr.", new ProseWriter(new Currency("SEK", "kr", false)).Query(view));
+        Assert.Contains("Fee: 5600 NOK.", new ProseWriter(Currency.Default).Query(view));
     }
 
     [Fact]
@@ -128,6 +142,45 @@ public class ProseTests
         Assert.Contains("86 days to go", text);
         Assert.DoesNotContain("raw-water-seacock", text);
         Assert.Contains("No known problems.", P.Query(new ReadinessView(1, 96, 95, 100, false, [], [], [])));
+    }
+
+    [Fact]
+    public void A_diy_route_names_where_the_part_stands_when_it_is_not_on_the_shelf()
+    {
+        var item = new ReadinessItem("Starter soaked in bilge water", "Starter motor", "Discovered", 3800, 9000, null, false, "She won't start.",
+            [new FixRoute("DIY", "Fit a new starter motor", 3800, 120, 0, true, null, "not on the yard's shelf: order it first, 3 to 10 days"),
+             new FixRoute("Yard", "The yard fits one", 5000, 0, 4, true, null)]);
+        var text = P.Query(new ReadinessView(80, 96, 16, 25000, false, [item], [], []));
+        Assert.Contains("DIY: Fit a new starter motor (not on the yard's shelf: order it first, 3 to 10 days), 3800 NOK, 2 h", text);
+        Assert.Contains("Yard: The yard fits one, 5000 NOK, 4 days", text);
+        var onShelf = new ReadinessItem("Tired impeller", "Raw-water impeller", "Discovered", 350, 4500, null, false, "x",
+            [new FixRoute("DIY", "Fit a new impeller", 350, 60, 0, true, null)]);
+        Assert.Contains("DIY: Fit a new impeller, 350 NOK, 1 h", P.Query(new ReadinessView(80, 96, 16, 25000, false, [onShelf], [], [])));
+    }
+
+    [Fact]
+    public void A_plan_by_another_port_says_so_in_the_first_line_and_names_the_legs()
+    {
+        var game = Game.NewFirstFault();
+        var text = P.Query(game.Ask(new PlanTrip("Kvitnes")));
+        Assert.Contains("Skjærvik to Kvitnes by Hestholmen: 23 nm. Leaving day 75.", text);
+        Assert.Contains("The legs: Skjærvik to Hestholmen, 14 nm on 040; then Hestholmen to Kvitnes, 9 nm on 120. A passage is one leg: you depart again from Hestholmen.", text);
+        Assert.Contains("About 4.6 hours under engine", text);
+        // A direct plan keeps its old line.
+        Assert.Contains("Skjærvik to Hestholmen: 14 nm on a course of 40 degrees.", P.Query(game.Ask(new PlanTrip("Hestholmen"))));
+        Assert.Contains("(by Hestholmen: 23 nm along the routes)", P.Query(game.Ask(new Chart())));
+    }
+
+    [Fact]
+    public void The_calendar_says_which_events_are_going_and_a_made_one_says_nothing_of_it()
+    {
+        var game = Game.NewFirstFault();
+        var plain = P.Query(game.Ask(new Calendar()));
+        Assert.Contains("not marked: a wait goes past it", plain);
+        game.Execute(new PlanEvent("Midsummer"));
+        var text = P.Query(game.Ask(new Calendar()));
+        Assert.Contains("Midsummer at Storholmen, Friday and Saturday, days 172 to 173: ahead; going: a wait stops on its morning.", text);
+        Assert.Contains("The regatta party at Hestholmen, Saturday, day 152: ahead; not marked: a wait goes past it.", text);
     }
 
     [Fact]
@@ -186,7 +239,7 @@ public class ProseTests
             89, "Wednesday", false, "Wednesday, day 89: a weekday.", 130, 22, 25, 3, 0, 12400, 20000, 6000, 90, [], [], money, events);
         var text = P.Query(view);
         Assert.Contains("Worth sailing for:", text);
-        Assert.Contains("The club cruise to Kvitnes, Saturday and Sunday, days 215 to 216: ahead.", text);
+        Assert.Contains("The club cruise to Kvitnes, Saturday and Sunday, days 215 to 216: ahead; not marked: a wait goes past it.", text);
         Assert.Contains("anchor gear in order: met (no known problem).", text);
         Assert.Contains("a bilge pump that works: not met (Burnt-out bilge pump).", text);
         Assert.Contains("warm enough below, if the week is cold: not known yet (depends on the weather).", text);
@@ -195,6 +248,34 @@ public class ProseTests
         Assert.Contains("By evening the regatta party has spilled down onto the jetty.", text);
         Assert.DoesNotContain("✓", text);
         Assert.DoesNotContain("✗", text);
+    }
+
+    [Fact]
+    public void Calendar_says_to_ask_the_friend_first_before_the_week_is_picked_and_lists_the_beats_after()
+    {
+        var money = new MoneyView(12400, 0, 0, 0, 0, 0, []);
+        var unasked = new EventView("A friend's week aboard", "Skjærvik", 180, 203, "a week of your choice in July, days 180 to 203", "ahead",
+            [new Requirement("a heads that works", true, "no known problem")], "", ToBePicked: true);
+        var asked = new EventView("A friend's week aboard", "Skjærvik", 187, 193, "Saturday to Friday, days 187 to 193", "made",
+            [new Requirement("a heads that works", true, "no known problem")], "", Going: true,
+            Beats:
+            [
+                new BeatView("Your friend comes aboard", "Saturday, day 187, about 17:00", "made", ""),
+                new BeatView("A day trip to Hestholmen", "any day of the week", "on now", ""),
+                new BeatView("The last night aboard", "Friday, day 193, about 22:00", "ahead", "warm enough below on the last night, if it is cold"),
+            ], Outcome: "a week: one of the day trip and the last night");
+        CalendarView View(EventView e) => new(89, "Wednesday", false, "Wednesday, day 89: a weekday.", 130, 22, 25, 3, 0, 12400, 20000, 6000, 90, [], [], money, [e]);
+
+        var before = P.Query(View(unasked));
+        Assert.Contains("ask your friend first (invite friend <day>, days 180 to 203)", before);
+        Assert.DoesNotContain("a wait goes past it", before);
+
+        var after = P.Query(View(asked));
+        Assert.DoesNotContain("ask your friend first", after);
+        Assert.Contains("A friend's week aboard at Skjærvik, Saturday to Friday, days 187 to 193: made (a week: one of the day trip and the last night).", after);
+        Assert.Contains("Your friend comes aboard, Saturday, day 187, about 17:00: made.", after);
+        Assert.Contains("A day trip to Hestholmen, any day of the week: on now.", after);
+        Assert.Contains("The last night aboard, Friday, day 193, about 22:00: ahead (warm enough below on the last night, if it is cold).", after);
     }
 
     [Fact]

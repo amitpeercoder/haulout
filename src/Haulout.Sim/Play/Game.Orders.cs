@@ -62,6 +62,19 @@ public sealed partial class Game
         return $"The yard chandlery doesn't keep {WithArticle(name)} on the shelf. Order one (order {name}): {LeadWords}.";
     }
 
+    /// <summary>
+    /// Where the part for a DIY fix stands (design note 010, second pass I): a part the yard does not keep on the shelf is ordered first, and the
+    /// readiness says so, with the lead from the rules. Null for a part off the shelf.
+    /// </summary>
+    private string? PartNote(Component c)
+    {
+        if (!Unstocked(c)) return null;
+        if (_partsAboard.GetValueOrDefault(c.Id) > 0) return "the new part is aboard";
+        if (OutstandingFor(c.Id) is { } order)
+            return order.Arrived ? "waiting for you at the yard" : $"on order, due day {order.DueDay}";
+        return $"not on the yard's shelf: order it first, {_boat.Orders.LeadLo} to {_boat.Orders.LeadHi} days";
+    }
+
     // ------------------------------------------------------------------ the command
 
     private CommandResult DoOrder(Turn t, string item)
@@ -89,16 +102,36 @@ public sealed partial class Game
         return Reject(action, $"The yard chandlery keeps the {comp.Name.ToLowerInvariant()} on the shelf: replace it.");
     }
 
-    private CommandResult PlaceOrder(Turn t, string action, string name, int price, string? componentId, string? itemId)
+    /// <summary>Why the order cannot be placed now (the command's own refusal, free and unlogged); null when it can.</summary>
+    private string? OrderRefusal(string name, int price, string? componentId, string? itemId)
     {
         var existing = _orders.FirstOrDefault(o => !o.Aboard && (componentId is not null ? o.ComponentId == componentId : o.ItemId == itemId));
         if (existing is not null)
-            return Reject(action, existing.Arrived
+            return existing.Arrived
                 ? $"The {name} is waiting for you at the yard already."
-                : $"The {name} is on order already: due on day {existing.DueDay}.");
+                : $"The {name} is on order already: due on day {existing.DueDay}.";
         if (componentId is not null && _partsAboard.GetValueOrDefault(componentId) > 0)
-            return Reject(action, $"You have a new {name} aboard already.");
-        if (MoneyRefusal(price) is { } broke) return Reject(action, broke);
+            return $"You have a new {name} aboard already.";
+        if (itemId is not null && ItemById(itemId) is { Upgrade: not null } upgrade && _boat.TryGetUpgrade(upgrade.Upgrade, out var rule))
+        {
+            if (_boat.IsFitted(rule.Component.Id)) return $"Already fitted: the {name}.";
+            if (_inventory.GetValueOrDefault(itemId) > 0) return $"You have the {name} aboard already.";
+        }
+        return MoneyRefusal(price);
+    }
+
+    /// <summary>What Order says to a chandlery item right now: at sea, with nothing to order, on the shelf, or the refusals of <see cref="OrderRefusal"/>.</summary>
+    private string? ItemOrderRefusal(ChandleryItem item)
+    {
+        if (AtSea) return "You're at sea: ring the yard from port.";
+        if (!_boat.Orders.Enabled) return "The yard chandlery has everything on the shelf: buy it.";
+        if (item.Stocked) return $"The yard chandlery keeps the {item.Name} on the shelf: buy it.";
+        return OrderRefusal(item.Name, item.PriceNok, null, item.Id);
+    }
+
+    private CommandResult PlaceOrder(Turn t, string action, string name, int price, string? componentId, string? itemId)
+    {
+        if (OrderRefusal(name, price, componentId, itemId) is { } refusal) return Reject(action, refusal);
 
         var rules = _boat.Orders;
         int number = _orderCount + 1;
@@ -112,7 +145,7 @@ public sealed partial class Game
         string what = itemId is not null && ItemById(itemId)?.Upgrade is not null ? "the " + name : WithArticle(name);
         t.Narrative.Add(action == "buy"
             ? $"The yard chandlery doesn't keep {what} on the shelf: ordered, due on day {due}."
-            : $"You ring the yard chandlery and order {what}: {price} NOK, due on day {due}.");
+            : $"You ring the yard chandlery and order {what}: {Money(price)}, due on day {due}.");
         return Accept(t, action, rules.PhoneMinutes, price, null, $"Ordered {what} from the yard chandlery, due on day {due}.", work: false);
     }
 

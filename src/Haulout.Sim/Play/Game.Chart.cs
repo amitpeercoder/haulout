@@ -106,10 +106,16 @@ public sealed partial class Game
         var here = p is not null ? trips.PointAlong(p.Route, p.ProgressNm) : CurrentPort?.Chart ?? new ChartPoint(0, 0);
 
         var reachable = AtSea || _sunk ? [] : trips.RoutesFrom(_portId).Select(r => r.To).ToHashSet();
-        var ports = trips.Ports.Where(x => x.Chart is not null).Select(x => new ChartPort(
-            x.Name, Tenth(x.Chart!.EastNm), Tenth(x.Chart.NorthNm), x.Yard, x.Shop, x.Fuel, x.Anchorage,
-            p is null && x.Id == _portId, reachable.Contains(x.Id),
-            Tenth(DistanceBetween(here, x.Chart)), BearingBetween(here, x.Chart))).ToList();
+        var ports = trips.Ports.Where(x => x.Chart is not null).Select(x =>
+        {
+            IReadOnlyList<Route> legs = AtSea || _sunk || x.Id == _portId || reachable.Contains(x.Id) ? [] : trips.PathBetween(_portId, x.Id);
+            var way = legs.Count > 1 ? new Way(legs) : null;
+            return new ChartPort(
+                x.Name, Tenth(x.Chart!.EastNm), Tenth(x.Chart.NorthNm), x.Yard, x.Shop, x.Fuel, x.Anchorage,
+                p is null && x.Id == _portId, reachable.Contains(x.Id),
+                Tenth(DistanceBetween(here, x.Chart)), BearingBetween(here, x.Chart),
+                way is null ? null : ViaNames(way), way?.TotalNm ?? 0);
+        }).ToList();
 
         var routes = trips.Routes.Select(r => new ChartRoute(PortName(r.From), PortName(r.To), r.DistanceNm, r.CourseDeg, ShelterViews(trips, r))).ToList();
 
@@ -141,10 +147,10 @@ public sealed partial class Game
         var earlier = _pastPassages.Where(x => x.Year == year).Select(x => TrackView(x.From, x.To, x.Day, x.Outcome, x.Track)).ToList();
 
         ChartPlan? plan = null;
-        if (!string.IsNullOrWhiteSpace(planned) && !AtSea && !_sunk && FindRoute(trips, planned) is { } route)
+        if (!string.IsNullOrWhiteSpace(planned) && !AtSea && !_sunk && FindWay(trips, planned) is { } way)
         {
             var snap = PlanTripSnapshot(planned, null);
-            plan = new ChartPlan(snap.From, snap.To, route.DistanceNm, route.CourseDeg, ShelterViews(trips, route),
+            plan = new ChartPlan(snap.From, snap.To, way.TotalNm, way.First.CourseDeg, ShelterViewsAlong(trips, way),
                 snap.MotorHours, snap.SailHours, snap.Estimate, snap.Blockers);
         }
 

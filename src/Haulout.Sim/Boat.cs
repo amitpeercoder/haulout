@@ -35,6 +35,9 @@ public sealed class Boat
     private readonly Dictionary<string, Cover> _covers = new();
     private readonly Dictionary<string, Position> _positions = new();
     private readonly List<Component> _components;
+    /// <summary>Every component there has been, in the order it came aboard, including those an upgrade has taken off the boat.</summary>
+    private readonly List<Component> _everAboard;
+    private readonly List<Component> _retired = [];
     private readonly Dictionary<string, UpgradeRule> _upgrades = new();
 
     public Boat(
@@ -45,11 +48,14 @@ public sealed class Boat
         IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null,
         YardRules? yard = null, FoulingRules? fouling = null, MooringRules? mooring = null, LayupRules? layup = null,
         SaleRules? sale = null, CalendarRules? calendar = null, OrderRules? orders = null, FuelRules? fuel = null, NightRules? night = null,
-        IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null)
+        IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null, Currency? currency = null, CloseCallRules? closeCalls = null, InstrumentRules? instruments = null)
     {
+        Currency = currency ?? Currency.Default;
         Reputation = reputation ?? ReputationRules.Default;
         Fuel = fuel ?? FuelRules.Default;
         Night = night ?? NightRules.Default;
+        CloseCalls = closeCalls ?? CloseCallRules.Default;
+        Instruments = instruments ?? InstrumentRules.Default;
         Calendar = calendar ?? CalendarRules.Default;
         Orders = orders ?? OrderRules.Default;
         Sale = sale ?? SaleRules.Default;
@@ -73,6 +79,7 @@ public sealed class Boat
         Covers = covers.ToList();
         Positions = positions.ToList();
         _components = components.ToList();
+        _everAboard = _components.ToList();
 
         foreach (var p in Places)
             if (!_places.TryAdd(p.Id, p)) throw new ArgumentException($"Duplicate place id '{p.Id}'.");
@@ -109,10 +116,19 @@ public sealed class Boat
             if (_byId.ContainsKey(c.Id) || !_upgrades.TryAdd(c.Id, u))
                 throw new ArgumentException($"Duplicate component id '{c.Id}'.");
             Validate(c);
+            foreach (var extra in u.Also)
+            {
+                if (_byId.ContainsKey(extra.Id) || _upgrades.ContainsKey(extra.Id) || _upgrades.Values.Any(o => o != u && o.Also.Any(a => a.Id == extra.Id)) || extra.Id == c.Id)
+                    throw new ArgumentException($"Duplicate component id '{extra.Id}'.");
+                Validate(extra);
+            }
             if (!_places.ContainsKey(u.PlaceId))
                 throw new ArgumentException($"Upgrade '{c.Id}' is fitted at unknown place '{u.PlaceId}'.");
             if ((u.YardNok is null) != (u.YardDays is null))
                 throw new ArgumentException($"Upgrade '{c.Id}' needs both yardNok and yardDays, or neither.");
+            foreach (var old in u.Replaces)
+                if (!_byId.ContainsKey(old))
+                    throw new ArgumentException($"Upgrade '{c.Id}' replaces '{old}', which is not a component of the boat.");
         }
     }
 
@@ -135,6 +151,8 @@ public sealed class Boat
     }
 
     public string Name { get; }
+    /// <summary>How money is written (display only; one abstract unit). From economy.json.</summary>
+    public Currency Currency { get; }
     public Economy Economy { get; }
     public Rates Rates { get; }
     public WaterRules Water { get; }
@@ -155,6 +173,8 @@ public sealed class Boat
     public OrderRules Orders { get; }
     public FuelRules Fuel { get; }
     public NightRules Night { get; }
+    public CloseCallRules CloseCalls { get; }
+    public InstrumentRules Instruments { get; }
     public ReputationRules Reputation { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }
@@ -176,13 +196,26 @@ public sealed class Boat
 
     public bool TryGetUpgrade(string id, out UpgradeRule upgrade) => _upgrades.TryGetValue(id, out upgrade!);
 
-    /// <summary>Appends the upgrade to the end of the components and registers it by id. Throws if it is unknown or fitted already.</summary>
+    /// <summary>
+    /// Appends the upgrade to the end of the components and registers it by id; the components it replaces leave the boat (they are kept in
+    /// <see cref="Retired"/>). Throws if it is unknown or fitted already.
+    /// </summary>
     internal void Fit(string id)
     {
         if (!_upgrades.TryGetValue(id, out var u)) throw new KeyNotFoundException($"No upgrade '{id}'.");
         if (_byId.ContainsKey(id)) throw new InvalidOperationException($"Upgrade '{id}' is fitted already.");
-        _components.Add(u.Component);
-        _byId[id] = u.Component;
+        foreach (var old in u.Replaces)
+            if (_byId.Remove(old, out var gone))
+            {
+                _components.Remove(gone);
+                _retired.Add(gone);
+            }
+        foreach (var part in u.Also.Prepend(u.Component))
+        {
+            _components.Add(part);
+            _everAboard.Add(part);
+            _byId[part.Id] = part;
+        }
     }
 
     public bool TryGet(string id, out Component c) => _byId.TryGetValue(id, out c!);
@@ -197,4 +230,13 @@ public sealed class Boat
         _positions.TryGetValue(id, out var p) ? p : throw new KeyNotFoundException($"No position '{id}'.");
 
     public IEnumerable<Fault> AllFaults => Components.SelectMany(c => c.Faults);
+
+    /// <summary>The components an upgrade has taken off the boat (the old heads when the new ones went in). Not aboard; their faults went with them.</summary>
+    public IReadOnlyList<Component> Retired => _retired;
+
+    /// <summary>
+    /// Every fault in the order the components first came aboard, retired ones included (a retired one is Fixed). A fit does not move the
+    /// index of any fault, so a seeded roll indexed by fault stays the same when an upgrade replaces a part.
+    /// </summary>
+    public IEnumerable<Fault> AllFaultsEver => _everAboard.SelectMany(c => c.Faults);
 }

@@ -46,6 +46,9 @@ public class SeasonPageTests
         return BoatLoader.Load(node.ToJsonString());
     }
 
+    /// <summary>The boat as shipped in an economy edited by <paramref name="edit"/> (the money knobs live in economy.json).</summary>
+    private static Boat EditedEconomy(Action<JsonNode> edit) => BoatLoader.Load(Sloop28Json(), economyJson: TestEconomy.Edited(edit));
+
     private static Boat WithReputation(params (string Key, JsonNode Value)[] changes) =>
         Edited(n => { foreach (var (k, v) in changes) n["reputation"]![k] = v; });
 
@@ -53,7 +56,7 @@ public class SeasonPageTests
     private static Game Afloat(int startDay, WeatherSeries? weather = null, Boat? boat = null, bool lightsFixed = false)
     {
         boat ??= BoatLoader.LoadSloop28();
-        boat.Get("anchor-gear").Replace(); // she starts with a seized anchor chain
+        boat.Get("anchor-gear").Replace(); boat.Get("anchor-shackle").Replace(); // she starts with a seized anchor chain
         var g = new Game(boat, startDay, new FixedRandom(0.99), Game.DefaultSeed, weather ?? Calm());
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
@@ -323,7 +326,7 @@ public class SeasonPageTests
     public void A_bill_that_took_her_past_the_banks_limit_costs_a_point_and_is_not_a_bill_paid_in_time()
     {
         // A berth bill of 60000 NOK takes the balance past the bank's 20000 on day 90 and again on day 180.
-        var boat = Edited(n => n["calendar"]!["bills"]![0]!["nok"] = 60000);
+        var boat = EditedEconomy(n => n["calendar"]!["bills"]![0]!["nok"] = 60000);
         var g = Afloat(77, boat: boat);
         WaitTo(g, 91);
         Assert.True(Status(g).BalanceNok < -20000);
@@ -348,19 +351,12 @@ public class SeasonPageTests
     }
 
     [Fact]
-    public void A_parted_mooring_costs_two_points_and_a_patrol_fine_one()
+    public void A_parted_mooring_costs_two_points()
     {
         var parted = Afloat(260, GalesOn(261), WithReputation(("onTimeBillsPerPoint", 0)));
         parted.MooringChafe = 0.95;
         Ok(parted.Execute(new WaitDays(2)));
         Assert.Equal(-2, parted.ReputationPoints);
-
-        var dark = Afloat(100, WeatherSeries.Constant(new WeatherDay(0, 3, "southwest", 0, 12, 8, DaylightHours: 1)), WithReputation(("onTimeBillsPerPoint", 0)));
-        Walk.ToPlace(dark, "cockpit");
-        Ok(dark.Execute(new Depart("Hestholmen")));
-        var hour = Ok(dark.Execute(new Motor()));
-        Assert.Contains(hour.Alerts, a => a.Text.StartsWith("A patrol boat's searchlight finds you", StringComparison.Ordinal));
-        Assert.Equal(-1, dark.ReputationPoints);
     }
 
     [Fact]
@@ -428,7 +424,7 @@ public class SeasonPageTests
         Assert.Equal("You keep her. The yard has her down for launch on day 456.", keep.Narrative[0]);
         Assert.Equal(
             "Next season: the regatta party at Hestholmen on Saturday, day 516; Midsummer at Storholmen, days 532 to 533; "
-            + "the club cruise to Kvitnes, days 579 to 580; your friend can come for a week in July. 25 vacation days from the new year.",
+            + $"the club cruise to Kvitnes, days 578 to 580; your friend can come for a week in July. {BoatLoader.LoadSloop28().Calendar.VacationDaysPerYear} vacation days from the new year.",
             keep.Narrative[1]);
         Assert.Equal("The page of season 1 is in the logbook.", keep.Narrative[2]);
         Assert.Equal(3, keep.Narrative.Count);
@@ -547,7 +543,7 @@ public class SeasonPageTests
     public void The_reputation_data_is_flagged_as_a_placeholder_of_design_note_010()
     {
         var rules = BoatLoader.LoadSloop28().Reputation;
-        Assert.Equal((2, 1, -1, -2, -1, -1, -1), (rules.OnTimeBillsPerPoint, rules.SlotKept, rules.Tow, rules.MooringParted, rules.SlotMissed, rules.BillPastLimit, rules.PatrolFine));
+        Assert.Equal((2, 1, -1, -2, -1, -1, -1), (rules.OnTimeBillsPerPoint, rules.SlotKept, rules.Tow, rules.MooringParted, rules.SlotMissed, rules.BillPastLimit, rules.FerryReport));
         Assert.Equal((-5, 5, 0.05, 1), (rules.Min, rules.Max, rules.TowFactorPerPoint, rules.SlotDaysPerPoint));
         Assert.Equal(5, rules.Words.Count);
         Assert.Contains("reputation {", Sloop28Json());

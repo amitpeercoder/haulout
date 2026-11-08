@@ -1,8 +1,13 @@
 using Haulout.Sim.Play;
 
-var game = Game.NewFirstFault();
+// `--seed N` picks the seeded run; the default is the game's own. Scripts in tools/playtest rely on the default.
+int seed = Game.DefaultSeed;
+for (int i = 0; i < args.Length - 1; i++)
+    if (args[i] == "--seed" && int.TryParse(args[i + 1], out var s)) seed = s;
+var game = Game.NewFirstFault(seed);
+var prose = new Haulout.Prose.Prose(game.Currency);
 
-if (game.Ask(new Briefing()) is BriefingView briefing) Console.Write(Haulout.Prose.Prose.Briefing(briefing));
+if (game.Ask(new Briefing()) is BriefingView briefing) Console.Write(prose.Briefing(briefing));
 
 while (true)
 {
@@ -20,12 +25,12 @@ while (true)
             Console.WriteLine(p.Message);
             break;
         case RunQuery q:
-            Console.Write(Haulout.Prose.Prose.Query(game.Ask(q.Query)));
+            Console.Write(prose.Query(game.Ask(q.Query)));
             break;
         case RunCommand c:
             var result = game.Execute(c.Command);
             var status = (StatusView)game.Ask(new Status());
-            Console.Write(Haulout.Prose.Prose.Result(result, status));
+            Console.Write(prose.Result(result, status));
             break;
     }
 }

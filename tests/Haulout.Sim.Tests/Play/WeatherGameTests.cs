@@ -52,7 +52,8 @@ public class WeatherGameTests
 
         var day = series[75];
         Assert.Equal(75, a.Day);
-        Assert.Equal(WeatherWords.Describe(day), a.Text);
+        Assert.StartsWith(WeatherWords.Describe(day), a.Text);   // the report goes on to read the dew point and the sea
+        Assert.Contains(WeatherWords.SkyLine(day, numbersOnly: true)[..^1], a.Text);
         Assert.Equal(day.WindForce, a.WindForce);
         Assert.Equal(day.WindFrom, a.WindFrom);
         Assert.Equal(day.RainMm, a.RainMm);

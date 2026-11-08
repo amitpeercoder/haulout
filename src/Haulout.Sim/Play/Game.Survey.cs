@@ -10,7 +10,7 @@ public sealed partial class Game
     /// <summary>The survey lines that went into the report, in order.</summary>
     private readonly List<SurveyItemData> _surveyKept = [];
 
-    private Fault? FaultById(string id) => _boat.AllFaults.FirstOrDefault(f => f.Id == id);
+    private Fault? FaultById(string id) => _boat.AllFaultsEver.FirstOrDefault(f => f.Id == id);
 
     private CommandResult DoOrderSurvey(Turn t)
     {
@@ -74,7 +74,7 @@ public sealed partial class Game
             if (f.Diy is { } diy)
             {
                 var diyReason = AfloatRefusal(f, comp) ?? WetRefusal(comp) ?? MoneyRefusal(diy.PartsNok);
-                routes.Add(new FixRoute("DIY", diy.How, diy.PartsNok, diy.Minutes, 0, diyReason is null, diyReason));
+                routes.Add(new FixRoute("DIY", diy.How, diy.PartsNok, diy.Minutes, 0, diyReason is null, diyReason, PartNote(comp)));
             }
             if (f.Yard is { } yard)
             {

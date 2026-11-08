@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data\sloop28.json" LogicalName="Haulout.Sim.Data.sloop28.json" />
+    <EmbeddedResource Include="Data\economy.json" LogicalName="Haulout.Sim.Data.economy.json" />
     <EmbeddedResource Include="Data\weather.json" LogicalName="Haulout.Sim.Data.weather.json" />
   </ItemGroup>
 

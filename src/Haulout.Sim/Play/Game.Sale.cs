@@ -84,19 +84,19 @@ public sealed partial class Game
     private static string Basis(Fault f) =>
         f.Yard is not null ? "at the yard" : f.Diy is not null ? "in parts" : "to put right later";
 
-    private static Finding FindingOf(Fault f)
+    private Finding FindingOf(Fault f)
     {
         int nok = f.Yard?.Nok ?? f.Diy?.PartsNok ?? f.CostLaterNok;
         string line = f.Yard is not null ? $"{f.Name}, at the yard's price"
             : f.Diy is not null ? $"{f.Name}, at the price of the parts"
             : $"{f.Name}, at what it costs to leave it";
-        return new Finding(line, $"{f.Name}: {nok} NOK {Basis(f)}.", nok);
+        return new Finding(line, $"{f.Name}: {Money(nok)} {Basis(f)}.", nok);
     }
 
     private Finding FoulingFinding()
     {
         int wash = _boat.Yard.WashNok;
-        return new Finding("Heavy growth on the hull, at the yard's wash", $"Heavy growth under the waterline: {wash} NOK for the yard's wash.", wash);
+        return new Finding("Heavy growth on the hull, at the yard's wash", $"Heavy growth under the waterline: {Money(wash)} for the yard's wash.", wash);
     }
 
     /// <summary>The problems the player knows are open, and heavy growth only if they have seen it. Never anything else.</summary>
@@ -118,12 +118,12 @@ public sealed partial class Game
         int years = UndocumentedYears();
         if (years > 0)
             lines.Add(new ValuationLine(
-                Capital($"{Counted(years, "year", "years")} of engine hours with no service entry, at {rules.PerUndocumentedYearNok} NOK each"),
+                Capital($"{Counted(years, "year", "years")} of engine hours with no service entry, at {Money(rules.PerUndocumentedYearNok)} each"),
                 -years * rules.PerUndocumentedYearNok));
         int entries = Math.Min(rules.EntriesCap, _maintenanceEntries);
         if (entries > 0)
             lines.Add(new ValuationLine(
-                $"A kept logbook: {Counted(entries, "maintenance entry", "maintenance entries")} this season, at {rules.PerEntryNok} NOK each",
+                $"A kept logbook: {Counted(entries, "maintenance entry", "maintenance entries")} this season, at {Money(rules.PerEntryNok)} each",
                 entries * rules.PerEntryNok));
 
         int total = lines.Sum(l => l.Nok);
@@ -171,7 +171,7 @@ public sealed partial class Game
     {
         int open = OpenViewings().Count();
         string offers = open == 0 ? "" : open == 1 ? ", with an offer open" : $", with {Counted(open, "offer", "offers")} open";
-        return $"She is listed for sale at {_askNok} NOK{offers}.";
+        return $"She is listed for sale at {Money(_askNok)}{offers}.";
     }
 
     private void WithdrawListing()
@@ -200,12 +200,12 @@ public sealed partial class Game
         _askNok = askNok;
         var letter = BuildLetter(Day);
         t.Narrative.Add(change
-            ? $"You ring {rules.Broker} and change the asking price to {askNok} NOK."
-            : $"You ring {rules.Broker}. Someone comes down to the yard, walks round her with a clipboard and sends you their valuation letter. You list her at {askNok} NOK.");
+            ? $"You ring {rules.Broker} and change the asking price to {Money(askNok)}."
+            : $"You ring {rules.Broker}. Someone comes down to the yard, walks round her with a clipboard and sends you their valuation letter. You list her at {Money(askNok)}.");
         return Accept(t, action, rules.ListMinutes, 0, new ListingView(letter),
             change
-                ? $"Changed the asking price to {askNok} NOK. The broker values her at {letter.ValueNok} NOK."
-                : $"Listed her for sale with {rules.Broker} at {askNok} NOK. The broker values her at {letter.ValueNok} NOK.");
+                ? $"Changed the asking price to {Money(askNok)}. The broker values her at {Money(letter.ValueNok)}."
+                : $"Listed her for sale with {rules.Broker} at {Money(askNok)}. The broker values her at {Money(letter.ValueNok)}.");
     }
 
     /// <summary>At launch: she is off the market, and so are the offers. Also clears the "kept" mark: a new stretch afloat has begun.</summary>
@@ -237,7 +237,7 @@ public sealed partial class Game
         const string stamp = "12:00";
         int from = t.Newly.Count;
         var findings = new List<Finding>();
-        var faults = _boat.AllFaults.ToList();
+        var faults = _boat.AllFaultsEver.ToList(); // a replaced part's faults are Fixed, and no index moves
         for (int i = 0; i < faults.Count; i++)
         {
             var f = faults[i];
@@ -265,10 +265,10 @@ public sealed partial class Game
 
         string found = findings.Count == 0 ? "found nothing wrong" : $"found {Counted(findings.Count, "problem", "problems")}";
         _log.Add(new LogEntry(day, stamp,
-            $"A buyer looked her over. Their surveyor {found}, and they offer {offer} NOK, open until day {viewing.HoldsUntilDay}.",
+            $"A buyer looked her over. Their surveyor {found}, and they offer {Money(offer)}, open until day {viewing.HoldsUntilDay}.",
             0, $"viewing {viewing.Number}"));
         Raise("viewing",
-            $"The broker rang: a buyer looked her over on day {day} and offers {offer} NOK, open until day {viewing.HoldsUntilDay}. Their surveyor's notes are in the logbook ('sale').");
+            $"The broker rang: a buyer looked her over on day {day} and offers {Money(offer)}, open until day {viewing.HoldsUntilDay}. Their surveyor's notes are in the logbook ('sale').");
     }
 
     // ------------------------------------------------------------------ the sale
@@ -303,7 +303,7 @@ public sealed partial class Game
         var card = ClosingCard(chosen);
         t.Narrative.Add("You shake hands with the buyer on the quay and sign the bill of sale. She's theirs.");
         t.Narrative.AddRange(card.Lines);
-        return Accept(t, action, 0, 0, card, $"Sold her for {chosen.OfferNok} NOK.", work: false);
+        return Accept(t, action, 0, 0, card, $"Sold her for {Money(chosen.OfferNok)}.", work: false);
     }
 
     private ClosingView ClosingCard(Viewing sold)
@@ -312,8 +312,8 @@ public sealed partial class Game
         int hours = (int)Math.Round(_time.WorkMinutes / 60.0, MidpointRounding.AwayFromZero);
         var lines = new List<string>
         {
-            $"Sold on day {Day} for {sold.OfferNok} NOK, to the buyer who viewed her on day {sold.Day}.",
-            $"You spent {_money} NOK on her over {Days(days)}, and {hours} {(hours == 1 ? "hour" : "hours")} of your own work.",
+            $"Sold on day {Day} for {Money(sold.OfferNok)}, to the buyer who viewed her on day {sold.Day}.",
+            $"You spent {Money(_money)} on her over {Days(days)}, and {hours} {(hours == 1 ? "hour" : "hours")} of your own work.",
             $"Trips made: {_trips}. Tows: {_tows}.",
         };
         foreach (var earned in new[] { _firstAwayLine, _firstCauseLine, _firstTowLine })

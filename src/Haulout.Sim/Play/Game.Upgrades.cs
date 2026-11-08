@@ -72,8 +72,13 @@ public sealed partial class Game
 
     private void FitUpgrade(UpgradeRule rule, int day)
     {
+        // What it replaces goes off the boat with its faults: they are put right (the part is gone), so the known list shows them as done.
+        foreach (var old in rule.Replaces)
+            if (_boat.TryGet(old, out var oldComponent))
+                foreach (var f in oldComponent.Faults.Where(f => f.Present).ToList()) f.Clear();
         _boat.Fit(rule.Component.Id);
         _seen.Add(rule.Component.Id);
+        foreach (var part in rule.Also) _seen.Add(part.Id); // the cable you taped down the mast is a part you have seen
         _fitted[rule.Component.Id] = (day, _seasonIndex);
         // A fault an upgrade may carry starts its clock now. Its spread is not drawn (the world's stream is not touched by a fit): it ages at 1.0.
         foreach (var f in rule.Component.Faults) f.ActivateOn(day);
@@ -132,7 +137,7 @@ public sealed partial class Game
         int nok = YardInstallNok(rule);
         _inventory[item.Id] = AboardCount(item) - 1;
         if (_inventory[item.Id] <= 0) _inventory.Remove(item.Id);
-        string text = $"The yard fits the {item.Name} you brought: {nok} NOK of labour. {Days(days)} later it's done.";
+        string text = $"The yard fits the {item.Name} you brought: {Money(nok)} of labour. {Days(days)} later it's done.";
         t.Narrative.Add(text);
         return Accept(t, action, days * 1440, nok, new RepairView(rule.Component.Name, text),
             $"The yard fitted the {rule.Component.Name.ToLowerInvariant()}.", work: false,
@@ -159,12 +164,13 @@ public sealed partial class Game
             .Where(x => x.Item is not null)
             .Select(x => new UpgradeView(
                 x.Item!.Name, UpgradeStatus(x.Item, x.Rule), x.Item.PriceNok, x.Rule.InstallMinutes, x.Rule.YardNok, x.Rule.YardDays,
-                x.Rule.Opens, x.Rule.ValueNok))
+                x.Rule.Opens, x.Rule.ValueNok, ItemOrderRefusal(x.Item), InstallRefusal(x.Item, x.Rule),
+                x.Rule.YardNok is null || x.Rule.YardDays is null ? null : YardInstallRefusal(x.Item, x.Rule)))
             .ToList();
 
     private UpgradesView UpgradesSnapshot() => new(UpgradeViews());
 
-    /// <summary>The broker's lines for the upgrades fitted: what each is worth at its condition, to 100 NOK.</summary>
+    /// <summary>The broker's lines for the upgrades fitted: what each is worth at its condition, to 100 units.</summary>
     private IEnumerable<ValuationLine> UpgradeLines()
     {
         foreach (var c in _boat.Components)

@@ -62,7 +62,7 @@ public class EventTests
     private static Game Afloat(int day, Boat? boat = null, bool chainFixed = false, WeatherSeries? weather = null)
     {
         boat ??= BoatLoader.LoadSloop28();
-        if (chainFixed) boat.Get("anchor-gear").Replace();
+        if (chainFixed) { boat.Get("anchor-gear").Replace(); boat.Get("anchor-shackle").Replace(); }
         var g = new Game(boat, day, new FixedRandom(0.99), Game.DefaultSeed, weather ?? Clear());
         Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
         Ok(Walk.Do(g, "seacock", c => new Replace(c)));
@@ -95,12 +95,12 @@ public class EventTests
         Assert.Equal("Saturday, day 152", events[0].When);
         Assert.Equal("Friday and Saturday, days 172 to 173", events[1].When);
         Assert.Equal("a week of your choice in July, days 180 to 203", events[2].When);
-        Assert.Equal("Saturday and Sunday, days 215 to 216", events[3].When);
+        Assert.Equal("Friday to Sunday, days 214 to 216", events[3].When);
         Assert.Equal(["Hestholmen", "Storholmen", "Skjærvik", "Kvitnes"], events.Select(e => e.Place));
         Assert.All(events, e => Assert.Equal("ahead", e.Status));
         Assert.Equal((152, 152), (events[0].FromDay, events[0].ToDay));
         Assert.Equal((172, 173), (events[1].FromDay, events[1].ToDay));
-        Assert.Equal((215, 216), (events[3].FromDay, events[3].ToDay));
+        Assert.Equal((214, 216), (events[3].FromDay, events[3].ToDay));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class EventTests
         Assert.Equal(Regatta, events[0].Name);
         Assert.Equal("Saturday, day 516 (next year)", events[0].When);   // day 510 is a Sunday: the Saturday after
         Assert.Equal("Monday and Tuesday, days 532 to 533 (next year)", events[1].When); // Midsummer is a date, not a weekday
-        Assert.Equal("Saturday and Sunday, days 579 to 580 (next year)", events[3].When);
+        Assert.Equal("Friday to Sunday, days 578 to 580 (next year)", events[3].When);   // day 574 is a Monday: the Friday after
         Assert.All(events, e => Assert.Equal("ahead", e.Status));
     }
 
@@ -167,6 +167,7 @@ public class EventTests
     public void A_wait_stops_on_the_morning_of_a_window_and_a_party_slept_through_is_missed_and_said_once()
     {
         var g = Afloat(150);
+        Ok(g.Execute(new PlanEvent("regatta")));   // waits stop only for events the player has marked
         var wait = Ok(g.Execute(new WaitDays(5)));
         Assert.Equal(152, Status(g).Day);
         Assert.Contains($"You come back on day 152: {Regatta} starts today.", wait.Narrative);
@@ -206,6 +207,7 @@ public class EventTests
     public void Midsummer_at_home_is_missed_at_the_end_of_the_window_and_leaving_before_the_midnight_misses_the_night()
     {
         var home = Afloat(171);
+        Ok(home.Execute(new PlanEvent("midsummer")));
         Ok(home.Execute(new WaitDays(5)));          // cut on the morning of 172
         Assert.Equal(172, Status(home).Day);
         Ok(home.Execute(new WaitDays(4)));
@@ -256,10 +258,13 @@ public class EventTests
         var g = Afloat(185);
         Ok(g.Execute(new InviteFriend(190)));
         int left = Status(g).VacationDaysLeft;
-        var wait = Ok(g.Execute(new WaitDays(10)));
+        var morning = Ok(g.Execute(new WaitDays(10)));
         Assert.Equal(190, Status(g).Day);
-        Assert.Contains($"You come back on day 190: {Friend} starts today.", wait.Narrative);
-        Assert.Contains("Your friend looks at the bucket in the forepeak, and then at you, and books the hotel by the ferry.", wait.Narrative);
+        Assert.Contains($"You come back on day 190: {Friend} starts today.", morning.Narrative);
+        Assert.Equal("on now", Event(g, Friend).Status);
+        var wait = Ok(g.Execute(new WaitDays(1)));   // cut at the hour the friend comes
+        Assert.Equal("17:00", Status(g).TimeOfDay);
+        Assert.Contains("Your friend opens the forepeak door, takes one breath, shuts it again, and books the hotel by the ferry.", wait.Narrative);
         Assert.Equal("failed: a heads that works", Event(g, Friend).Status);
         Assert.Contains(Log(g).Entries, e => e.Text == $"Missed: {Friend} (a heads that works).");
         Assert.Equal(left, Status(g).VacationDaysLeft);   // no week was spent
@@ -288,25 +293,19 @@ public class EventTests
     }
 
     [Fact]
-    public void A_friend_who_finds_what_they_need_spends_every_weekday_at_once_drinks_the_boats_diesel_free_and_tops_up_the_tank()
+    public void A_friend_who_finds_what_they_need_comes_at_five_drinks_the_boats_diesel_free_and_tops_up_the_tank()
     {
         var boat = BoatWhoseFriendAsksForNothing();
         var g = Afloat(185, boat);
-        Ok(g.Execute(new InviteFriend(190)));          // Tuesday 190 to Monday 196: five weekdays
+        Ok(g.Execute(new InviteFriend(190)));          // Tuesday 190 to Monday 196
         int left = Status(g).VacationDaysLeft;
-        var wait = Ok(g.Execute(new WaitDays(10)));
-        Assert.Equal(190, Status(g).Day);
+        Ok(g.Execute(new WaitDays(10)));                 // cut on the morning of day 190
+        var wait = Ok(g.Execute(new WaitDays(1)));       // and at the friend's hour
+        Assert.Equal((190, "17:00"), (Status(g).Day, Status(g).TimeOfDay));
         Assert.Contains("Your friend comes down the pontoon with a rucksack and a bag of oranges, looks round the saloon, and says that it is better than they remembered.", wait.Narrative);
-        Assert.Contains($"The week costs five vacation days ({left - 5} left this year).", wait.Narrative);
-        Assert.Equal(left - 5, Status(g).VacationDaysLeft);
         Assert.Equal("made", Event(g, Friend).Status);
         Assert.Contains(Log(g).Entries, e => e.Text == $"Made it: {Friend}.");
-
-        // Working aboard on a weekday of the week costs nothing more.
-        for (int i = 0; i < 8; i++) Ok(Walk.Do(g, "negative terminal", c => new Inspect(c)));
-        for (int i = 0; i < 40; i++) Ok(g.Execute(new Inspect("negative terminal")));
-        Assert.Equal(left - 5, Status(g).VacationDaysLeft);
-        Assert.Equal("Wednesday, day 191: a weekday. Today is already a vacation day.".Replace("191", Status(g).Day.ToString()).Replace("Wednesday", new GameClock(Status(g).Day).WeekdayName), Cal(g).Week);
+        Assert.Equal(left, Status(g).VacationDaysLeft);  // the player was at work: no block of days is charged
 
         // The friend pays for the diesel.
         Walk.ToPlace(g, "cockpit");
@@ -320,29 +319,12 @@ public class EventTests
 
         // The week goes by; at its last midnight the friend fills her again before going.
         boat.Get("fuel-tank").State["fuelLitres"] = 10;
-        var after = Ok(g.Execute(new WaitDays(10)));
+        Ok(g.Execute(new WaitDays(10)));                 // cut on the morning of the last day
+        Ok(g.Execute(new WaitDays(1)));                  // cut at the last night
+        var after = Ok(g.Execute(new WaitDays(1)));      // through the midnight
         Assert.Contains(after.Alerts, a => a.Text == "Your friend topped up the tank before they went, and wouldn't hear about paying.");
-        Assert.Equal("Fuel: about 60 litres (a full tank).", Status(g).Fuel);
+        Assert.Equal("Fuel: about 45 litres (a full tank).", Status(g).Fuel);
         Assert.DoesNotContain(Cal(g).Money.Recent, e => e.Kind == "spending" && e.Nok < 0 && e.Day >= 190 && e.Text.Contains("iesel"));
-    }
-
-    [Fact]
-    public void With_the_vacation_days_spent_the_rest_of_the_week_is_unpaid_leave_in_the_same_line()
-    {
-        var node = JsonNode.Parse(Sloop28Json())!;
-        node["calendar"]!["events"]!.AsArray().Single(e => e!["id"]!.GetValue<string>() == "friend-week")!["requires"] = new JsonArray();
-        node["calendar"]!["vacationDaysPerYear"] = 3;
-        var g = Afloat(185, BoatLoader.Load(node.ToJsonString()));
-        Ok(g.Execute(new InviteFriend(190)));
-        int left = Status(g).VacationDaysLeft;       // the preparations made day 185 a vacation day: two left
-        Assert.Equal(2, left);
-        int balance = Status(g).BalanceNok;
-        var wait = Ok(g.Execute(new WaitDays(10)));
-        Assert.Contains("The week costs two vacation days (0 left this year) and three days of unpaid leave (4500 NOK off your pay).", wait.Narrative);
-        Assert.Equal(0, Status(g).VacationDaysLeft);
-        Assert.Equal(3, Cal(g).UnpaidDays);
-        Assert.Equal(balance - 4500, Status(g).BalanceNok);
-        Assert.Equal(3, Cal(g).Money.Recent.Count(e => e.Kind == "unpaid"));
     }
 
     // ------------------------------------------------------------------ the club cruise
@@ -350,7 +332,10 @@ public class EventTests
     [Fact]
     public void The_club_cruise_with_a_seized_chain_shows_it_the_fault_is_found_and_the_event_is_failed_with_its_reason()
     {
-        var g = Afloat(215);
+        var boat = BoatLoader.LoadSloop28();
+        boat.Get("anchor-shackle").Faults.Single().MarkEscalated();   // the wet season has done it: the shackle's fault became the chain's
+        boat.AllFaults.Single(f => f.Id == "anchor-chain-seized").Wake(215);
+        var g = Afloat(215, boat);
         // What the player knows before they sail: nothing wrong.
         var before = Event(g, Cruise).Requirements;
         Assert.Equal(new Requirement("anchor gear in order", true, "no known problem"), before[0]);
@@ -368,6 +353,33 @@ public class EventTests
         Assert.Equal("failed: anchor gear in order", view.Status);
         Assert.Equal(new Requirement("anchor gear in order", false, "Seized anchor chain"), view.Requirements[0]);
         Assert.Equal(new Requirement("a bilge pump that works", true, "no known problem"), view.Requirements[1]);
+    }
+
+    [Fact]
+    public void The_club_cruise_with_the_frozen_shackle_still_open_is_failed_and_the_shackle_is_found()
+    {
+        var g = Afloat(215);   // as sold: rusted chain, frozen shackle, not yet seized
+        Motor(g, "hestholmen");
+        Walk.ToPlace(g, "cockpit");
+        Ok(Walk.Start(g));
+        var arrive = Motor(g, "kvitnes");
+        Assert.Contains("The club lies in a ring round the bay, each boat to its own anchor, and you on a borrowed line among them. Nobody says anything. Everybody knows.", arrive.Narrative);
+        Assert.Contains(arrive.NewlyDiscovered, k => k.Name == "Rusted chain with a frozen shackle");
+        Assert.Contains(Log(g).Entries, e => e.Text == $"Missed: {Cruise} (anchor gear in order).");
+        Assert.Equal(new Requirement("anchor gear in order", false, "Rusted chain with a frozen shackle"), Event(g, Cruise).Requirements[0]);
+    }
+
+    [Fact]
+    public void The_club_cruise_is_made_with_a_new_shackle_and_the_chain_left_as_it_is()
+    {
+        var boat = BoatLoader.LoadSloop28();
+        boat.Get("anchor-shackle").Replace();   // the chain was never replaced: it only has to be free of faults
+        var g = Afloat(215, boat);
+        Motor(g, "hestholmen");
+        Walk.ToPlace(g, "cockpit");
+        Ok(Walk.Start(g));
+        Motor(g, "kvitnes");
+        Assert.Equal("made", Event(g, Cruise).Status);
     }
 
     [Fact]
@@ -412,14 +424,15 @@ public class EventTests
     }
 
     [Fact]
-    public void The_friends_needs_are_what_the_boat_has_not_got_yet_and_say_so_in_words()
+    public void The_friends_needs_say_only_what_the_player_knows_in_words()
     {
         var g = Afloat(160);
         var needs = Event(g, Friend).Requirements;
-        Assert.Equal(new Requirement("a heads that works", false, "not aboard"), needs[0]);
-        Assert.Equal(new Requirement("a stove that works", false, "not aboard"), needs[1]);
+        // The old heads has a weeping valve nobody has found: to the player there is no known problem. The cushions are not aboard.
+        Assert.Equal(new Requirement("a heads that works", true, "no known problem"), needs[0]);
+        Assert.Equal(new Requirement("a stove", true, "no known problem"), needs[1]);
         Assert.Equal(new Requirement("dry bunks", false, "not aboard"), needs[2]);
-        Assert.Equal("warm enough below, if the week is cold", needs[3].Text);
+        Assert.Equal("warm enough below on the last night, if it is cold", needs[3].Text);
         Assert.Null(needs[3].Met);
         Assert.Equal("depends on the weather", needs[3].Note);
     }

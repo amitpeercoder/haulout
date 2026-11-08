@@ -65,12 +65,12 @@ public class SeasonTests
     private static Boat ChainFixed()
     {
         var boat = BoatLoader.LoadSloop28();
-        boat.Get("anchor-gear").Replace();
+        boat.Get("anchor-gear").Replace(); boat.Get("anchor-shackle").Replace();
         return boat;
     }
 
     private static Boat BoatWithBalance(int nok) =>
-        BoatLoader.Load(Sloop28Json().Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"), withCalendar: false);
+        BoatLoader.Load(Sloop28Json(), withCalendar: false, TestEconomy.Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"));
 
     private static Game OnTheHard(int startDay, WeatherSeries? weather = null, int worldSeed = Game.DefaultSeed, Boat? boat = null) =>
         new(boat ?? BoatLoader.LoadSloop28(), startDay, new FixedRandom(0.99), worldSeed, weather ?? Calm());

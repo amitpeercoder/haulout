@@ -209,8 +209,10 @@ public sealed record SurveyReportView(
     IReadOnlyList<string> Opening, IReadOnlyList<SurveyItemView> Items, IReadOnlyList<string> Closing) : QueryResult;
 
 /// <summary>One way to fix a problem. Route: "DIY" | "Yard". How: plain words. Minutes: your time (DIY); LeadDays: the yard's.
-/// Available false with a reason, e.g. afloat for below-waterline work, or not enough money.</summary>
-public sealed record FixRoute(string Route, string How, int CostNok, int Minutes, int LeadDays, bool Available, string? UnavailableReason);
+/// Available false with a reason, e.g. afloat for below-waterline work, or not enough money. PartNote (DIY, a part the yard does not keep on the
+/// shelf): where the part stands, "not on the yard's shelf: order it first, 3 to 10 days", "on order, due day N", "waiting for you at the yard"
+/// or "the new part is aboard"; null for a part off the shelf.</summary>
+public sealed record FixRoute(string Route, string How, int CostNok, int Minutes, int LeadDays, bool Available, string? UnavailableReason, string? PartNote = null);
 
 /// <summary>
 /// A discovered problem that is still open. State: "Discovered" | "Deferred". CostNowNok: cheapest route now.
@@ -256,14 +258,19 @@ public sealed record TripRisk(string Problem, string Component, string AtSea, st
 /// SparesMissing: the spares the risks name that are not aboard. SailHours null: the wind will not serve, or no forecast.
 /// Design note 010: Fuel is the gauge in words against what the passage needs; VacationDays the weekdays the passage will charge; Warnings are
 /// things that are risks, not walls (fuel, the dark, fog, vacation days), only ever what the player knows; AtDestination the events and the
-/// anchorage rule at the other end.
+/// anchorage rule at the other end. Legs: when the way runs through another port, its legs (null for a direct route); the distance, hours, fuel,
+/// daylight and vacation days then cover the whole way, and a passage sails the first leg.
 /// </summary>
 public sealed record TripPlanView(
     string From, string To, double DistanceNm, int CourseDeg, int DepartDay, double MotorHours, double? SailHours, string Estimate,
     IReadOnlyList<ForecastDay> Forecast, IReadOnlyList<TripRisk> Risks, IReadOnlyList<string> SparesAboard,
     IReadOnlyList<string> SparesMissing, IReadOnlyList<string> Shelter, int BalanceNok, int TowNok,
     IReadOnlyList<string> Blockers,
-    string? Fuel = null, int VacationDays = 0, IReadOnlyList<string>? Warnings = null, IReadOnlyList<string>? AtDestination = null) : QueryResult;
+    string? Fuel = null, int VacationDays = 0, IReadOnlyList<string>? Warnings = null, IReadOnlyList<string>? AtDestination = null,
+    IReadOnlyList<PlanLeg>? Legs = null) : QueryResult;
+
+/// <summary>One leg of a way through another port (design note 010, second pass I). The plan's distance, hours, fuel, daylight and vacation days cover all of them; a passage is the first leg.</summary>
+public sealed record PlanLeg(string From, string To, double DistanceNm, int CourseDeg);
 
 /// <summary>
 /// Where she is on the passage. At a port: AtSea false, Port set, the rest empty. At sea: From and To are port names, PositionNm is the
@@ -348,10 +355,10 @@ public sealed record ChartView(
     string Here, IReadOnlyList<ChartPort> Ports, IReadOnlyList<ChartRoute> Routes, ChartBoat Boat,
     ChartTrack? Track, IReadOnlyList<ChartTrack> EarlierTracks, ChartWind Wind, ChartPlan? Plan) : QueryResult;
 
-/// <summary>A port with its marks. DistanceNm and BearingDeg are from the boat's position now; Reachable: a route out of the port she lies at (false at sea).</summary>
+/// <summary>A port with its marks. DistanceNm and BearingDeg are from the boat's position now; Reachable: a route out of the port she lies at (false at sea). Via: a port with no route from here but one through other ports, the ports passed through in words ("Hestholmen"), RouteNm the length of that way.</summary>
 public sealed record ChartPort(
     string Name, double EastNm, double NorthNm, bool Yard, bool Shop, bool Fuel, bool Anchorage, bool IsHere,
-    bool Reachable, double DistanceNm, int BearingDeg);
+    bool Reachable, double DistanceNm, int BearingDeg, string? Via = null, double RouteNm = 0);
 
 /// <summary>A route as written in the data, once (the way back is the same line). Distance and course are derived from the ports' positions.</summary>
 public sealed record ChartRoute(string From, string To, double DistanceNm, int CourseDeg, IReadOnlyList<ChartShelter> Shelters);
@@ -411,17 +418,29 @@ public sealed record Requirement(string Text, bool? Met, string Note);
 
 /// <summary>
 /// An event of the calendar of wants (design note 010). When: "Saturday, day 152". Status: "ahead", "on now", "made", "failed: &lt;requirement&gt;" or
-/// "missed". Story: the first line of the story once made, else empty. ToDay is the last day of the window.
+/// "missed". Story: the first line of the story once made, else empty. ToDay is the last day of the window. Going: the player marked it (plan event),
+/// or the friend was asked for it: a wait stops on the morning it starts; an event not marked still happens and is still judged. ToBePicked: a week the
+/// player has not chosen yet (ask first). Beats: the beats of an invited week. Outcome: how a finished week went, in the short words of the data.
 /// </summary>
 public sealed record EventView(
-    string Name, string Place, int FromDay, int ToDay, string When, string Status, IReadOnlyList<Requirement> Requirements, string Story);
+    string Name, string Place, int FromDay, int ToDay, string When, string Status, IReadOnlyList<Requirement> Requirements, string Story,
+    bool Going = false, IReadOnlyList<BeatView>? Beats = null, bool ToBePicked = false, string Outcome = "");
+
+/// <summary>
+/// One beat of a picked week (design note 010, second pass H): Text in the player's words, When the day and hour in words, Status "ahead", "on now",
+/// "made", "failed: &lt;requirement&gt;" or "missed", Note what it asks while it is still to come.
+/// </summary>
+public sealed record BeatView(string Text, string When, string Status, string Note);
 
 /// <summary>
 /// One upgrade (design note 010, step 3). Name: the item as the chandlery sells it. Status: "fitted on day N", "aboard, not fitted", "on order, due day N",
 /// "waiting at the yard" or "not aboard". PriceNok: the part. InstallMinutes: your own work. YardNok and YardDays: the yard's labour and days, null when
-/// it is a job for you. Opens: what it makes possible. ValueNok: what the broker adds for it, new.
+/// it is a job for you. Opens: what it makes possible. ValueNok: what the broker adds for it, new. OrderRefusal, InstallRefusal, YardInstallRefusal: why that
+/// command would be refused now, in the words the command itself gives (null: it would go ahead); YardInstallRefusal is null too when the yard does not do the job.
 /// </summary>
-public sealed record UpgradeView(string Name, string Status, int PriceNok, int InstallMinutes, int? YardNok, int? YardDays, string Opens, int ValueNok);
+public sealed record UpgradeView(
+    string Name, string Status, int PriceNok, int InstallMinutes, int? YardNok, int? YardDays, string Opens, int ValueNok,
+    string? OrderRefusal = null, string? InstallRefusal = null, string? YardInstallRefusal = null);
 
 public sealed record UpgradesView(IReadOnlyList<UpgradeView> Items) : QueryResult;
 

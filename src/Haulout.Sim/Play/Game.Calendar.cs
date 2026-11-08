@@ -59,12 +59,12 @@ public sealed partial class Game
         int limit = _boat.Calendar.OverdraftLimitNok;
         if (limit <= 0)
             return costNok <= Balance ? null
-                : Balance < 0 ? $"That's {costNok} NOK and you owe {-Balance} NOK already."
-                : $"That's {costNok} NOK and you have {Balance} NOK left.";
+                : Balance < 0 ? $"That's {Money(costNok)} and you owe {Money(-Balance)} already."
+                : $"That's {Money(costNok)} and you have {Money(Balance)} left.";
         if (costNok <= 0 || Balance - costNok >= -limit) return null;
         return Balance >= -limit
-            ? $"That's {costNok} NOK, and you have {Balance + limit} NOK left before the bank's limit ({limit} NOK overdrawn)."
-            : $"You're {-Balance} NOK overdrawn, past the bank's limit of {limit} NOK: nothing more until payday brings you back under.";
+            ? $"That's {Money(costNok)}, and you have {Money(Balance + limit)} left before the bank's limit ({Money(limit)} overdrawn)."
+            : $"You're {Money(-Balance)} overdrawn, past the bank's limit of {Money(limit)}: nothing more until payday brings you back under.";
     }
 
     // ------------------------------------------------------------------ the weekday rule
@@ -76,7 +76,7 @@ public sealed partial class Game
     private void ChargeDay(Turn t, int day, bool atSea)
     {
         var rules = _boat.Calendar;
-        if (!rules.ChargesDays || _chargedDay == day || _prepaid.Contains(day)) return;
+        if (!rules.ChargesDays || _chargedDay == day) return;
         var clock = new GameClock(day);
         if (clock.IsWeekend) return;
         _chargedDay = day;
@@ -95,7 +95,7 @@ public sealed partial class Game
         _unpaidDays++;
         _chargedUnpaid = true;
         Spend(rules.UnpaidLeaveNok, LedgerUnpaid, $"Unpaid leave: {name}, day {day}.");
-        t.Narrative.Add($"No vacation days left: today, {name}, is unpaid leave. {rules.UnpaidLeaveNok} NOK comes off your pay.");
+        t.Narrative.Add($"No vacation days left: today, {name}, is unpaid leave. {Money(rules.UnpaidLeaveNok)} comes off your pay.");
         _log.Add(new LogEntry(day, TimeOfDay, $"Unpaid leave: {name}, day {day}.", rules.UnpaidLeaveNok));
     }
 
@@ -118,15 +118,15 @@ public sealed partial class Game
             {
                 int interest = (int)Math.Ceiling(-Balance * rules.InterestPerMonth);
                 Spend(interest, LedgerInterest, "Overdraft interest for the month.");
-                RaiseCalendar("interest", $"The bank took {interest} NOK of overdraft interest.", interest);
-                _weekEvents.Add($"overdraft interest {interest} NOK");
+                RaiseCalendar("interest", $"The bank took {Money(interest)} of overdraft interest.", interest);
+                _weekEvents.Add($"overdraft interest {Money(interest)}");
             }
             if (rules.PayNok > 0)
             {
                 Earn(rules.PayNok, "Payday.");
                 _paydays++;
-                RaiseCalendar("payday", $"Payday: {rules.PayNok} NOK.", 0);
-                _weekEvents.Add($"payday {rules.PayNok} NOK");
+                RaiseCalendar("payday", $"Payday: {Money(rules.PayNok)}.", 0);
+                _weekEvents.Add($"payday {Money(rules.PayNok)}");
             }
         }
         foreach (var bill in rules.Bills)
@@ -134,8 +134,8 @@ public sealed partial class Game
             if (today < bill.FromDay || !bill.DaysOfYear.Contains(today % GameClock.DaysPerYear)) continue;
             Spend(bill.Nok, LedgerBill, bill.Text);
             if (rules.OverdraftLimitNok > 0 && Balance >= -rules.OverdraftLimitNok) _billsOnTime++;
-            RaiseCalendar($"bill-{bill.Id}", $"{bill.Text}: {bill.Nok} NOK.", bill.Nok);
-            _weekEvents.Add($"{(bill.Short.Length > 0 ? bill.Short : bill.Id)} {bill.Nok} NOK");
+            RaiseCalendar($"bill-{bill.Id}", $"{bill.Text}: {Money(bill.Nok)}.", bill.Nok);
+            _weekEvents.Add($"{(bill.Short.Length > 0 ? bill.Short : bill.Id)} {Money(bill.Nok)}");
         }
         DeliverOrders();
     }
@@ -157,35 +157,34 @@ public sealed partial class Game
     private int MinutesToMorning(int targetDay) => targetDay * 1440 + StartMinuteOfDay - (_startDay * 1440 + StartMinuteOfDay + ClockMinutes);
 
     /// <summary>
-    /// A wait that would pass the morning of something the player was told about (the booked slot, a delivery due at the yard) stops on
+    /// A wait that would pass the morning of something the player was told about (the booked slot, a delivery due at the yard, an event they marked) stops on
     /// that morning, at the same time of day the wait would have ended. A wait that starts on that day is not stopped by it. The first wins.
     /// </summary>
     private int StopAtCalendar(Turn t, int minutes)
     {
-        int endAbs = ClockMinutes + minutes;
-        int endDay = DayAt(endAbs);
-        int stopDay = int.MaxValue;
+        int endDay = DayAt(ClockMinutes + minutes);
+        int best = minutes;
         string? why = null;
-        if (_bookedDay is { } booked && booked > Day && booked <= endDay)
+        // A stop on a morning is at the same time of day the wait would have ended; the first of equal stops wins.
+        void StopAtDay(int day, string text)
         {
-            stopDay = booked;
-            why = $"You come back on day {booked} for your haulout slot.";
+            int m = minutes - (endDay - day) * 1440;
+            if (m < best || why is null && m <= best) { best = m; why = text; }
         }
+        void StopAtMinutes(int m, string text)
+        {
+            if (m < best) { best = m; why = text; }
+        }
+        if (_bookedDay is { } booked && booked > Day && booked <= endDay)
+            StopAtDay(booked, $"You come back on day {booked} for your haulout slot.");
         foreach (var o in _orders.Where(o => !o.Arrived && o.DueDay > Day && o.DueDay <= endDay))
-            if (o.DueDay < stopDay)
-            {
-                stopDay = o.DueDay;
-                why = $"You come back on day {o.DueDay}: the {o.Name} is due at the yard.";
-            }
-        foreach (var (eventDay, name) in OpenWindowStarts().Where(e => e.Day > Day && e.Day <= endDay))
-            if (eventDay < stopDay)
-            {
-                stopDay = eventDay;
-                why = $"You come back on day {eventDay}: {name} starts today.";
-            }
+            StopAtDay(o.DueDay, $"You come back on day {o.DueDay}: the {o.Name} is due at the yard.");
+        foreach (var (eventDay, name, _) in OpenWindowStarts().Where(e => e.Going && e.Day > Day && e.Day <= endDay))
+            StopAtDay(eventDay, $"You come back on day {eventDay}: {name} starts today.");
+        WeekStops(minutes, endDay, StopAtDay, StopAtMinutes);
         if (why is null) return minutes;
         t.Narrative.Add(why);
-        return endAbs - (endDay - stopDay) * 1440 - ClockMinutes;
+        return best;
     }
 
     private CommandResult DoNextWeekend(Turn t)
@@ -251,7 +250,7 @@ public sealed partial class Game
                         yield return new AheadItem(d, "bill", bill.Text, bill.Short.Length > 0 ? bill.Short : bill.Text, -bill.Nok);
             foreach (var o in _orders.Where(o => !o.Arrived && o.DueDay == d && d > Day))
                 yield return new AheadItem(d, "delivery", $"The {o.Name} is due at the yard", $"the {o.Name} due at the yard", 0);
-            foreach (var (eventDay, name) in OpenWindowStarts().Where(e => e.Day == d))
+            foreach (var (eventDay, name, _) in OpenWindowStarts().Where(e => e.Day == d))
                 yield return new AheadItem(d, "event", name, name, 0);
             if (_bookedDay == d)
             {
@@ -265,9 +264,9 @@ public sealed partial class Game
     private static string Hours(int minutes) =>
         minutes >= 60 ? (minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes / 60} h {minutes % 60} min") : $"{minutes} min";
 
-    private bool DayCharged(int day) => _chargedDay == day || _prepaid.Contains(day);
+    private bool DayCharged(int day) => _chargedDay == day;
 
-    private bool DayUnpaid(int day) => _chargedDay == day ? _chargedUnpaid : _prepaidUnpaid.Contains(day);
+    private bool DayUnpaid(int day) => _chargedDay == day && _chargedUnpaid;
 
     private int EveningLeft()
     {
@@ -292,7 +291,7 @@ public sealed partial class Game
         if (!CalendarOn) return null;
         var first = AheadItems().FirstOrDefault();
         if (first is null) return null;
-        string nok = first.Nok == 0 ? "" : $", {Math.Abs(first.Nok)} NOK";
+        string nok = first.Nok == 0 ? "" : $", {Money(Math.Abs(first.Nok))}";
         return $"Next: {first.Words} on day {first.Day}{nok}.";
     }
 

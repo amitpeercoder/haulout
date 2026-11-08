@@ -8,9 +8,12 @@ public enum RateFactor { Exposure, Use, Neglect }
 /// ExposedBy: ids of covers whose being off exposes this fault.
 /// RainOnlyWhenOff: when not empty, rain counts toward the exposure factor (and the cause line) only on days one of these covers was off
 /// at the end of the day; frost is unaffected.
+/// Spread (design note 010, second pass F): [low, high], this fault's own range for its seeded spread, drawn from its own roll (salt 12) and
+/// not from the world stream, so adding such a fault moves no other draw. Null: the world stream and the boat's range, as before.
 /// </summary>
 public sealed record ProgressionSpec(
-    double BaseRatePerDay, IReadOnlyList<RateFactor> Factors, IReadOnlyList<string> ExposedBy, IReadOnlyList<string>? RainOnlyWhenOff = null);
+    double BaseRatePerDay, IReadOnlyList<RateFactor> Factors, IReadOnlyList<string> ExposedBy, IReadOnlyList<string>? RainOnlyWhenOff = null,
+    IReadOnlyList<double>? Spread = null);
 
 /// <summary>What applied on one day to one fault. Recorded so the logbook can name the causes.</summary>
 public sealed record DailyCauses(

@@ -31,6 +31,11 @@ public class CalendarTests
         return r;
     }
 
+    // The shipped knobs, read from the loaded rules so a rebalance of economy.json does not break the rule tests.
+    private static int Pay => BoatLoader.LoadSloop28().Calendar.PayNok;
+    private static int Vac => BoatLoader.LoadSloop28().Calendar.VacationDaysPerYear;
+    private static int UnpaidDay => BoatLoader.LoadSloop28().Calendar.UnpaidLeaveNok;
+
     private static string Text(CommandResult r) => string.Join(" ", r.Narrative);
     private static StatusView Status(Game g) => (StatusView)g.Ask(new Status());
     private static CalendarView Cal(Game g) => (CalendarView)g.Ask(new Calendar());
@@ -45,13 +50,16 @@ public class CalendarTests
 
     private static Boat Boat(params (string From, string To)[] edits)
     {
+        // An edit goes to the boat file or, for a money and time knob, to economy.json (design note 010, second pass A).
         var json = Sloop28Json();
+        var economy = TestEconomy.Text();
         foreach (var (from, to) in edits)
         {
-            Assert.Contains(from, json);
-            json = json.Replace(from, to);
+            Assert.True(json.Contains(from) || economy.Contains(from), from);
+            if (json.Contains(from)) json = json.Replace(from, to);
+            else economy = economy.Replace(from, to);
         }
-        return BoatLoader.Load(json);
+        return BoatLoader.Load(json, economyJson: economy);
     }
 
     private static Game NewGame(int startDay, Boat? boat = null, WeatherSeries? weather = null) =>
@@ -92,25 +100,25 @@ public class CalendarTests
         var g = NewGame(77); // a Monday
         var start = Cal(g);
         Assert.Equal(180, start.EveningMinutesLeft);
-        Assert.Equal((25, 25, 0, 0), (start.VacationDaysLeft, start.VacationDaysPerYear, start.VacationDaysUsed, start.UnpaidDays));
+        Assert.Equal((Vac, Vac, 0, 0), (start.VacationDaysLeft, start.VacationDaysPerYear, start.VacationDaysUsed, start.UnpaidDays));
         Assert.Equal("Monday, day 77: a weekday. An evening aboard: 3 h left before it costs a vacation day.", start.Week);
 
         UseUpTheEvening(g);
-        Assert.Equal(25, Cal(g).VacationDaysLeft);
+        Assert.Equal(Vac, Cal(g).VacationDaysLeft);
         Assert.DoesNotContain("vacation", Cal(g).Week.Replace("before it costs a vacation day", ""));
 
         var over = Ok(g.Execute(new Inspect("negative terminal")));
-        Assert.Contains("That's more than an evening's work: today, Monday, becomes a vacation day (24 left this year).", over.Narrative);
+        Assert.Contains($"That's more than an evening's work: today, Monday, becomes a vacation day ({Vac - 1} left this year).", over.Narrative);
         var cal = Cal(g);
-        Assert.Equal((24, 1, 0), (cal.VacationDaysLeft, cal.VacationDaysUsed, cal.EveningMinutesLeft));
+        Assert.Equal((Vac - 1, 1, 0), (cal.VacationDaysLeft, cal.VacationDaysUsed, cal.EveningMinutesLeft));
         Assert.Equal("Monday, day 77: a weekday. Today is already a vacation day.", cal.Week);
         Assert.Contains(Log(g).Entries, e => e.Text == "Vacation day: Monday, day 77." && e.CostNok == 0);
-        Assert.Equal(24, Status(g).VacationDaysLeft);
+        Assert.Equal(Vac - 1, Status(g).VacationDaysLeft);
 
         // A second long job the same day costs nothing more.
         var more = Ok(g.Execute(new Charge("start battery")));
         Assert.DoesNotContain("vacation", Text(more));
-        Assert.Equal(24, Cal(g).VacationDaysLeft);
+        Assert.Equal(Vac - 1, Cal(g).VacationDaysLeft);
         Assert.Single(Log(g).Entries, e => e.Text.StartsWith("Vacation day", StringComparison.Ordinal));
     }
 
@@ -122,7 +130,7 @@ public class CalendarTests
         var b = Ok(g.Execute(new Charge("start battery")));
         Assert.InRange(Status(g).Day, 75, 76); // Saturday into Sunday
         Assert.DoesNotContain("vacation", Text(a) + Text(b));
-        Assert.Equal((25, 0), (Cal(g).VacationDaysLeft, Cal(g).VacationDaysUsed));
+        Assert.Equal((Vac, 0), (Cal(g).VacationDaysLeft, Cal(g).VacationDaysUsed));
         Assert.DoesNotContain(Log(g).Entries, e => e.Text.Contains("acation day", StringComparison.Ordinal));
     }
 
@@ -132,9 +140,9 @@ public class CalendarTests
         var g = NewGame(77);
         var r = Ok(g.Execute(new WaitDays(3)));
         Assert.DoesNotContain("vacation", Text(r));
-        Assert.Equal((25, 0, 0), (Cal(g).VacationDaysLeft, Cal(g).VacationDaysUsed, Cal(g).UnpaidDays));
+        Assert.Equal((Vac, 0, 0), (Cal(g).VacationDaysLeft, Cal(g).VacationDaysUsed, Cal(g).UnpaidDays));
         Ok(g.Execute(new WaitWeek()));
-        Assert.Equal(25, Cal(g).VacationDaysLeft);
+        Assert.Equal(Vac, Cal(g).VacationDaysLeft);
     }
 
     /// <summary>Launched on a Saturday with the fixes in, waited to Monday morning at her mooring, engine running, in the cockpit.</summary>
@@ -157,31 +165,31 @@ public class CalendarTests
     public void A_weekday_departure_charges_a_vacation_day_and_a_weekend_one_does_not()
     {
         var g = AfloatOnMonday();
-        Assert.Equal(25, Cal(g).VacationDaysLeft);
+        Assert.Equal(Vac, Cal(g).VacationDaysLeft);
         var depart = Ok(g.Execute(new Depart()));
-        Assert.Contains("A weekday at sea: today, Monday, is a vacation day (24 left this year).", depart.Narrative);
+        Assert.Contains($"A weekday at sea: today, Monday, is a vacation day ({Vac - 1} left this year).", depart.Narrative);
         Assert.Contains(Log(g).Entries, e => e.Text == "Vacation day: Monday, day 77.");
         var next = Ok(g.Execute(new Continue()));
         Assert.DoesNotContain("vacation", Text(next));
-        Assert.Equal(24, Cal(g).VacationDaysLeft);
+        Assert.Equal(Vac - 1, Cal(g).VacationDaysLeft);
     }
 
     [Fact]
     public void With_the_budget_spent_a_long_weekday_is_unpaid_leave_with_its_bill()
     {
-        var g = NewGame(77, Boat(("\"vacationDaysPerYear\": 25", "\"vacationDaysPerYear\": 0")));
+        var g = NewGame(77, Boat(($"\"vacationDaysPerYear\": {Vac}", "\"vacationDaysPerYear\": 0")));
         UseUpTheEvening(g);
         int balance = Status(g).BalanceNok;
         var over = Ok(g.Execute(new Inspect("negative terminal")));
-        Assert.Contains("No vacation days left: today, Monday, is unpaid leave. 1500 NOK comes off your pay.", over.Narrative);
-        Assert.Equal(balance - 1500, Status(g).BalanceNok);
+        Assert.Contains($"No vacation days left: today, Monday, is unpaid leave. {UnpaidDay} NOK comes off your pay.", over.Narrative);
+        Assert.Equal(balance - UnpaidDay, Status(g).BalanceNok);
         var cal = Cal(g);
         Assert.Equal((0, 0, 1), (cal.VacationDaysLeft, cal.VacationDaysUsed, cal.UnpaidDays));
         Assert.Equal("Monday, day 77: a weekday. Today is unpaid leave.", cal.Week);
-        Assert.Contains(Log(g).Entries, e => e.Text == "Unpaid leave: Monday, day 77." && e.CostNok == 1500);
-        Assert.Equal(new LedgerEntry(77, "unpaid", "Unpaid leave: Monday, day 77.", -1500), cal.Money.Recent[0]);
-        Assert.Equal(1500, cal.Money.UnpaidNok);
-        Assert.Equal(1500, Status(g).MoneySpentNok);
+        Assert.Contains(Log(g).Entries, e => e.Text == "Unpaid leave: Monday, day 77." && e.CostNok == UnpaidDay);
+        Assert.Equal(new LedgerEntry(77, "unpaid", "Unpaid leave: Monday, day 77.", -UnpaidDay), cal.Money.Recent[0]);
+        Assert.Equal(UnpaidDay, cal.Money.UnpaidNok);
+        Assert.Equal(UnpaidDay, Status(g).MoneySpentNok);
         // Charged once.
         Ok(g.Execute(new Charge("start battery")));
         Assert.Equal(1, Cal(g).UnpaidDays);
@@ -190,7 +198,7 @@ public class CalendarTests
     [Fact]
     public void The_vacation_budget_comes_back_at_the_new_year()
     {
-        var g = NewGame(357, Boat(("\"vacationDaysPerYear\": 25", "\"vacationDaysPerYear\": 2"))); // 357 is a Monday
+        var g = NewGame(357, Boat(($"\"vacationDaysPerYear\": {Vac}", "\"vacationDaysPerYear\": 2"))); // 357 is a Monday
         UseUpTheEvening(g);
         Ok(g.Execute(new Inspect("negative terminal")));
         Assert.Equal((1, 1), (Cal(g).VacationDaysLeft, Cal(g).VacationDaysUsed));
@@ -218,20 +226,20 @@ public class CalendarTests
         var g = NewGame(85);
         var r = Ok(g.Execute(new WaitDays(5)));
         Assert.Equal(90, Status(g).Day);
-        Assert.Equal(25000 + 6000 - 3000, Status(g).BalanceNok);
+        Assert.Equal(25000 + Pay - 3000, Status(g).BalanceNok);
         Assert.Equal(3000, Status(g).MoneySpentNok);
 
-        Assert.Contains(r.Alerts, a => a.Text == "Payday: 6000 NOK." && a.Day == 90 && a.TimeOfDay == "00:00");
+        Assert.Contains(r.Alerts, a => a.Text == $"Payday: {Pay} NOK." && a.Day == 90 && a.TimeOfDay == "00:00");
         Assert.Contains(r.Alerts, a => a.Text == "Berth and mooring at Skjærvik, the quarter: 3000 NOK.");
         var log = Log(g).Entries;
-        Assert.Contains(log, e => e.Alert && e.Text == "Payday: 6000 NOK." && e.Day == 90);
+        Assert.Contains(log, e => e.Alert && e.Text == $"Payday: {Pay} NOK." && e.Day == 90);
         Assert.Contains(log, e => e.Alert && e.Text == "Berth and mooring at Skjærvik, the quarter: 3000 NOK." && e.CostNok == 3000);
-        Assert.Equal("While you were away: payday 6000 NOK; the berth invoice 3000 NOK.", r.Narrative[^1]);
+        Assert.Equal($"While you were away: payday {Pay} NOK; the berth invoice 3000 NOK.", r.Narrative[^1]);
 
         var money = Cal(g).Money;
-        Assert.Equal((6000, 0, 3000, 0, 0), (money.IncomeNok, money.SpendingNok, money.BillsNok, money.InterestNok, money.UnpaidNok));
+        Assert.Equal((Pay, 0, 3000, 0, 0), (money.IncomeNok, money.SpendingNok, money.BillsNok, money.InterestNok, money.UnpaidNok));
         Assert.Equal(new LedgerEntry(90, "bill", "Berth and mooring at Skjærvik, the quarter", -3000), money.Recent[0]);
-        Assert.Equal(new LedgerEntry(90, "income", "Payday.", 6000), money.Recent[1]);
+        Assert.Equal(new LedgerEntry(90, "income", "Payday.", Pay), money.Recent[1]);
         Assert.Equal(Status(g).BalanceNok, money.BalanceNok);
         Assert.Equal(120, Cal(g).NextPaydayDay);
     }
@@ -241,7 +249,7 @@ public class CalendarTests
     {
         var g = NewGame(88);
         WaitTo(g, 121);
-        var days = Log(g).Entries.Where(e => e.Text == "Payday: 6000 NOK.").Select(e => e.Day).ToList();
+        var days = Log(g).Entries.Where(e => e.Text == $"Payday: {Pay} NOK.").Select(e => e.Day).ToList();
         Assert.Equal([90, 120], days);
         Assert.Single(Log(g).Entries, e => e.Text.StartsWith("Berth and mooring", StringComparison.Ordinal)); // not on 120
 
@@ -251,7 +259,7 @@ public class CalendarTests
         var insurance = Log(g).Entries.Where(e => e.Text.StartsWith("Insurance", StringComparison.Ordinal)).ToList();
         var renewal = Assert.Single(insurance);
         Assert.Equal((450, 8000), (renewal.Day, renewal.CostNok));
-        Assert.Equal(13, Log(g).Entries.Count(e => e.Text == "Payday: 6000 NOK."));
+        Assert.Equal(13, Log(g).Entries.Count(e => e.Text == $"Payday: {Pay} NOK."));
     }
 
     [Fact]
@@ -266,11 +274,11 @@ public class CalendarTests
         Assert.Contains(r.Alerts, a => a.Text == "The bank took 150 NOK of overdraft interest.");
         var recent = Cal(g).Money.Recent;
         Assert.Equal("bill", recent[0].Kind);
-        Assert.Equal(new LedgerEntry(90, "income", "Payday.", 6000), recent[1]);
+        Assert.Equal(new LedgerEntry(90, "income", "Payday.", Pay), recent[1]);
         Assert.Equal(new LedgerEntry(90, "interest", "Overdraft interest for the month.", -150), recent[2]);
-        Assert.Equal(-10000 - 150 + 6000 - 3000, Status(g).BalanceNok);
+        Assert.Equal(-10000 - 150 + Pay - 3000, Status(g).BalanceNok);
         Assert.Equal(150, Cal(g).Money.InterestNok);
-        Assert.Contains("overdraft interest 150 NOK; payday 6000 NOK; the berth invoice 3000 NOK", r.Narrative[^1]);
+        Assert.Contains($"overdraft interest 150 NOK; payday {Pay} NOK; the berth invoice 3000 NOK", r.Narrative[^1]);
     }
 
     // ------------------------------------------------------------------ the overdraft
@@ -287,7 +295,7 @@ public class CalendarTests
 
         var past = NewGame(75, Boat(("\"startingBalanceNok\": 25000", "\"startingBalanceNok\": -21000")));
         No(past.Execute(new Buy("fuses")), "You're 21000 NOK overdrawn, past the bank's limit of 20000 NOK: nothing more until payday brings you back under.");
-        Assert.Equal("Balance -19960 NOK (the bank allows 20000 overdrawn).", Prose.Prose.Calendar(Cal(g)).Split(Environment.NewLine).Single(l => l.StartsWith("Balance", StringComparison.Ordinal)));
+        Assert.Equal("Balance -19960 NOK (the bank allows 20000 overdrawn).", new Prose.Prose(g.Currency).Calendar(Cal(g)).Split(Environment.NewLine).Single(l => l.StartsWith("Balance", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -522,9 +530,9 @@ public class CalendarTests
         Assert.Equal((92, "08:00"), (Status(g).Day, Status(g).TimeOfDay));
         Assert.Equal("You go back to work for a week. Tuesday, day 92: you're back aboard at eight.", r.Narrative[0]);
         Assert.Contains(Log(g).Entries, e => e.Text == "Waited a week.");
-        Assert.Equal("While you were away: payday 6000 NOK; the berth invoice 3000 NOK.", r.Narrative[^1]);
+        Assert.Equal($"While you were away: payday {Pay} NOK; the berth invoice 3000 NOK.", r.Narrative[^1]);
         Assert.Equal(7 * 1440, r.MinutesTaken);
-        Assert.Equal(25000 + 6000 - 3000, Status(g).BalanceNok);
+        Assert.Equal(25000 + Pay - 3000, Status(g).BalanceNok);
     }
 
     [Fact]
@@ -612,17 +620,17 @@ public class CalendarTests
         var g = NewGame(75);
         var cal = Cal(g);
         Assert.Equal(
-            [new CalendarEntry(90, "Sunday", "payday", "Payday", 6000),
+            [new CalendarEntry(90, "Sunday", "payday", "Payday", Pay),
              new CalendarEntry(90, "Sunday", "bill", "Berth and mooring at Skjærvik, the quarter", -3000)],
             cal.Ahead);
-        Assert.Equal((90, 6000, 20000, 25000), (cal.NextPaydayDay, cal.PayNok, cal.OverdraftLimitNok, cal.BalanceNok));
-        Assert.Equal("Next: payday on day 90, 6000 NOK.", Status(g).Next);
+        Assert.Equal((90, Pay, 20000, 25000), (cal.NextPaydayDay, cal.PayNok, cal.OverdraftLimitNok, cal.BalanceNok));
+        Assert.Equal($"Next: payday on day 90, {Pay} NOK.", Status(g).Next);
         Assert.Equal("Saturday, day 75: a weekend, a boat day.", Status(g).Week);
-        Assert.Equal(25, Status(g).VacationDaysLeft);
+        Assert.Equal(Vac, Status(g).VacationDaysLeft);
 
         WaitTo(g, 90);
         Assert.Equal(120, Cal(g).NextPaydayDay);
-        Assert.Equal("Next: payday on day 120, 6000 NOK.", Status(g).Next);
+        Assert.Equal($"Next: payday on day 120, {Pay} NOK.", Status(g).Next);
     }
 
     [Fact]
@@ -665,7 +673,7 @@ public class CalendarTests
     public void The_shipped_data_turns_the_money_on_and_the_stocked_flags_land_on_the_ten_parts()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal((180, 25, 1500, 6000, 20000, 0.015), (boat.Calendar.EveningMinutes, boat.Calendar.VacationDaysPerYear, boat.Calendar.UnpaidLeaveNok, boat.Calendar.PayNok, boat.Calendar.OverdraftLimitNok, boat.Calendar.InterestPerMonth));
+        Assert.Equal((180, 12, 150, 3500, 20000, 0.015), (boat.Calendar.EveningMinutes, boat.Calendar.VacationDaysPerYear, boat.Calendar.UnpaidLeaveNok, boat.Calendar.PayNok, boat.Calendar.OverdraftLimitNok, boat.Calendar.InterestPerMonth));
         Assert.Equal(["berth", "insurance"], boat.Calendar.Bills.Select(b => b.Id));
         Assert.Equal([3, 10], boat.Orders.LeadDays.ToArray());
         Assert.Equal(("skjaervik", 5), (boat.Orders.DeliverTo, boat.Orders.PhoneMinutes));

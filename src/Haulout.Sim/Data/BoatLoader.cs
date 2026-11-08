@@ -9,6 +9,21 @@ namespace Haulout.Sim.Data;
 public static class BoatLoader
 {
     private const string Sloop28Resource = "Haulout.Sim.Data.sloop28.json";
+    private const string EconomyResource = "Haulout.Sim.Data.economy.json";
+
+    /// <summary>
+    /// The knobs economy.json owns (design note 010, second pass A): a boat file that still holds one is refused, so the two never disagree.
+    /// Each entry is a path of object keys; the last key is the knob (or the whole section when it is the only key).
+    /// </summary>
+    private static readonly string[][] EconomyKnobs =
+    [
+        ["economy"], ["survey", "nokPerFoot"],
+        ["yard", "liftNok"], ["yard", "storageNok"], ["yard", "changeFeeNok"], ["yard", "washNok"],
+        ["trips", "tow", "nok"], ["mooring", "partedRepairNok"], ["layup", "dieselNokPerLitre"], ["closeCalls", "letterNok"],
+        ["orders", "leadDays"],
+        ["calendar", "eveningMinutes"], ["calendar", "vacationDaysPerYear"], ["calendar", "unpaidLeaveNok"], ["calendar", "payNok"],
+        ["calendar", "overdraftLimitNok"], ["calendar", "interestPerMonth"], ["calendar", "bills"],
+    ];
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -21,16 +36,30 @@ public static class BoatLoader
     /// false: the boat as it was before design note 010. No pay, no bills, no vacation days, no overdraft limit, and every part on the
     /// yard's shelf (no orders). For tests whose subject is not the week or the money.
     /// </param>
-    public static Boat LoadSloop28(bool withCalendar = true)
+    public static Boat LoadSloop28(bool withCalendar = true) => Load(ReadResource(Sloop28Resource), withCalendar);
+
+    private static string ReadResource(string name)
     {
-        using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream(Sloop28Resource)
-            ?? throw new InvalidOperationException($"Embedded resource '{Sloop28Resource}' not found.");
+        using var stream = typeof(BoatLoader).Assembly.GetManifestResourceStream(name)
+            ?? throw new InvalidOperationException($"Embedded resource '{name}' not found.");
         using var reader = new StreamReader(stream);
-        return Load(reader.ReadToEnd(), withCalendar);
+        return reader.ReadToEnd();
     }
 
-    public static Boat Load(string json, bool withCalendar = true)
+    /// <summary>The world's economy, from the embedded economy.json.</summary>
+    public static EconomyData LoadEconomy() => ParseEconomy(ReadResource(EconomyResource));
+
+    public static EconomyData ParseEconomy(string json) =>
+        JsonSerializer.Deserialize<EconomyData>(json, Options) ?? throw new InvalidOperationException("Economy JSON is empty.");
+
+    /// <param name="economyJson">
+    /// The economy file's text. Null: the embedded economy.json, so a boat written inline in a test is played in the world's economy
+    /// (the same numbers the knobs held in the boat file before design note 010, second pass A).
+    /// </param>
+    public static Boat Load(string json, bool withCalendar = true, string? economyJson = null)
     {
+        RefuseEconomyKnobs(json);
+        var eco = economyJson is null ? LoadEconomy() : ParseEconomy(economyJson);
         var dto = JsonSerializer.Deserialize<BoatDto>(json, Options)
             ?? throw new InvalidOperationException("Boat JSON is empty.");
 
@@ -59,7 +88,7 @@ public static class BoatLoader
                 c.SeriesOhms, kind, replaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
-                c.BelowWaterline, c.ReplaceText, c.NeedsDry, c.Stocked);
+                c.BelowWaterline, c.ReplaceText, c.NeedsDry, c.Stocked, c.NoPoorJob);
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
             var faults = (c.Faults ?? []).Select(f => new Fault(
                 f.Id, f.Name, c.Id, f.Effect ?? new FaultEffect(FaultEffectKind.None, 0),
@@ -75,9 +104,11 @@ public static class BoatLoader
                 f.Yard is { } y ? new YardRoute(y.How, y.Nok, y.LeadDays) : null,
                 f.Escalation is { } e ? new Escalation(e.To, e.OnLaunch, e.Text ?? "") : null,
                 f.Properties is null ? null : new Dictionary<string, double>(f.Properties),
-                f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? [], pr.RainOnlyWhenOff ?? []) : null,
+                f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? [], pr.RainOnlyWhenOff ?? [], pr.Spread is { Count: 2 } ps ? ps : null) : null,
                 f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text,
-                f.AtSea is { } asp ? new AtSeaSpec(asp.Text, asp.Spare) : null));
+                f.AtSea is { } asp ? new AtSeaSpec(asp.Text, asp.Spare) : null,
+                f.FailsWhen is { Length: > 0 } fw ? (fw is "rain" ? fw : throw new InvalidOperationException($"Fault '{f.Id}' has failsWhen '{fw}'.")) : null,
+                f.Symptom));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         }
         var components = dto.Components.Select(BuildComponent).ToList();
@@ -92,19 +123,29 @@ public static class BoatLoader
             return new UpgradeRule
             {
                 Component = comp, PlaceId = u.Place, InstallMinutes = u.InstallMinutes, YardNok = u.YardNok, YardDays = u.YardDays,
-                ValueNok = u.ValueNok, Opens = u.Opens ?? "", InstallText = u.InstallText ?? "",
+                ValueNok = u.ValueNok, Opens = u.Opens ?? "", InstallText = u.InstallText ?? "", Replaces = u.Replaces ?? [],
+                Also = (u.Also ?? []).Select(BuildComponent).ToList(),
             };
         }).ToList();
+        // An upgrade may take the place of components the boat has from the start (design note 010, second pass F), each by at most one upgrade.
+        var replacedBy = new Dictionary<string, string>();
+        foreach (var u in upgrades)
+            foreach (var old in u.Replaces)
+            {
+                if (dto.Components.All(c => c.Id != old))
+                    throw new InvalidOperationException($"Upgrade '{u.Component.Id}' replaces '{old}', which is not a component of the boat.");
+                if (!replacedBy.TryAdd(old, u.Component.Id))
+                    throw new InvalidOperationException($"Component '{old}' is replaced by both '{replacedBy[old]}' and '{u.Component.Id}'.");
+            }
         foreach (var item in chandlery.Where(i => i.Upgrade is not null))
             if (upgrades.All(u => u.Component.Id != item.Upgrade))
                 throw new InvalidOperationException($"Chandlery item '{item.Id}' fits '{item.Upgrade}', which is not an upgrade.");
 
-        var economy = dto.Economy is { } ec
-            ? new Economy(ec.StartingBalanceNok, ec.LaunchDeadlineDay, ec.EmergencyLiftNok, ec.LaunchMinutes, ec.EmergencyLiftDays)
-            : null;
+        var economy = new Economy(
+            eco.Start.StartingBalanceNok, eco.Start.LaunchDeadlineDay, eco.EmergencyLift.Nok, eco.Start.LaunchMinutes, eco.EmergencyLift.Days);
         var survey = dto.Survey is { } sv
             ? new SurveyData(
-                sv.NokPerFoot, sv.LengthFeet, sv.Days, sv.Surveyor, sv.Opening ?? [], sv.Closing ?? [],
+                eco.Survey.NokPerFoot, sv.LengthFeet, sv.Days, sv.Surveyor, sv.Opening ?? [], sv.Closing ?? [],
                 (sv.Items ?? []).Select(i => new SurveyItemData(i.Component, i.Severity, i.Fault, i.Finding, i.Text)).ToList())
             : null;
         var quality = dto.DiyQuality is { } dq
@@ -147,10 +188,22 @@ public static class BoatLoader
 
         var trips = dto.Trips is { } tr
             ? new TripRules(
-                tr.Home, tr.Ports ?? [], DeriveRoutes(tr.Ports ?? [], tr.Routes ?? []), tr.Tow ?? new TowRules())
+                tr.Home, tr.Ports ?? [], DeriveRoutes(tr.Ports ?? [], tr.Routes ?? []), (tr.Tow ?? new TowRules()) with { Nok = eco.Tow.Nok })
             : null;
 
-        var calendar = withCalendar ? dto.Calendar : null;
+        // withCalendar false: no pay, no bills, no vacation limit, no overdraft limit (the calendar's money knobs stay at their off defaults) and no orders.
+        var calendar = withCalendar
+            ? (dto.Calendar ?? CalendarRules.Default) with
+            {
+                EveningMinutes = eco.Calendar.EveningMinutes,
+                VacationDaysPerYear = eco.Calendar.VacationDaysPerYear,
+                UnpaidLeaveNok = eco.Calendar.DerivedUnpaidLeaveNok(),
+                PayNok = eco.Calendar.PayNok,
+                OverdraftLimitNok = eco.Calendar.OverdraftLimitNok,
+                InterestPerMonth = eco.Calendar.InterestPerMonth,
+                Bills = eco.Calendar.Bills,
+            }
+            : null;
         foreach (var e in calendar?.Events ?? [])
         {
             if (trips?.FindPort(e.Port) is null)
@@ -159,19 +212,73 @@ public static class BoatLoader
                 throw new InvalidOperationException($"Event '{e.Id}' has the weekday '{wd}'.");
             foreach (var r in e.Requires)
             {
-                if (r.Kind is not ("fitted" or "working" or "dryBunks" or "warm"))
+                if (r.Kind is not ("fitted" or "working" or "anyWorking" or "dryBunks" or "warm"))
                     throw new InvalidOperationException($"Event '{e.Id}' has a requirement of the kind '{r.Kind}'.");
+                if (r.Kind == "anyWorking")
+                {
+                    // Alternatives, each one component or several joined by '+' that must all work (design note 010, second pass F).
+                    if (r.Components.Count == 0 || r.Id.Length == 0)
+                        throw new InvalidOperationException($"Event '{e.Id}' has an anyWorking requirement with no id or no components.");
+                    foreach (var id in r.Components.SelectMany(a => a.Split('+')))
+                        if (dto.Components.All(c => c.Id != id) && upgrades.All(u => u.Component.Id != id))
+                            throw new InvalidOperationException($"Event '{e.Id}' needs '{id}', which is neither a component nor an upgrade.");
+                    continue;
+                }
                 // A requirement names a component the boat has from the start, or an upgrade it can be given (design note 010, step 3).
-                if (r.Kind == "working" && dto.Components.All(c => c.Id != r.Component))
-                    throw new InvalidOperationException($"Event '{e.Id}' needs '{r.Component}' to work, which is not a component.");
-                if (dto.Components.All(c => c.Id != r.Component) && upgrades.All(u => u.Component.Id != r.Component))
-                    throw new InvalidOperationException($"Event '{e.Id}' needs '{r.Component}', which is neither a component nor an upgrade.");
+                // "working" may name several (all must work).
+                foreach (var id in r.Components.Prepend(r.Component))
+                {
+                    if (r.Kind == "working" && dto.Components.All(c => c.Id != id))
+                        throw new InvalidOperationException($"Event '{e.Id}' needs '{id}' to work, which is not a component.");
+                    if (dto.Components.All(c => c.Id != id) && upgrades.All(u => u.Component.Id != id))
+                        throw new InvalidOperationException($"Event '{e.Id}' needs '{id}', which is neither a component nor an upgrade.");
+                }
             }
         }
-        var orders = withCalendar ? dto.Orders : null;
+        foreach (var e in calendar?.Events ?? [])
+            foreach (var b in e.Beats)
+            {
+                if (b.Kind is not ("arrival" or "trip" or "night"))
+                    throw new InvalidOperationException($"Event '{e.Id}' has a beat '{b.Id}' of the kind '{b.Kind}'.");
+                if (b.Hour is < 0 or > 23)
+                    throw new InvalidOperationException($"Event '{e.Id}' has a beat '{b.Id}' at hour {b.Hour}.");
+                if (b.Kind == "trip" && trips?.FindPort(b.Port) is null)
+                    throw new InvalidOperationException($"Event '{e.Id}' has a trip beat to '{b.Port}', which is not in the trips.");
+            }
+        var orders = withCalendar ? (dto.Orders ?? OrderRules.Default) with { LeadDays = eco.Orders.LeadDays } : null;
+        var yard = (dto.Yard ?? YardRules.Default) with
+        {
+            LiftNok = eco.Yard.LiftNok, StorageNok = eco.Yard.StorageNok, ChangeFeeNok = eco.Yard.ChangeFeeNok, WashNok = eco.Yard.WashNok,
+        };
+        var mooring = (dto.Mooring ?? MooringRules.Default) with { PartedRepairNok = eco.Mooring.PartedRepairNok };
+        var layup = (dto.Layup ?? LayupRules.Default) with { DieselNokPerLitre = eco.Fuel.DieselNokPerLitre };
+        var night = dto.Night ?? NightRules.Default;
+        var closeCalls = (dto.CloseCalls ?? CloseCallRules.Default) with { LetterNok = eco.CloseCalls.LetterNok };
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
-            chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale, calendar, orders, dto.Fuel, dto.Night, upgrades, withCalendar ? dto.Reputation : null);
+            chandlery, trips, dto.Sea, dto.Forecast, yard, dto.Fouling, mooring, layup, dto.Sale, calendar, orders, dto.Fuel, night, upgrades, withCalendar ? dto.Reputation : null,
+            eco.Currency, closeCalls, dto.Instruments);
+    }
+
+    /// <summary>A boat file holding a knob that economy.json owns is a mistake the two files could disagree about, so it is refused.</summary>
+    private static void RefuseEconomyKnobs(string boatJson)
+    {
+        using var doc = JsonDocument.Parse(boatJson, new JsonDocumentOptions { AllowTrailingCommas = true });
+        foreach (var path in EconomyKnobs)
+        {
+            var node = doc.RootElement;
+            var found = true;
+            foreach (var key in path)
+            {
+                if (node.ValueKind != JsonValueKind.Object) { found = false; break; }
+                var next = node.EnumerateObject().Where(p => string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase)).Select(p => (JsonElement?)p.Value).FirstOrDefault();
+                if (next is null) { found = false; break; }
+                node = next.Value;
+            }
+            if (found)
+                throw new InvalidOperationException(
+                    $"The boat file holds '{string.Join('.', path)}', which economy.json owns (design note 010, second pass A). Remove it from the boat file.");
+        }
     }
 
     private static Dictionary<string, ComponentKind> BuildKinds(List<KindDto>? dtos)
@@ -285,7 +392,6 @@ public static class BoatLoader
         public List<PositionDto> Positions { get; set; } = [];
         public List<KindDto>? Kinds { get; set; }
         public List<ComponentDto> Components { get; set; } = [];
-        public EconomyDto? Economy { get; set; }
         public SurveyDto? Survey { get; set; }
         public DiyQualityDto? DiyQuality { get; set; }
         public RatesDto? Rates { get; set; }
@@ -305,6 +411,8 @@ public static class BoatLoader
         public OrderRules? Orders { get; set; }
         public FuelRules? Fuel { get; set; }
         public NightRules? Night { get; set; }
+        public CloseCallRules? CloseCalls { get; set; }
+        public InstrumentRules? Instruments { get; set; }
         public ReputationRules? Reputation { get; set; }
         public List<UpgradeDto>? Upgrades { get; set; }
     }
@@ -317,8 +425,25 @@ public static class BoatLoader
         public int? YardNok { get; set; }
         public int? YardDays { get; set; }
         public int ValueNok { get; set; }
+        /// <summary>Parts that come aboard with it and are not upgrades themselves (the radar's scanner cable): full components, fitted together.</summary>
+        public List<ComponentDto>? Also { get; set; }
         public string? Opens { get; set; }
         public string? InstallText { get; set; }
+        /// <summary>The component(s) aboard that this one takes the place of: one id or a list of ids.</summary>
+        [JsonConverter(typeof(StringOrListConverter))]
+        public List<string>? Replaces { get; set; }
+    }
+
+    /// <summary>"replaces": "old-heads" or "replaces": ["old-heads", "joker-valve"].</summary>
+    private sealed class StringOrListConverter : JsonConverter<List<string>>
+    {
+        public override List<string>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.String
+                ? [reader.GetString() ?? ""]
+                : JsonSerializer.Deserialize<List<string>>(ref reader, options);
+
+        public override void Write(Utf8JsonWriter writer, List<string> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, value, options);
     }
 
     private sealed class RouteDto
@@ -418,15 +543,7 @@ public static class BoatLoader
         public List<RateFactor>? Factors { get; set; }
         public List<string>? ExposedBy { get; set; }
         public List<string>? RainOnlyWhenOff { get; set; }
-    }
-
-    private sealed class EconomyDto
-    {
-        public int StartingBalanceNok { get; set; }
-        public int LaunchDeadlineDay { get; set; }
-        public int EmergencyLiftNok { get; set; }
-        public int LaunchMinutes { get; set; }
-        public int EmergencyLiftDays { get; set; }
+        public List<double>? Spread { get; set; }
     }
 
     private sealed class SurveyItemDto
@@ -440,7 +557,6 @@ public static class BoatLoader
 
     private sealed class SurveyDto
     {
-        public int NokPerFoot { get; set; }
         public int LengthFeet { get; set; }
         public int Days { get; set; }
         public string Surveyor { get; set; } = "";
@@ -559,6 +675,8 @@ public static class BoatLoader
         public string? ReplaceText { get; set; }
         public bool NeedsDry { get; set; }
         public bool Stocked { get; set; } = true;
+        /// <summary>Fitting a new one cannot come out as a poor job: the templates are about paint and wiring, and new lines or a shackle are just new.</summary>
+        public bool NoPoorJob { get; set; }
     }
 
     private sealed class KindDto
@@ -601,6 +719,10 @@ public static class BoatLoader
         public string? Note { get; set; }
         public ArrivalSignDto? ArrivalSign { get; set; }
         public AtSeaDto? AtSea { get; set; }
+        /// <summary>"rain": the fault stops the instrument only on a day of rain (design note 010, second pass G).</summary>
+        public string? FailsWhen { get; set; }
+        /// <summary>What shows of it while it stops the instrument.</summary>
+        public string? Symptom { get; set; }
     }
 
     private sealed class AtSeaDto

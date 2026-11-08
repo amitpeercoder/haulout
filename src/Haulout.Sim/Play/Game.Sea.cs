@@ -54,7 +54,11 @@ public sealed partial class Game
 
         // Fog holds her to a creep unless she has the instruments (design note 010); noted for the hour line.
         var (midDay, midHour) = StepMiddle(step);
-        double? fogCap = p.Mode is SeaMode.Motoring or SeaMode.Sailing ? FogCap(midDay, midHour) : null;
+        double minutesOut = ClockMinutes - step / 2.0 - p.DepartClockMinutes;
+        bool underWay = p.Mode is SeaMode.Motoring or SeaMode.Sailing;
+        double? fogCap = underWay ? FogCap(midDay, midHour, minutesOut) : null;
+        if (underWay && BlindInFog(midDay, midHour, minutesOut)) RollCloseCall(p, "fog", midDay, midHour);
+        if (underWay && IsDark(midDay, midHour) && !ComponentWorks(NavLightsId)) RollCloseCall(p, "night", midDay, midHour);
         p.FogCap = fogCap;
         double Capped(double knots) => fogCap is { } cap ? Math.Min(knots, cap) : knots;
 
@@ -124,7 +128,6 @@ public sealed partial class Game
         }
         else p.OverheatMinutes = 0;
 
-        CheckPatrol(t, p, step);
         p.EngineNote = EngineNote();
         UpdateFix(p);
         if (p.Mode != SeaMode.UnderTow && p.PositionNm >= p.Route.DistanceNm + p.DriftNm - 1e-9) Arrive(p);
@@ -158,9 +161,17 @@ public sealed partial class Game
         t.Narrative.Add("You pick up a mooring and stop the engine.");
         var lines = ArrivalLinesFor(t, port);
         t.Narrative.AddRange(lines);
+        if (p.Onward is { Count: > 0 } onward && !p.TurnedBack)
+        {
+            double rest = onward.Sum(l => l.DistanceNm);
+            t.Narrative.Add($"{port.Name} was the first leg of your way to {PortName(onward[^1].To)}: from here it is "
+                + $"{rest.ToString("0.#", CultureInfo.InvariantCulture)} nm on. Depart again when you are ready.");
+        }
         CollectWaiting(t);
+        DeliverLetters(t, Day); // a letter written before today waits at the harbour office
         _log.Add(new LogEntry(DayAt(p.EndClockMinutes), FormatTime(p.EndClockMinutes), $"Arrived at {port.Name}."));
         CountArrival(p, port);
+        JudgeTrip(t, p, port);
         return ResultOf(p, towed: false, lines.ToList());
     }
 
@@ -196,21 +207,23 @@ public sealed partial class Game
         if (!_running) return Reject("depart", "Start the engine first: you'll motor off the mooring.");
         if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
             return Reject("depart", $"It's blowing too hard to leave: {WeatherWords.WindPhrase(Today)}.");
-        if (FogHoldsHarbour) return Reject("depart", FogHarbourMessage);
-        var route = FindRoute(trips, destination);
-        if (route is null)
+        var way = FindWay(trips, destination);
+        if (way is null)
             return Reject("depart", $"There's no route from {CurrentPort?.Name} to '{(destination ?? "").Trim()}'.");
+        var route = way.First;
 
         var ci = CultureInfo.InvariantCulture;
         string from = PortName(route.From), to = PortName(route.To);
         int logStart = _log.Count;
         t.Narrative.Add($"You slip the mooring and motor out of {from}, bound for {to}: {route.DistanceNm.ToString("0.#", ci)} nm on {route.CourseDeg:000}.");
+        if (!way.Direct) t.Narrative.Add($"First leg: {to}. {RestOfTheWay(way)}");
         return Accept(t, "depart", _boat.SeaRules.DepartMinutes, 0, null, $"Left {from} for {to}.", afterTick: () =>
         {
             _passage = new Passage
             {
                 Route = route, OriginPortId = route.From, DestinationPortId = route.To, Mode = SeaMode.Motoring,
                 DepartClockMinutes = ClockMinutes, MoneyAtDeparture = _money, LogStart = logStart, Year = new GameClock(Day).Year,
+                Onward = way.Direct ? null : way.Legs.Skip(1).ToList(), FriendAboard = FriendAboardNow,
             };
             StartTrack(_passage);
             ChargeDay(t, Day, atSea: true); // casting off on a weekday is the player's day
@@ -231,7 +244,7 @@ public sealed partial class Game
             SeaMode.Sailing => Sea.Serves(rules, w.WindForce, w.WindFrom, p.Route.CourseDeg) ? Slowed(Sea.SailKnots(rules, w.WindForce), Fouling) : 0,
             _ => 0,
         };
-        if (speed > 0 && p.Mode is SeaMode.Motoring or SeaMode.Sailing && FogCap(Day, HourOfDay) is { } cap) speed = Math.Min(speed, cap);
+        if (speed > 0 && p.Mode is SeaMode.Motoring or SeaMode.Sailing && FogCap(Day, HourOfDay, ClockMinutes - p.DepartClockMinutes) is { } cap) speed = Math.Min(speed, cap);
         if (speed <= 0) return MaxStepMinutes;
         return Math.Clamp((int)Math.Ceiling(p.RemainingNm / speed * 60 - 1e-9), 1, MaxStepMinutes);
     }
@@ -247,6 +260,7 @@ public sealed partial class Game
             string line = HourLine(p, _water.PumpCycles - pumpBefore);
             t.Narrative.Add(line);
             _log.Add(new LogEntry(Day, TimeOfDay, line));
+            TellCloseCalls(t, p);
             var w = _weather[StepDay(1)];
             return new LegView(HourOf(p), p.ModeWord, Math.Round(p.ProgressNm, 1), Math.Round(p.RemainingNm, 1),
                 w.WindForce, w.WindFrom, Sea.SeaState(_boat.SeaRules, w.WindForce), line);
@@ -267,6 +281,8 @@ public sealed partial class Game
             ? $"No wind, {sea}."
             : $"Force {w.WindForce} from the {w.WindFrom}, {sea} {Sea.WindPhrase(rules, Sea.WindOnBoat(w.WindFrom, p.Route.CourseDeg))}.";
         if (p.FogCap is { } fog) wind += $" Fog: you creep along at {fog.ToString("0.#", ci)} knots, listening.";
+        foreach (var symptom in InstrumentSymptoms(_boat.Components))
+            if (p.SymptomsTold.Add(symptom)) wind += " " + symptom;
         string pump = pumpCycles switch
         {
             0 => "the bilge pump has stayed quiet",
@@ -401,9 +417,9 @@ public sealed partial class Game
         p.DestinationPortId = target;
         t.Narrative.Add("You call the towboat on the VHF and give your position. It comes alongside, takes your line, and the engine stays silent.");
         t.Narrative.Add($"{home} is the nearer port, {towNm.ToString("0.0", CultureInfo.InvariantCulture)} nm off; that's where they take her.");
-        _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {towNok} NOK to be towed {towed}.", towNok));
-        CountTow($"Called the towboat: {towNok} NOK to be towed {towed}.");
-        MarkTrack($"Called the towboat: {towNok} NOK to be towed {towed}.");
+        _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {Money(towNok)} to be towed {towed}.", towNok));
+        CountTow($"Called the towboat: {Money(towNok)} to be towed {towed}.");
+        MarkTrack($"Called the towboat: {Money(towNok)} to be towed {towed}.");
         int before = ClockMinutes;
 
         Tick(t, tow.Hours * 60, aboard: true);
@@ -420,7 +436,7 @@ public sealed partial class Game
         p.EndClockMinutes = ClockMinutes;
         string[] lines =
         [
-            $"The towboat brings her {towed} at a walking pace, the engine silent behind you, and hands you a bill for {towNok} NOK.",
+            $"The towboat brings her {towed} at a walking pace, the engine silent behind you, and hands you a bill for {Money(towNok)}.",
             "By the time she is on her mooring the day is gone and the evening with it. Whatever was on goes on without you.",
         ];
         t.Narrative.AddRange(lines);

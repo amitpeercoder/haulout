@@ -55,7 +55,7 @@ public class SaleTests
     private static Boat BoatWith(Func<string, string> edit) => BoatLoader.Load(edit(Sloop28Json()));
 
     private static Boat BoatWithBalance(int nok) =>
-        BoatWith(j => j.Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"));
+        BoatLoader.Load(Sloop28Json(), economyJson: TestEconomy.Replace("\"startingBalanceNok\": 25000", $"\"startingBalanceNok\": {nok}"));
 
     /// <summary>The buyer's surveyor never misses what is there to be found.</summary>
     private static Boat SharpSurveyor() => BoatWith(j => j.Replace("\"findChance\": 0.85", "\"findChance\": 1.0"));
@@ -297,7 +297,7 @@ public class SaleTests
         Assert.DoesNotContain(Sale(g).Letter!.Lines, l => l.Text.StartsWith("A kept logbook", StringComparison.Ordinal));
 
         // After a season afloat there is growth: the clean on the hard counts, and so does the yard wash.
-        var h = LaidUp(BoatWith(j => j.Replace("\"startingBalanceNok\": 25000", "\"startingBalanceNok\": 60000").Replace("\"paintProtection\": 0.9", "\"paintProtection\": 0").Replace("\"baseGrowthPerDay\": 0.008", "\"baseGrowthPerDay\": 0.02")), Calm());
+        var h = LaidUp(BoatLoader.Load(Sloop28Json().Replace("\"paintProtection\": 0.9", "\"paintProtection\": 0").Replace("\"baseGrowthPerDay\": 0.008", "\"baseGrowthPerDay\": 0.02"), economyJson: TestEconomy.Replace("\"startingBalanceNok\": 25000", "\"startingBalanceNok\": 60000")), Calm());
         int before = Line(Sale(h).Letter!, "A kept logbook").Nok;
         Ok(Walk.Do(h, "hull", c => new Clean(c)));
         Assert.Equal(before + 600, Line(Sale(h).Letter!, "A kept logbook").Nok);

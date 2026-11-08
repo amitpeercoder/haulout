@@ -187,11 +187,11 @@ public sealed partial class Game
         int rounded = (int)Math.Round(litres, MidpointRounding.AwayFromZero);
         var text = friend
             ? $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, and your friend pays."
-            : $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, {nok} NOK.";
+            : $"You fill the tank to the brim from the fuel pump: {rounded} litres of diesel, {Money(nok)}.";
         t.Narrative.Add(text);
         if (friend) _ledger.Add(new LedgerEntry(Day, LedgerSpending, "Diesel, paid by your friend.", 0));
         return Accept(t, action, rules.FillMinutes, nok, new RepairView(tank.Name, text),
-            friend ? $"Filled the tank: {rounded} litres of diesel, paid by your friend." : $"Filled the tank: {rounded} litres of diesel for {nok} NOK.");
+            friend ? $"Filled the tank: {rounded} litres of diesel, paid by your friend." : $"Filled the tank: {rounded} litres of diesel for {Money(nok)}.");
     }
 
     private string? BatteryAshoreRefusal()
@@ -362,6 +362,7 @@ public sealed partial class Game
             t.Narrative.Add("The companionway hatch is open: slide it shut before you go if you want her dry below.");
         _log.Add(new LogEntry(Day, TimeOfDay, "Left her for the winter."));
 
+        _weekEvents.Clear();
         _holdPumpCounter = true;
         string? why;
         try { why = WaitDaysUntilSpring(t, target); }
@@ -371,6 +372,7 @@ public sealed partial class Game
         int days = Day - startDay;
         t.Narrative.Add($"{Days(days)} later it is day {Day}.");
         t.Narrative.Add(WinterSummary(startDay, days));
+        AddWeekLine(t);
         t.Narrative.Add(why ?? "It is spring.");
         _log.Add(new LogEntry(Day, TimeOfDay, $"Came back on day {Day} after {Days(days)}."));
         // A condition that went on all winter (a flat battery, water over the sole) raised the same alert every morning: said once.
@@ -385,6 +387,7 @@ public sealed partial class Game
         while (Day < target)
         {
             var raisedBefore = new Dictionary<string, int>(_alerts.LastRaised);
+            var arrivedBefore = _orders.Where(o => o.Arrived).ToHashSet();
             Tick(t, 1440, aboard: false);
             if (_sunk) return null;
             // Water the floorboards would explain wants the player's hands now; rain through the open hatch is only told at the end.
@@ -392,6 +395,11 @@ public sealed partial class Game
             if (_bookedDay is { } booked && Day == booked)
             {
                 why = $"You come back on day {booked} for your haulout slot.";
+                break;
+            }
+            if (_orders.FirstOrDefault(o => o.Arrived && !arrivedBefore.Contains(o)) is { } delivered)
+            {
+                why = $"You come back on day {Day}: the {delivered.Name} is due at the yard.";
                 break;
             }
             if (FreshAlert(raisedBefore))

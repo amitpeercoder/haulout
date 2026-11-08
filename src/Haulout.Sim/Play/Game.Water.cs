@@ -48,9 +48,40 @@ public sealed partial class Game
         _water.Step(new WaterSystem.Inputs(minutes, Afloat, UnderWinterCover ? 0 : _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
             AtSea ? Sea.SeaState(_boat.SeaRules, _weather[day].WindForce) : 0));
         _water.Publish(_values);
+        InstrumentWear(minutes, day);
         if (_water.Level > _boat.Water.SoleLitres) _lastOverSoleDay = day;
         if (_watchingBilge && _water.Level > _boat.Water.HarbourmasterLitres) _bilgePassedToday = true;
         if (Afloat && _water.Level >= _boat.Water.SinkLitres) Sink(day);
+    }
+
+    /// <summary>The plug behind the binnacle's wetness and the scanner cable's chafe, counted from the day each was fitted (design note 010, second pass G).</summary>
+    private double _plugWetness;
+    private double _scannerChafe;
+
+    /// <summary>
+    /// The wear of the instruments over one step of <paramref name="minutes"/> on <paramref name="day"/>. The plug: the day's rain term (which a winter
+    /// cover zeroes) spread over the day, and spray in a wind of the data's force while at sea. The cable: the hours afloat in a wind of the data's force
+    /// or more, by force, and more when at sea (the mast works). Nothing counts before the instrument is fitted, nothing here draws a random number.
+    /// </summary>
+    private void InstrumentWear(int minutes, int day)
+    {
+        var rules = _boat.Instruments;
+        var weather = _weather[day];
+        double hours = minutes / 60.0;
+        if (_boat.IsFitted(PlotterId))
+        {
+            _plugWetness += rules.PlotterPlug.RainPerDay * RainTerm(day) * hours / 24.0;
+            if (AtSea && weather.WindForce >= rules.PlotterPlug.SprayFromForce) _plugWetness += rules.PlotterPlug.SprayPerHourAtSea * hours;
+            _values.Set(SystemValues.PlugWetness, _plugWetness);
+        }
+        if (_boat.IsFitted(RadarId))
+        {
+            var cable = rules.ScannerCable;
+            if (Afloat && cable.PerHourByForce.Count > 0 && weather.WindForce >= cable.FromForce)
+                _scannerChafe += cable.PerHourByForce[Math.Min(weather.WindForce - cable.FromForce, cable.PerHourByForce.Count - 1)]
+                    * (AtSea ? cable.UnderWayFactor : 1.0) * hours;
+            _values.Set(SystemValues.ScannerChafe, _scannerChafe);
+        }
     }
 
     /// <summary>
@@ -152,10 +183,10 @@ public sealed partial class Game
             PumpLine(),
             voided
                 ? $"The insurer's man comes down to the quay with a camera and a folder, and pays nothing: {voidReason}."
-                : $"The insurer's man comes down to the quay with a camera and a folder. They put her at {insurance.ValueNok} NOK and pay {payout} NOK.",
+                : $"The insurer's man comes down to the quay with a camera and a folder. They put her at {Money(insurance.ValueNok)} and pay {Money(payout)}.",
             "The yard has another tired boat for sale.",
         };
-        string sankText = voided ? "She sank. The insurer pays nothing." : $"She sank. The insurer pays {payout} NOK.";
+        string sankText = voided ? "She sank. The insurer pays nothing." : $"She sank. The insurer pays {Money(payout)}.";
         _log.Add(new LogEntry(day, TimeOfDay, sankText));
         if (_passage is { } wreck)
         {
@@ -209,7 +240,7 @@ public sealed partial class Game
     /// <summary>What voids the cover, recorded at the last launch; null when it holds.</summary>
     private string? VoidReason() => _launchVoidReason;
 
-    /// <summary>The fault and every fault it escalated into, on its component.</summary>
+    /// <summary>The fault and every fault it escalated into.</summary>
     private List<Fault> EscalationChain(string faultId)
     {
         var chain = new List<Fault>();
@@ -218,7 +249,7 @@ public sealed partial class Game
         {
             chain.Add(f);
             var to = f.Escalation?.To;
-            f = to is null ? null : _boat.Get(f.ComponentId).Faults.FirstOrDefault(x => x.Id == to);
+            f = to is null ? null : FaultById(to);
         }
         return chain;
     }

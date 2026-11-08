@@ -86,11 +86,15 @@
             var px = X(p.EastNm);
             var py = Y(p.NorthNm);
             var label = ChartGeometry.PortLabels.TryGetValue(p.Name, out var spot) ? spot : new ChartGeometry.LabelSpot(14, -12, "start");
-            var tip = p.IsHere ? p.Name + ", she lies here" : p.Reachable ? $"{p.Name}, {F1(p.DistanceNm)} nm on {p.BearingDeg:000}. Click to plan the trip." : $"{p.Name}, {F1(p.DistanceNm)} nm on {p.BearingDeg:000}";
-            var cls = "c-port" + (p.IsHere ? " here" : "") + (p.Reachable ? " reachable" : "");
+            bool plannable = p.Reachable || p.Via is not null;
+            var tip = p.IsHere ? p.Name + ", she lies here"
+                : p.Reachable ? $"{p.Name}, {F1(p.DistanceNm)} nm on {p.BearingDeg:000}. Click to plan the trip."
+                : p.Via is not null ? $"{p.Name}, {F1(p.DistanceNm)} nm on {p.BearingDeg:000}; by {p.Via}, {F1(p.RouteNm)} nm along the routes. Click to plan the trip."
+                : $"{p.Name}, {F1(p.DistanceNm)} nm on {p.BearingDeg:000}";
+            var cls = "c-port" + (p.IsHere ? " here" : "") + (plannable ? " reachable" : "");
             <g class="@cls" data-port="@p.Name" transform="translate(@F(px) @F(py))"
-               role="@(p.Reachable ? "button" : null)" tabindex="@(p.Reachable ? 0 : null)"
-               aria-label="@(p.Reachable ? "Plan a trip to " + p.Name : p.Name)"
+               role="@(plannable ? "button" : null)" tabindex="@(plannable ? 0 : null)"
+               aria-label="@(plannable ? "Plan a trip to " + p.Name : p.Name)"
                @onclick="() => OnPort(p)" @onkeydown="e => OnKey(e, p)">
                 <title>@tip</title>
                 <circle class="c-hit" r="24" />
@@ -193,7 +197,7 @@
 
     private void OnPort(ChartPort p)
     {
-        if (p.Reachable) Session.PlanTo(p.Name);
+        if (p.Reachable || p.Via is not null) Session.PlanTo(p.Name);
     }
 
     private void OnKey(KeyboardEventArgs e, ChartPort p)

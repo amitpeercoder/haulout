@@ -108,12 +108,12 @@ public sealed partial class Game
                 "She stands on the hard in her cradle, grey light and a cold wind off the water.",
                 "The yard hose is rigged to the raw-water intake, so the engine can run ashore.",
                 "You're standing in the cockpit, the companionway hatch slid open.",
-                $"The yard has her down for launch on day {_launchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
+                $"The yard has her down for launch on day {_launchDeadlineDay}. You have {Money(_boat.Economy.StartingBalanceNok)} for the spring.",
                 "The season runs on past the launch: paydays and bills, a calendar of things worth sailing for, the autumn haulout and the winter; then sell her or keep her for another year.",
             ]),
             Status => new StatusView(
                 Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, KnownStatus(), ToolNames(), CurrentPlace.Name,
-                Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today, HourOfDay), _sunk,
+                Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today, HourOfDay, withSky: true, minutesOut: MinutesOut), _sunk,
                 UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea, SeasonLine(), _sold, ReadinessSeasonLead(),
                 CalendarOn ? WeekLine() : null, CalendarOn && _boat.Calendar.ChargesDays ? _vacationLeft : 0, NextWords(), FuelStatusLine()),
             Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
@@ -193,6 +193,8 @@ public sealed partial class Game
         new("wait week", null, "Not at sea: go back to work and come back aboard at eight, a week on"),
         new("order", "item", "Ring the yard chandlery and order a part it doesn't keep on the shelf (it arrives in days)"),
         new("invite friend", "day", "Ring a friend and ask them aboard for a week starting on that day (once a year, in July, a few days' notice)"),
+        new("calendar plan", "event", "Mark an event of the calendar as one you are going to: waits stop on its morning (free, no time)"),
+        new("calendar unplan", "event", "Take the mark off an event: waits no longer stop for it (it still happens if you are there)"),
         new("calendar", null, "The week: today, your evenings and vacation days, the bills and payday ahead, what is on order, the money"),
         new("install", "item", "Fit an upgrade you have aboard, in the place it goes (your own work, hours)"),
         new("yard install", "item", "The yard fits an upgrade for labour and days, with the part if you have none aboard"),
@@ -210,10 +212,13 @@ public sealed partial class Game
 
     private WeatherDay Today => _weather[Day];
 
+    /// <summary>Minutes since she cast off while under way; null in port.</summary>
+    private double? MinutesOut => _passage is { } p ? ClockMinutes - p.DepartClockMinutes : null;
+
     private WeatherView TodayView()
     {
         var w = Today;
-        return new WeatherView(Day, WeatherWords.Describe(w, HourOfDay), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
+        return new WeatherView(Day, WeatherWords.Describe(w, HourOfDay, withSky: true, minutesOut: MinutesOut), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
     }
 
     /// <summary>A job that needs a dry day is refused when it is raining today.</summary>
@@ -323,6 +328,8 @@ public sealed partial class Game
             WaitWeek => DoWaitWeek(turn),
             Order c => DoOrder(turn, c.Item),
             InviteFriend c => DoInviteFriend(turn, c.Day),
+            PlanEvent c => DoPlanEvent(turn, c.Event, going: true),
+            UnplanEvent c => DoPlanEvent(turn, c.Event, going: false),
             Install c => DoInstall(turn, c.Item),
             YardInstall c => DoYardInstall(turn, c.Item),
             Launch => DoLaunch(turn),
@@ -406,6 +413,7 @@ public sealed partial class Game
         RevealSpawnedByLook(t);
         t.Narrative.Add(place.Description);
         if (SoleLine(place) is { } soleLook) t.Narrative.Add(soleLook);
+        t.Narrative.AddRange(InstrumentSymptoms(_reach.VisibleAt(place.Id)));
         if (OverTheSideLine(place) is { } overTheSide) t.Narrative.Add(overTheSide);
         foreach (var cover in _boat.Covers.Where(c => c.PlaceId == place.Id))
             t.Narrative.Add($"The {Words.CoverName(cover)} {Words.Is(cover)} {Words.State(cover, _removed.Contains(cover.Id))}.");
@@ -497,6 +505,10 @@ public sealed partial class Game
             .FirstOrDefault(r => r is { Discovers: false, NeedsUncovered: true }) : null;
         if (standIn is not null) t.Narrative.Add(standIn.Text);
         else if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
+        // The eye suggests (design note 010, second pass I): a worn impeller's vanes lie curled even when nothing is cracked yet.
+        if (off && c.Id == EngineInputsBuilder.ImpellerId && Wear(c) >= _boat.SeaRules.ImpellerSetFromWear
+            && !c.ActiveFaults.Any(f => f.RevealFor(PlayerAction.Inspect, uncovered: true) is { Discovers: true }))
+            t.Narrative.Add(ImpellerSetText);
         foreach (var f in c.ActiveFaults.ToList())
         {
             if (f.RevealFor(PlayerAction.Inspect, uncovered: off) is { Discovers: false, NeedsUncovered: true }) continue;
@@ -638,7 +650,7 @@ public sealed partial class Game
             _finished = true;
             int total = _time.WorkMinutes + minutes;
             t.Narrative.Add($"She'll do. {LaunchIn()}");
-            t.Narrative.Add($"Time spent: {total / 60} h {total % 60} min. Money spent: {_money} NOK.");
+            t.Narrative.Add($"Time spent: {total / 60} h {total % 60} min. Money spent: {Money(_money)}.");
         }
         return Accept(t, "start", minutes, 0, new StartAttemptView(result.Outcome.ToString(), result.Description, result.LabouredCrank),
             $"Tried to start the engine. Result: {result.Outcome}.");
@@ -724,7 +736,7 @@ public sealed partial class Game
         }
         if (c.Id == EngineOilId) _oilChangedDay = Day;
         if (_boat.Sale.ServiceComponents.Contains(c.Id)) _serviceSeasons.Add(_seasonIndex);
-        if (c.Id != MooringLinesId) MaybePoorJob(c); // the poor-job templates are about paint; new lines are just new lines
+        if (!c.Spec.NoPoorJob) MaybePoorJob(c); // the poor-job templates are about paint; new lines or a shackle are just new
         return Accept(t, "replace", c.ReplaceMinutes, cost, new RepairView(c.Name, text),
             spare is null ? $"Replaced the {c.Name.ToLowerInvariant()}." : $"Replaced the {c.Name.ToLowerInvariant()} from the spares aboard.");
     }
@@ -770,7 +782,9 @@ public sealed partial class Game
         }
 
         double flow = EngineInputsBuilder.Build(_boat).Cooling.RawWaterFlow;
-        t.Narrative.Add(flow >= 0.8 ? "Water leaves the exhaust in strong, steady spurts."
+        // The flow check confirms what the eye suggested: a worn impeller reads weaker before its vanes have shed.
+        bool worn = _boat.TryGet(EngineInputsBuilder.ImpellerId, out var impeller) && Wear(impeller) >= _boat.SeaRules.ImpellerWeakFlowFromWear;
+        t.Narrative.Add(flow >= 0.8 && !worn ? "Water leaves the exhaust in strong, steady spurts."
             : flow >= 0.25 ? "The water at the exhaust is weaker than you'd like."
             : "Almost nothing comes out of the exhaust.");
         foreach (var f in _boat.AllFaults.Where(f => f.Present).ToList()) Reveal(t, f, PlayerAction.CheckRawWaterFlow);
@@ -788,6 +802,11 @@ public sealed partial class Game
         int m = (StartMinuteOfDay + minutesSpent) % 1440;
         return $"{m / 60:00}:{m % 60:00}";
     }
+
+    private const string ImpellerSetText = "The vanes have taken a set: they lie curled the way the pump turns and spring back slowly.";
+
+    /// <summary>How worn a part is: 0 new, 1 spent (one minus its condition).</summary>
+    private static double Wear(Component c) => 1 - c.Condition;
 
     private static string WearPhrase(double condition) =>
         condition >= 0.8 ? "In good shape."

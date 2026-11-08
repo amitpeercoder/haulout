@@ -19,6 +19,13 @@ public enum StageView { Boat, Chart }
 public sealed class GameSession
 {
     private readonly Game _game = Game.NewFirstFault();
+
+    /// <summary>How money is written (a display label from the game; the web never reads the data files).</summary>
+    public Haulout.Sim.Data.Currency Currency => _game.Currency;
+    /// <summary>An amount with the currency label.</summary>
+    public string Money(int units) => MoneyWords.Amount(units, _game.Currency);
+    /// <summary>As <see cref="Money"/>, with a plus on a positive amount.</summary>
+    public string Signed(int units) => MoneyWords.Signed(units, _game.Currency);
     private readonly Dictionary<string, string> _lastInspect = new();
     private readonly Dictionary<string, string> _lastMeter = new();
 
@@ -336,6 +343,8 @@ public sealed class GameSession
     public CommandResult WaitWeek() => Execute(new WaitWeek());
     public CommandResult Order(string item) => Execute(new Order(item));
     public CommandResult InviteFriend(int day) => Execute(new InviteFriend(day));
+    /// <summary>Marks an event as going (a wait stops on its morning) or takes the mark off.</summary>
+    public CommandResult SetGoing(string eventName, bool going) => Execute(going ? new PlanEvent(eventName) : new UnplanEvent(eventName));
     public CommandResult Install(string item) => Execute(new Install(item));
     public CommandResult YardInstall(string item) => Execute(new YardInstall(item));
 

@@ -173,7 +173,7 @@ public sealed record Route
 /// <summary>What a tow costs: money, hours aboard on the way, hours lost on top. PLACEHOLDERS.</summary>
 public sealed record TowRules
 {
-    public int Nok { get; init; } = 6000;
+    public int Nok { get; init; }
     public int Hours { get; init; } = 6;
     public int LostHours { get; init; } = 18;
 }
@@ -199,6 +199,38 @@ public sealed record TripRules(string Home, IReadOnlyList<Port> Ports, IReadOnly
     /// <summary>Routes out of a port: the data routes from it, and each route to it, reversed.</summary>
     public IEnumerable<Route> RoutesFrom(string portId) =>
         Routes.Where(r => r.From == portId).Concat(Routes.Where(r => r.To == portId).Select(r => r.Reversed()));
+
+    /// <summary>
+    /// The legs of the shortest way (by nautical miles) from one port to another through the routes of the data, each leg as sailed from its own
+    /// start. Empty when there is none (or the ports are the same). Ties go to the port listed first, so the answer never changes from run to run.
+    /// </summary>
+    public IReadOnlyList<Route> PathBetween(string fromPortId, string toPortId)
+    {
+        if (fromPortId == toPortId) return [];
+        var best = new Dictionary<string, double> { [fromPortId] = 0 };
+        var via = new Dictionary<string, Route>();
+        var open = new List<string> { fromPortId };
+        var done = new HashSet<string>();
+        while (open.Count > 0)
+        {
+            string at = open.OrderBy(id => best[id]).ThenBy(id => Ports.ToList().FindIndex(p => p.Id == id)).First();
+            open.Remove(at);
+            if (!done.Add(at)) continue;
+            if (at == toPortId) break;
+            foreach (var leg in RoutesFrom(at))
+            {
+                double nm = best[at] + leg.DistanceNm;
+                if (done.Contains(leg.To) || best.TryGetValue(leg.To, out var known) && known <= nm) continue;
+                best[leg.To] = nm;
+                via[leg.To] = leg;
+                if (!open.Contains(leg.To)) open.Add(leg.To);
+            }
+        }
+        if (!via.ContainsKey(toPortId)) return [];
+        var legs = new List<Route>();
+        for (string id = toPortId; id != fromPortId; id = via[id].From) legs.Insert(0, via[id]);
+        return legs;
+    }
 }
 
 /// <summary>Speed, sea state and the load of a passage (design note 007). All PLACEHOLDERS for Amit.</summary>
@@ -221,6 +253,12 @@ public sealed record SeaRules
     public int StirFromSeaState { get; init; } = 3;
     public int StirHoursToBite { get; init; } = 2;
     public double ImpellerShedPerLoadHour { get; init; } = 0.3;
+    /// <summary>
+    /// Wear (1 minus condition) at which the impeller's vanes show a set to the eye with the pump cover off, and at which the flow at the exhaust
+    /// reads weaker; both before it sheds (design note 010, second pass I). A boat that names no threshold shows no wear symptom.
+    /// </summary>
+    public double ImpellerSetFromWear { get; init; } = double.MaxValue;
+    public double ImpellerWeakFlowFromWear { get; init; } = double.MaxValue;
     public int OverheatStopMinutes { get; init; } = 90;
     public double UnderWayDrawPerHour { get; init; } = 0.05;
     public int DepartMinutes { get; init; } = 10;
@@ -265,10 +303,10 @@ public sealed record YardRules
     public int DriftFromDayOfYear { get; init; } = 240;
     public int DriftMaxDaysPerWeek { get; init; } = 7;
     public int MinLeadDays { get; init; } = 1;
-    public int LiftNok { get; init; } = 7000;
-    public int StorageNok { get; init; } = 9000;
-    public int ChangeFeeNok { get; init; } = 500;
-    public int WashNok { get; init; } = 1200;
+    public int LiftNok { get; init; }
+    public int StorageNok { get; init; }
+    public int ChangeFeeNok { get; init; }
+    public int WashNok { get; init; }
     public int WashMinutes { get; init; } = 120;
     public int HauloutMinutes { get; init; } = 120;
     /// <summary>A lift on or after this day of year is the autumn lift: storage is billed and she is laid up.</summary>
@@ -315,7 +353,7 @@ public sealed record MooringRules
     public IReadOnlyList<double> Spread { get; init; } = [0.6, 1.6];
     public double PartAt { get; init; } = 1.0;
     public double WarnFrom { get; init; } = 0.5;
-    public int PartedRepairNok { get; init; } = 4000;
+    public int PartedRepairNok { get; init; }
     public IReadOnlyList<Band> ChafeWords { get; init; } = [];
 
     public static MooringRules Default { get; } = new();
@@ -332,7 +370,7 @@ public sealed record LayupRules
     public int WinteriseMinutes { get; init; } = 90;
     public int AntifreezeNok { get; init; } = 250;
     public int FillMinutes { get; init; } = 30;
-    public int DieselNokPerLitre { get; init; } = 22;
+    public int DieselNokPerLitre { get; init; }
     /// <summary>A tank at or above this fraction of its capacity breathes no damp air worth the name.</summary>
     public double FullAt { get; init; } = 0.9;
     public int BatteryMinutes { get; init; } = 30;
@@ -452,14 +490,34 @@ public sealed record OrderRules
 
 /// <summary>
 /// Fuel (design note 010, step 2). The default burns nothing, so a boat built without data runs as before. All numbers in the shipped data
-/// are PLACEHOLDERS for Amit; the burn is UNVERIFIED against a real 20 hp diesel.
+/// are PLACEHOLDERS for Amit; the burn is UNVERIFIED against a real 20 hp diesel (design note 010, second pass C).
 /// </summary>
 public sealed record FuelRules
 {
-    /// <summary>Litres an hour while motoring under way.</summary>
-    public double MotorLitresPerHour { get; init; }
-    /// <summary>Litres an hour with the engine running and the boat going nowhere (in port, hove-to, on the yard hose, charging).</summary>
-    public double IdleLitresPerHour { get; init; }
+    /// <summary>The engine's rating in horsepower. Zero: the boat burns nothing.</summary>
+    public double RatedHp { get; init; }
+    /// <summary>The hull's speed in knots (about 1.34 times the root of the waterline length in feet): the load is the cube of the speed over it.</summary>
+    public double HullSpeedKn { get; init; } = 6;
+    /// <summary>Litres of diesel per horsepower-hour at full load.</summary>
+    public double LitresPerHpHour { get; init; } = 0.2;
+    /// <summary>The load under way is clamped to this range.</summary>
+    public double LoadMin { get; init; } = 0.15;
+    public double LoadMax { get; init; } = 1.0;
+    /// <summary>The load with the engine running and the boat going nowhere (in port, hove-to, on the yard hose, charging at the mooring).</summary>
+    public double IdleLoad { get; init; } = 0.15;
+    /// <summary>The burn rises by this fraction at the heaviest fouling, in proportion to the growth.</summary>
+    public double FoulingMaxAdd { get; init; }
+    /// <summary>The burn rises by this fraction while the alternator charges a battery below <see cref="ChargingBelowStateOfCharge"/>.</summary>
+    public double ChargingAdd { get; init; }
+    public double ChargingBelowStateOfCharge { get; init; } = 0.7;
+    /// <summary>A present fault (by id) that makes the engine drink more: the fraction it adds.</summary>
+    public IReadOnlyDictionary<string, double> FaultAdds { get; init; } = new Dictionary<string, double>();
+    /// <summary>The short phrase for a cause of extra burn: a fault id, or "charging".</summary>
+    public IReadOnlyDictionary<string, string> CauseWords { get; init; } = new Dictionary<string, string>();
+    /// <summary>The phrase for the fouling, by the growth the player saw (or the truth's, in the log).</summary>
+    public IReadOnlyList<Band> FoulingWords { get; init; } = [];
+    /// <summary>One multiplier's add in words ("a tenth", "a third"), by the fraction it adds.</summary>
+    public IReadOnlyList<Band> AddWords { get; init; } = [];
     /// <summary>The gauge reads to this many litres.</summary>
     public int GaugeStepLitres { get; init; } = 5;
     /// <summary>Below this the tank is empty: the fuel supply is fully restricted.</summary>
@@ -467,21 +525,19 @@ public sealed record FuelRules
     /// <summary>The gauge in words, by the fraction of a full tank.</summary>
     public IReadOnlyList<Band> GaugeWords { get; init; } = [];
 
-    public bool Burns => MotorLitresPerHour > 0 || IdleLitresPerHour > 0;
+    public bool Burns => RatedHp > 0;
 
     public static FuelRules Default { get; } = new();
 }
 
 /// <summary>
-/// Night and fog at sea (design note 010, step 2). The default has no fine and no fog cap. All numbers in the shipped data are PLACEHOLDERS;
-/// the harbourmaster's fog rule and the patrol are UNVERIFIED.
+/// Night and fog at sea (design note 010, step 2). The default has no fog cap. All numbers in the shipped data are PLACEHOLDERS;
+/// the harbourmaster's fog rule is UNVERIFIED. What a boat running dark risks is a close call (<see cref="CloseCallRules"/>, cause "night").
 /// </summary>
 public sealed record NightRules
 {
     /// <summary>An hour is dark when it is more than half the day's length from this hour.</summary>
     public double SolarNoonHour { get; init; } = 13;
-    /// <summary>The harbour patrol's fine for running dark without a working bow light. 0: no patrol.</summary>
-    public int NoLightsFineNok { get; init; }
     /// <summary>Knots in fog without a working chartplotter or radar. 0: fog does not slow her and the harbour does not hold her.</summary>
     public double FogKnots { get; init; }
     /// <summary>Knots in fog with a working chartplotter only (radar: no cap).</summary>
@@ -493,17 +549,155 @@ public sealed record NightRules
 }
 
 /// <summary>
+/// Close calls under way (design note 010, second pass D; step E adds the cause "night"): per cause a chance per whole hour, the share of
+/// close calls a ferry reports, the narrations (a ferry's or not, picked by the roll) and the line that tells she was reported. A cause may
+/// bring the harbourmaster's letter when a ferry reports it (design note 010, second pass E). The default has none. All numbers in the shipped
+/// data are PLACEHOLDERS; the chances, and what ferries and harbourmasters do, are UNVERIFIED.
+/// </summary>
+public sealed record CloseCallRules
+{
+    /// <summary>What the harbourmaster's letter bills (money; set from economy.json, never the boat file).</summary>
+    public int LetterNok { get; init; }
+    /// <summary>The fictional ferries that report (the roll picks one for the letter).</summary>
+    public IReadOnlyList<string> Ferries { get; init; } = [];
+    /// <summary>The ledger line of the letter's bill.</summary>
+    public string LetterBillText { get; init; } = "";
+    /// <summary>The alert that tells the letter has come: {ferry}, {day}, {hour}, {nok} (each letter's text differs, so none is folded into another).</summary>
+    public string LetterAlert { get; init; } = "";
+    public IReadOnlyDictionary<string, CloseCallCause> Causes { get; init; } = new Dictionary<string, CloseCallCause>();
+
+    public static CloseCallRules Default { get; } = new();
+}
+
+/// <summary>
+/// How the plotter and the radar wear (design note 010, second pass G). Each is a count of exposure that starts when the instrument is fitted;
+/// a dormant fault wakes when the count reaches its spawn rule's threshold times the house's seeded spread. All numbers PLACEHOLDERS, UNVERIFIED.
+/// </summary>
+public sealed record InstrumentRules
+{
+    /// <summary>The plug behind the binnacle: wetness a full day of rain (the exposure rain term, so a winter cover keeps it off) adds, and what an hour of spray at sea adds.</summary>
+    public PlotterPlugRules PlotterPlug { get; init; } = new();
+    /// <summary>The scanner cable on the mast: chafe an hour adds in a wind of force FromForce, FromForce + 1 ..., times UnderWayFactor when she is at sea.</summary>
+    public ScannerCableRules ScannerCable { get; init; } = new();
+
+    public static InstrumentRules Default { get; } = new();
+}
+
+public sealed record PlotterPlugRules
+{
+    public double RainPerDay { get; init; }
+    public double SprayPerHourAtSea { get; init; }
+    public int SprayFromForce { get; init; } = 99;
+}
+
+public sealed record ScannerCableRules
+{
+    public int FromForce { get; init; } = 99;
+    public IReadOnlyList<double> PerHourByForce { get; init; } = [];
+    public double UnderWayFactor { get; init; } = 1;
+}
+
+/// <summary>One cause of close calls: the chance for each whole hour under way, the share a ferry reports, and the words.</summary>
+public sealed record CloseCallCause
+{
+    public double ChancePerHour { get; init; }
+    public double ReportChance { get; init; }
+    public IReadOnlyList<CloseCallNarration> Narrations { get; init; } = [];
+    public string ReportLine { get; init; } = "";
+    /// <summary>A reported close call of this cause brings the harbourmaster's letter.</summary>
+    public bool Letter { get; init; }
+    /// <summary>The component whose present faults the letter shows the owner (the lights: the letter says she was unlit). Empty: none.</summary>
+    public string LetterDiscovers { get; init; } = "";
+    /// <summary>The letter, with {ferry}, {day}, {hour} and {nok}.</summary>
+    public string LetterText { get; init; } = "";
+    /// <summary>What the passage plan says when the player knows the lights have a problem: finishes "...you know the navigation lights have a problem: ".</summary>
+    public string PlanLine { get; init; } = "";
+}
+
+/// <summary>A close call in words; Ferry says it was a ferry (the narrations of a reported close call are the ferry ones).</summary>
+public sealed record CloseCallNarration(bool Ferry, string Text);
+
+/// <summary>
 /// What an event of the calendar of wants asks of the boat (design note 010, step 2). Kind: fitted (an upgrade, fitted and without a present
-/// fault), working (a component without a present fault), dryBunks (the cushions fitted and no water over the sole in the last Days days),
-/// warm (met when the component is fitted, or the day is at least BelowC degrees). Text is the requirement in the player's words.
+/// fault), working (a component, and any others named, without a present fault), anyWorking (any one of several alternatives aboard and without a present fault), dryBunks (the cushions fitted and no water over the sole in the last Days days),
+/// warm (met when the component is fitted, or the night's low is at least BelowC degrees). Text is the requirement in the player's words.
 /// </summary>
 public sealed record RequirementRule
 {
     public string Kind { get; init; } = "";
+    /// <summary>The component it is about. For kind anyWorking, empty.</summary>
     public string Component { get; init; } = "";
+    /// <summary>
+    /// Kind working: more components that must all work as well. Kind anyWorking: the alternatives, each a component id or several joined by
+    /// '+' that must all be aboard and work; the requirement holds when any alternative does ("a heads that works": the old heads with its
+    /// valve, or the new heads).
+    /// </summary>
+    public IReadOnlyList<string> Components { get; init; } = [];
+    /// <summary>The key of the failed line (and of the view); empty: the component.</summary>
+    public string Id { get; init; } = "";
+    /// <summary>The key of this requirement's failed line.</summary>
+    public string Key => Id.Length > 0 ? Id : Component;
     public string Text { get; init; } = "";
     public int Days { get; init; }
     public double BelowC { get; init; }
+}
+
+/// <summary>
+/// A day of an event's window (0 is the first) and an hour of that day: the moment by which she must be there (design note 010, second pass H).
+/// </summary>
+public sealed record EventMoment
+{
+    public int Day { get; init; }
+    public int Hour { get; init; }
+}
+
+/// <summary>
+/// Being there early (the club cruise on the Friday evening): by this moment the event is made with extra lines, and the logbook and the season
+/// page say she made it. Lines are told with the made lines; Log is the logbook's line; Short is the season page's words.
+/// </summary>
+public sealed record EventEarly
+{
+    public int Day { get; init; }
+    public int Hour { get; init; }
+    public IReadOnlyList<string> Lines { get; init; } = [];
+    public string Log { get; init; } = "";
+    public string Short { get; init; } = "";
+}
+
+/// <summary>
+/// One beat of a week the player picks (the friend's week; design note 010, second pass H). Kind: arrival (at the event's port, at Hour of the first day:
+/// the requirements named in Requires are judged; failing one ends the week), trip (a passage to Port made in the week with the guest aboard) or night
+/// (at Hour of the last day, afloat at any port: a cold night needs what Requires asks). Requires names requirements of the event by key.
+/// </summary>
+public sealed record BeatRule
+{
+    public string Id { get; init; } = "";
+    public string Kind { get; init; } = "";
+    /// <summary>The beat in the player's words ("A day trip to Hestholmen").</summary>
+    public string Text { get; init; } = "";
+    /// <summary>What it asks, for a beat with no requirement of its own (the trip).</summary>
+    public string Ask { get; init; } = "";
+    public int Hour { get; init; }
+    public string Port { get; init; } = "";
+    public IReadOnlyList<string> Requires { get; init; } = [];
+    /// <summary>Told when the beat opens (the arrival tells what the friend wants).</summary>
+    public IReadOnlyList<string> AnnounceLines { get; init; } = [];
+    public IReadOnlyList<string> MadeLines { get; init; } = [];
+    /// <summary>The night beat when the night is not cold.</summary>
+    public IReadOnlyList<string> PassLines { get; init; } = [];
+    public IReadOnlyDictionary<string, string> FailedLines { get; init; } = new Dictionary<string, string>();
+    public string MissedText { get; init; } = "";
+    /// <summary>Told when a wait is cut at the beat's hour.</summary>
+    public string ComeBackLine { get; init; } = "";
+    /// <summary>Told when a wait is cut on the morning of the beat's day (the night).</summary>
+    public string MorningLine { get; init; } = "";
+}
+
+/// <summary>How the week went, by outcome (good, made, thin): the closing line, and the short words the season page uses.</summary>
+public sealed record WeekOutcome
+{
+    public string Line { get; init; } = "";
+    public string Short { get; init; } = "";
 }
 
 /// <summary>The window in which the player picks the week of an event, and how much notice it needs.</summary>
@@ -534,6 +728,16 @@ public sealed record EventRule
     /// <summary>What shows when a requirement fails, by the component id of the requirement.</summary>
     public IReadOnlyDictionary<string, string> FailedLines { get; init; } = new Dictionary<string, string>();
     public string MissedText { get; init; } = "";
+    /// <summary>The moment after which she is no longer judged (the club cruise: the Saturday evening). Null: the whole window.</summary>
+    public EventMoment? MadeBy { get; init; }
+    public EventEarly? Early { get; init; }
+    /// <summary>The beats of a picked week, in order; empty: one judgement on the first day.</summary>
+    public IReadOnlyList<BeatRule> Beats { get; init; } = [];
+    public IReadOnlyDictionary<string, WeekOutcome> WeekOutcomes { get; init; } = new Dictionary<string, WeekOutcome>();
+    /// <summary>Told when the player leaves the guest ashore (a wait during the week).</summary>
+    public string WalkLine { get; init; } = "";
+    /// <summary>Told when the guest is asked: what the week costs.</summary>
+    public string InviteCostLine { get; init; } = "";
 }
 
 /// <summary>
@@ -557,6 +761,10 @@ public sealed record UpgradeRule
     public string Opens { get; init; } = "";
     /// <summary>The narrative of fitting it.</summary>
     public string InstallText { get; init; } = "";
+    /// <summary>The components aboard from the start that fitting it takes off the boat (the old heads and its valve): gone, with their faults.</summary>
+    public IReadOnlyList<string> Replaces { get; init; } = [];
+    /// <summary>Components that come aboard with it (design note 010, second pass G: the radar's scanner cable): fitted together, never an upgrade of their own.</summary>
+    public IReadOnlyList<Haulout.Sim.Components.Component> Also { get; init; } = [];
 }
 
 /// <summary>
@@ -567,13 +775,14 @@ public sealed record ReputationRules
 {
     /// <summary>One point for every this many standing bills paid within the bank's limit. 0: bills do not count.</summary>
     public int OnTimeBillsPerPoint { get; init; }
-    /// <summary>Points for a haulout on the booked day, a tow, a parted mooring, a forfeited slot, a bill that left the balance past the limit, a patrol fine.</summary>
+    /// <summary>Points for a haulout on the booked day, a tow, a parted mooring, a forfeited slot, a bill that left the balance past the limit.</summary>
     public int SlotKept { get; init; }
     public int Tow { get; init; }
     public int MooringParted { get; init; }
     public int SlotMissed { get; init; }
     public int BillPastLimit { get; init; }
-    public int PatrolFine { get; init; }
+    /// <summary>Points for a ferry's report after a close call (design note 010, second pass D).</summary>
+    public int FerryReport { get; init; }
     public int Min { get; init; } = -5;
     public int Max { get; init; } = 5;
     /// <summary>Each point takes this share off the tow (a negative point adds it).</summary>
@@ -584,4 +793,30 @@ public sealed record ReputationRules
     public IReadOnlyList<Band> Words { get; init; } = [];
 
     public static ReputationRules Default { get; } = new();
+}
+
+/// <summary>One thing that makes the engine drink more: what it is called (a short phrase from data) and the fraction it adds.</summary>
+public sealed record FuelAdd(string Cause, double Add);
+
+/// <summary>The burn in litres an hour, and the named multipliers it was made of.</summary>
+public sealed record FuelBurn(double LitresPerHour, IReadOnlyList<FuelAdd> Adds)
+{
+    /// <summary>The load: the cube of the speed over the hull's speed, clamped; the idle load when she is not under way (null speed).</summary>
+    public static double Load(FuelRules rules, double? speedKn) =>
+        speedKn is not { } s ? rules.IdleLoad : Math.Clamp(Math.Pow(Math.Max(0, s) / rules.HullSpeedKn, 3), rules.LoadMin, rules.LoadMax);
+
+    /// <summary>
+    /// ratedHp x litresPerHpHour x load x the product of (1 + add) over the adds. The one function behind both the burn (every true add) and the
+    /// plan (only what the player knows).
+    /// </summary>
+    public static FuelBurn Of(FuelRules rules, double? speedKn, IReadOnlyList<FuelAdd> adds)
+    {
+        double rate = rules.RatedHp * rules.LitresPerHpHour * Load(rules, speedKn);
+        foreach (var a in adds) rate *= 1 + a.Add;
+        return new FuelBurn(rate, adds);
+    }
+
+    /// <summary>"heavy fouling adds a third; a clogged fuel filter adds a tenth".</summary>
+    public static string Words(FuelRules rules, IReadOnlyList<FuelAdd> adds) =>
+        string.Join("; ", adds.Select(a => $"{a.Cause} adds {Band.Pick(rules.AddWords, a.Add)}"));
 }

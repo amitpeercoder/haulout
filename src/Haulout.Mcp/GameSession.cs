@@ -8,6 +8,7 @@ namespace Haulout.Mcp;
 public sealed class GameSession
 {
     private readonly Game _game;
+    private readonly Prose.Prose _prose;
     private readonly string? _tracePath;
     private readonly object _lock = new();
     private int _seq;
@@ -20,6 +21,7 @@ public sealed class GameSession
     public GameSession(Game game, string? tracePath)
     {
         _game = game;
+        _prose = new Prose.Prose(game.Currency);
         _tracePath = string.IsNullOrWhiteSpace(tracePath) ? null : tracePath;
     }
 
@@ -28,14 +30,14 @@ public sealed class GameSession
         {
             var result = _game.Execute(command);
             var status = (StatusView)_game.Ask(new Status());
-            return (Prose.Prose.Result(result, status), result.Accepted);
+            return (_prose.Result(result, status), result.Accepted);
         });
 
     public string Ask(string tool, Query query) =>
         Run(tool, [], () =>
         {
             var answer = _game.Ask(query);
-            var text = answer is BriefingView b ? Prose.Prose.Briefing(b, includeHelpHint: false) : Prose.Prose.Query(answer);
+            var text = answer is BriefingView b ? _prose.Briefing(b, includeHelpHint: false) : _prose.Query(answer);
             return (text, true);
         });
 

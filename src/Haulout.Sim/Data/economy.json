@@ -1,0 +1,31 @@
+{
+  "placeholders": [
+    "The \"Nok\" suffix on names in code now means \"money units\": the in-game currency is one abstract unit (CLAUDE.md) and currency.code/symbol/before are a display label only, with no exchange rate, because a rate would silently unbalance this file. (design note 010, second pass A)",
+    "Every money and time knob of the economy lives in this file and nowhere else, so the boat files that will share it (design note 011) can never disagree with it. The price of a part, a chandlery item or an upgrade, an event definition and calendar.aheadDays (a UI horizon) stay in the boat file; so do the sale and reputation rules (the market and the yard's view of this boat), the layup task prices (antifreeze, battery room, charger, cover), and the durations of actions (wash minutes, launch minutes stay here only because they were in the old economy block).",
+    "Unpaid leave is derived: pay / workingDaysPerMonth rounded to the nearest unpaidLeaveRoundTo. An explicit calendar.unpaidLeaveNok would override it; none is set, so with pay 3500 it is 150 a day (design note 010, second pass B).",
+    "PLACEHOLDER (design note 010, second pass B): calendar { day 0 is a Monday; a weekday evening aboard is free up to 180 minutes, past that the day costs a vacation day; 12 vacation days a year (the calendar year, no pro rata); with none left a weekday aboard is unpaid leave and 150 NOK comes off the boat account; a weekday at sea is always a day }.",
+    "PLACEHOLDER (design note 010, second pass B): money { pay 3500 NOK on the first of every month (day of year divisible by 30), the figure the single economic knob; overdraft limit 20000 NOK at 1.5 percent a month, charged on the first of the month before the pay, ceil(owed * 0.015); bills the player did not choose may pass the limit; the Calendar looks 42 days ahead }.",
+    "PLACEHOLDER (design note 010, second pass B): standing bills { berth and mooring at Skjærvik 3000 NOK a quarter (12000 a year) on days of year 0, 90, 180 and 270, the first on day 90 (the spring quarter was paid with the boat); insurance 8000 NOK on day of year 90, the first renewal on day 450 (it runs to next spring); the yard's lift 7000 and storage 9000 stay as in design note 008 }.",
+    "PLACEHOLDER (design note 010): orders { a part the yard chandlery does not keep on the shelf (starter motor, injection pump, injectors, heat exchanger, raw-water pump, alternator, fuel tank, exhaust elbow, sprayhood, engine block) is ordered by phone (5 minutes) and arrives in 3 to 10 days, drawn per order, at the yard in Skjærvik; the price is the part's replace price }.",
+    "UNVERIFIED (design note 010): that these parts are not kept on a small yard's shelf, and the 3 to 10 day lead time; the berth and insurance prices and their billing dates; the share of a salary left over for the boat."
+  ],
+  "currency": { "code": "NOK", "symbol": "", "before": false },
+  "start": { "startingBalanceNok": 25000, "launchDeadlineDay": 96, "launchMinutes": 120 },
+  "emergencyLift": { "nok": 9000, "days": 2 },
+  "calendar": {
+    "eveningMinutes": 180, "vacationDaysPerYear": 12, "payNok": 3500,
+    "workingDaysPerMonth": 21, "unpaidLeaveRoundTo": 50,
+    "overdraftLimitNok": 20000, "interestPerMonth": 0.015,
+    "bills": [
+      { "id": "berth", "text": "Berth and mooring at Skjærvik, the quarter", "short": "the berth invoice", "nok": 3000, "daysOfYear": [0, 90, 180, 270], "fromDay": 90 },
+      { "id": "insurance", "text": "Insurance for the year", "short": "the insurance renewal", "nok": 8000, "daysOfYear": [90], "fromDay": 450 }
+    ]
+  },
+  "yard": { "liftNok": 7000, "storageNok": 9000, "changeFeeNok": 500, "washNok": 1200 },
+  "tow": { "nok": 6000 },
+  "orders": { "leadDays": [3, 10] },
+  "mooring": { "partedRepairNok": 4000 },
+  "fuel": { "dieselNokPerLitre": 22 },
+  "survey": { "nokPerFoot": 200 },
+  "closeCalls": { "letterNok": 2000 }
+}

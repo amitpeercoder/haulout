@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Haulout.Sim\Haulout.Sim.csproj" />
+    <Compile Include="..\..\src\Haulout.Console\WordParser.cs" Link="ConsoleWordParser.cs" />
     <ProjectReference Include="..\..\src\Haulout.Prose\Haulout.Prose.csproj" />
   </ItemGroup>
 

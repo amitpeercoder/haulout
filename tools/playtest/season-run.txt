@@ -114,8 +114,6 @@ status
 season
 wait 7
 season
-wait 7
-season
 start
 haul out
 season

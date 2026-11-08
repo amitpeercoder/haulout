@@ -144,6 +144,8 @@ public class ChartTests
         var kvit = c.Ports[3];
         Assert.Equal((16.8, 6.2, 17.9, 70), (kvit.EastNm, kvit.NorthNm, kvit.DistanceNm, kvit.BearingDeg));
         Assert.True(kvit.Anchorage && !kvit.Shop && !kvit.Reachable);
+        Assert.Equal(("Hestholmen", 23.0), (kvit.Via, kvit.RouteNm));   // the chart gives the way through another port instead of "no route"
+        Assert.Null(hest.Via);
 
         Assert.Equal(3, c.Routes.Count);
         var r0 = c.Routes[0];
@@ -176,7 +178,9 @@ public class ChartTests
         Assert.Contains("She's still on the hard.", plan.Blockers);
 
         Assert.Null(Chart(g).Plan);
-        Assert.Null(Chart(g, "Kvitnes").Plan);   // no route from here
+        var via = Chart(g, "Kvitnes").Plan!;       // no route from here: the way is through Hestholmen (design note 010, second pass I)
+        Assert.Equal(("Skjærvik", "Kvitnes", 23.0, 40), (via.From, via.To, via.DistanceNm, via.CourseDeg));
+        Assert.Equal(4.6, via.MotorHours);
         Assert.Null(Chart(g, "nowhere").Plan);
     }
 

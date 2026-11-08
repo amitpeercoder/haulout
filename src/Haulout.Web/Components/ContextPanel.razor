@@ -23,7 +23,7 @@
         }
         @if (!Session.HasRemoteStartButton)
         {
-            <button data-action="buy-remote" @onclick="() => Session.BuyRemoteStartButton()">Buy remote start button (@Session.RemoteStartButtonCostNok NOK)</button>
+            <button data-action="buy-remote" @onclick="() => Session.BuyRemoteStartButton()">Buy remote start button (@Session.Money(Session.RemoteStartButtonCostNok))</button>
         }
     </div>
 
@@ -46,7 +46,7 @@
                 <section class="closing" data-closing>
                     <h2>Sold.</h2>
                     @foreach (var line in sold.Lines) { <p>@line</p> }
-                    <p class="cost">Day @sold.Day · @sold.PriceNok NOK · @sold.Days days · @sold.HoursWorked h of your own work · @sold.Trips @(sold.Trips == 1 ? "trip" : "trips") · @sold.Tows @(sold.Tows == 1 ? "tow" : "tows")</p>
+                    <p class="cost">Day @sold.Day · @Session.Money(sold.PriceNok) · @sold.Days days · @sold.HoursWorked h of your own work · @sold.Trips @(sold.Trips == 1 ? "trip" : "trips") · @sold.Tows @(sold.Tows == 1 ? "tow" : "tows")</p>
                 </section>
             }
             @if (Session.LastResult is { } sr && sr.Observation is not ClosingView)
@@ -73,19 +73,23 @@
                 {
                     <div class="task" data-upgrade="@u.Name">
                         <p><strong>@u.Name</strong> · <span data-upgrade-status>@u.Status</span></p>
-                        <p class="faint">@u.PriceNok NOK · @Duration(u.InstallMinutes) of your own work@(u.YardNok is { } yn ? $" · yard {yn} NOK, {u.YardDays} {(u.YardDays == 1 ? "day" : "days")}" : "") · adds about @u.ValueNok NOK to her value</p>
+                        <p class="faint">@Session.Money(u.PriceNok) · @Duration(u.InstallMinutes) of your own work@(u.YardNok is { } yn ? $" · yard {Session.Money(yn)}, {u.YardDays} {(u.YardDays == 1 ? "day" : "days")}" : "") · adds about @Session.Money(u.ValueNok) to her value</p>
                         <p class="faint">@u.Opens</p>
                         <div class="row">
-                            @if (u.Status == "not aboard")
+                            @if (u.OrderRefusal is null)
                             {
                                 <button data-action="order" @onclick="() => Session.Order(u.Name)">Order</button>
                             }
-                            @if (u.Status == "aboard, not fitted")
+                            @if (u.InstallRefusal is null)
                             {
                                 <button data-action="install" @onclick="() => Session.Install(u.Name)">Install</button>
-                                @if (u.YardNok is not null) { <button data-action="yard-install" @onclick="() => Session.YardInstall(u.Name)">Yard install</button> }
+                            }
+                            @if (u.YardNok is not null && u.YardInstallRefusal is null)
+                            {
+                                <button data-action="yard-install" @onclick="() => Session.YardInstall(u.Name)">Yard install</button>
                             }
                         </div>
+                        @if (u.InstallRefusal is { } why) { <p class="faint" data-upgrade-why>@why</p> }
                     </div>
                 }
             }
@@ -97,7 +101,7 @@
                     @if (se.BookedDay is { } booked) { <span data-booked>Your slot: day @booked.</span> }
                     else if (se.FirstFreeDay is { } free) { <span data-first-free>First free slot: day @free.</span> }
                     else { <span>The yard is full for the autumn.</span> }
-                    Slots run from day @se.SlotsFromDay to day @se.SlotsToDay. Lift @se.LiftNok NOK, winter storage @se.StorageNok NOK@(se.BookedDay is null ? "" : $"; changing the booking costs {se.ChangeFeeNok} NOK"). An emergency lift is @se.EmergencyLiftNok NOK.
+                    Slots run from day @se.SlotsFromDay to day @se.SlotsToDay. Lift @Session.Money(se.LiftNok), winter storage @Session.Money(se.StorageNok)@(se.BookedDay is null ? "" : $"; changing the booking costs {Session.Money(se.ChangeFeeNok)}"). An emergency lift is @Session.Money(se.EmergencyLiftNok).
                 </p>
                 <div class="row">
                     @if (Offered(se, "book-haulout"))
@@ -134,7 +138,7 @@
                     {
                         <div class="task" data-task="@task.Command">
                             <p><strong>@task.Name</strong> @if (task.Done) { <span class="done" data-done>done</span> }</p>
-                            <p class="faint">@Duration(task.Minutes)@(task.CostNok > 0 ? $" · {task.CostNok} NOK" : "") · @task.Risk</p>
+                            <p class="faint">@Duration(task.Minutes)@(task.CostNok > 0 ? $" · {Session.Money(task.CostNok)}" : "") · @task.Risk</p>
                             <div class="row">
                                 @if (!task.Done && (TaskVerb(task.Command) is not { } verb || Offered(se, verb)))
                                 {
@@ -161,27 +165,27 @@
                 {
                     <article class="letter" data-letter>
                         <p class="faint">@letter.Broker, day @letter.Day</p>
-                        @foreach (var l in letter.Lines) { <p>@l.Text: @(l.Nok > 0 ? "+" : "")@l.Nok NOK</p> }
-                        <p><strong>She is worth about @letter.ValueNok NOK.</strong>@(letter.AskNok is { } a ? $" You are asking {a} NOK." : "")</p>
+                        @foreach (var l in letter.Lines) { <p>@l.Text: @Session.Signed(l.Nok)</p> }
+                        <p><strong>She is worth about @Session.Money(letter.ValueNok).</strong>@(letter.AskNok is { } a ? $" You are asking {Session.Money(a)}." : "")</p>
                         @foreach (var line in letter.Text) { <p class="faint">@line</p> }
                     </article>
                 }
                 @if (Offered(se, "list-for-sale"))
                 {
                     <div class="row">
-                        <input type="number" data-input="ask" placeholder="ask, NOK" @bind="_ask" />
+                        <input type="number" data-input="ask" placeholder="ask, @Session.Currency.Code" @bind="_ask" />
                         <button data-action="list-for-sale" disabled="@(_ask is null or <= 0)" @onclick="ListClicked">List for sale</button>
                     </div>
                 }
                 @foreach (var v in sale.Viewings)
                 {
                     <div class="viewing @(v.Open ? "" : "lapsed")" data-viewing="@v.Number">
-                        <p><strong>Viewing @v.Number</strong> · day @v.Day · their value @v.ValueNok NOK · offer @v.OfferNok NOK @(v.Open ? $"open until day {v.HoldsUntilDay}" : "(lapsed)")</p>
+                        <p><strong>Viewing @v.Number</strong> · day @v.Day · their value @Session.Money(v.ValueNok) · offer @Session.Money(v.OfferNok) @(v.Open ? $"open until day {v.HoldsUntilDay}" : "(lapsed)")</p>
                         @foreach (var f in v.Findings) { <p class="faint">@f</p> }
                         @if (v.Findings.Count == 0) { <p class="faint">Their surveyor found nothing.</p> }
                         @if (v.Open && Offered(se, "accept-offer"))
                         {
-                            <button data-action="accept-offer" @onclick="() => Session.AcceptOffer(v.Number)">Accept @v.OfferNok NOK</button>
+                            <button data-action="accept-offer" @onclick="() => Session.AcceptOffer(v.Number)">Accept @Session.Money(v.OfferNok)</button>
                         }
                     </div>
                 }
@@ -207,8 +211,8 @@
             }
             <p data-calendar-week>@cal.Week</p>
             <p>Vacation: @cal.VacationDaysLeft of @cal.VacationDaysPerYear days left, @cal.VacationDaysUsed used@(cal.UnpaidDays > 0 ? $", {cal.UnpaidDays} unpaid" : "").</p>
-            <p>@MoneyWords.Balance(cal.BalanceNok) The bank lets you owe up to @cal.OverdraftLimitNok NOK.</p>
-            @if (cal.NextPaydayDay >= 0) { <p>Next payday: day @cal.NextPaydayDay, @cal.PayNok NOK.</p> }
+            <p>@MoneyWords.Balance(cal.BalanceNok, Session.Currency) The bank lets you owe up to @Session.Money(cal.OverdraftLimitNok).</p>
+            @if (cal.NextPaydayDay >= 0) { <p>Next payday: day @cal.NextPaydayDay, @Session.Money(cal.PayNok).</p> }
             @if (cal.Reputation is { Length: > 0 } crep) { <p class="faint">@crep</p> }
             <div class="row">
                 <button data-action="next-weekend" @onclick="() => Session.NextWeekend()">Next weekend</button>
@@ -220,7 +224,7 @@
                 <h3>Ahead</h3>
                 @foreach (var a in cal.Ahead)
                 {
-                    <p class="faint" data-ahead>Day @a.Day, @a.Weekday: @a.Text@(a.Nok != 0 ? $" ({(a.Nok > 0 ? "+" : "")}{a.Nok} NOK)" : "")</p>
+                    <p class="faint" data-ahead>Day @a.Day, @a.Weekday: @a.Text@(a.Nok != 0 ? $" ({Session.Signed(a.Nok)})" : "")</p>
                 }
             }
             @if (cal.Orders.Count > 0)
@@ -239,8 +243,20 @@
                         {
                             <p class="faint">@(rq.Met switch { true => "met", false => "not met", _ => "unknown" }): @rq.Text (@rq.Note)</p>
                         }
+                        @if (ev.Beats is { Count: > 0 } beats)
+                        {
+                            @foreach (var b in beats)
+                            {
+                                <p class="faint" data-beat="@b.Text">@b.Text · @b.When · <span class="done">@b.Status</span>@(b.Note.Length > 0 ? $" ({b.Note})" : "")</p>
+                            }
+                        }
+                        @if (ev.Outcome.Length > 0) { <p class="faint" data-outcome>@ev.Outcome</p> }
                         @if (ev.Story.Length > 0) { <p class="faint">@ev.Story</p> }
-                        @if (ev.When.StartsWith("a week of your choice", StringComparison.Ordinal) && ev.Status == "ahead" && cal.Day <= ev.ToDay)
+                        @if (ev.Status is "ahead" or "on now" && !ev.ToBePicked)
+                        {
+                            <label class="faint" data-going><input type="checkbox" data-action="going" checked="@ev.Going" @onchange="e => Session.SetGoing(ev.Name, e.Value is true)" /> Going: a wait stops on its morning</label>
+                        }
+                        @if (ev.ToBePicked && ev.Status == "ahead" && cal.Day <= ev.ToDay)
                         {
                             <div class="row">
                                 <input type="number" data-input="friend-day" placeholder="day @ev.FromDay to @ev.ToDay" @bind="_friendDay" />
@@ -261,7 +277,7 @@
                 <section class="closing">
                     <h2>@(tr.Towed ? "Towed in." : tr.TurnedBack ? "Back where she started." : "Made port.")</h2>
                     @foreach (var line in tr.Lines) { <p>@line</p> }
-                    <p class="cost">@tr.Destination · @Duration(tr.Minutes)@(tr.MoneySpentNok > 0 ? $", {tr.MoneySpentNok} NOK" : "")</p>
+                    <p class="cost">@tr.Destination · @Duration(tr.Minutes)@(tr.MoneySpentNok > 0 ? $", {Session.Money(tr.MoneySpentNok)}" : "")</p>
                 </section>
             }
             @if (Session.LastResult is { } lr && lr.Observation is not TripResultView)
@@ -313,7 +329,7 @@
                 <div class="options">
                     @foreach (var l in inv.ForSale)
                     {
-                        <div class="option"><button data-action="buy" data-item="@l.Name" @onclick="() => Session.Buy(l.Name)">Buy @l.Name (@l.PriceNok NOK)</button></div>
+                        <div class="option"><button data-action="buy" data-item="@l.Name" @onclick="() => Session.Buy(l.Name)">Buy @l.Name (@Session.Money(l.PriceNok))</button></div>
                     }
                 </div>
             }
@@ -324,7 +340,7 @@
         var rd = Session.Readiness;
         var sv = Session.Survey;
         <section class="readiness">
-            <p>Day @rd.Day · @(rd.SeasonLead ?? $"deadline day {rd.LaunchDeadlineDay} ({DaysToGo(rd.DaysToDeadline)})") · @MoneyWords.BalanceShort(rd.BalanceNok)</p>
+            <p>Day @rd.Day · @(rd.SeasonLead ?? $"deadline day {rd.LaunchDeadlineDay} ({DaysToGo(rd.DaysToDeadline)})") · @MoneyWords.BalanceShort(rd.BalanceNok, Session.Currency)</p>
             <div class="options">
                 @if (!sv.Ordered)
                 {
@@ -337,7 +353,7 @@
                 <div class="option"><button data-action="wait" @onclick="() => Session.Wait(1)">Wait a day</button></div>
                 @if (rd.Launched && rd.Afloat)
                 {
-                    <div class="option"><button data-action="emergency-lift" @onclick="() => Session.EmergencyLift()">Emergency lift (@rd.EmergencyLiftNok NOK)</button></div>
+                    <div class="option"><button data-action="emergency-lift" @onclick="() => Session.EmergencyLift()">Emergency lift (@Session.Money(rd.EmergencyLiftNok))</button></div>
                 }
                 <div class="option"><button class="primary" data-action="launch" disabled="@rd.Afloat" @onclick="() => Session.Launch()">Launch</button></div>
             </div>
@@ -363,7 +379,7 @@
             {
                 <div class="problem">
                     <p><strong>@p.Problem</strong> · @p.Component · @p.State</p>
-                    <p>now @p.CostNowNok NOK / later @p.CostLaterNok NOK@(p.LaterNote is { Length: > 0 } ln ? " (" + ln + ")" : "")@(p.OnHardOnly ? " · on the hard only" : "")</p>
+                    <p>now @Session.Money(p.CostNowNok) / later @Session.Money(p.CostLaterNok)@(p.LaterNote is { Length: > 0 } ln ? " (" + ln + ")" : "")@(p.OnHardOnly ? " · on the hard only" : "")</p>
                     @if (Escalates(p) is { } escalates) { <p class="faint">@escalates</p> }
                     <p class="faint">@p.Consequence</p>
                     @if (p.State == "Deferred")
@@ -531,19 +547,19 @@
             ? (lo == hi ? $"Likely to get worse in {lo} {(lo == 1 ? "day" : "days")}." : $"Likely to get worse in {lo}\u2013{hi} days.")
         : p.EscalatesOnLaunch ? "Escalates on launch." : null;
 
-    private static string DaysToGo(int d) =>
+    private string DaysToGo(int d) =>
         d > 0 ? $"{d} days to go" : d == 0 ? "today" : $"{-d} days past";
 
-    private static string SurveyFee(SurveyReportView sv) => sv.FeeNok > 0 ? $" ({sv.FeeNok} NOK)" : "";
+    private string SurveyFee(SurveyReportView sv) => sv.FeeNok > 0 ? $" ({Session.Money(sv.FeeNok)})" : "";
 
-    private static string Duration(int minutes) =>
+    private string Duration(int minutes) =>
         minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes} min";
 
-    private static string Cost(CommandResult r)
+    private string Cost(CommandResult r)
     {
         var parts = new List<string>();
         if (r.MinutesTaken > 0) parts.Add($"+{Duration(r.MinutesTaken)}");
-        if (r.CostNok > 0) parts.Add($"{r.CostNok} NOK");
+        if (r.CostNok > 0) parts.Add($"{Session.Money(r.CostNok)}");
         return string.Join(", ", parts);
     }
 
@@ -553,10 +569,10 @@
     private bool LastIsMeter(string remembered) =>
         Session.LastResult is { Accepted: true, Observation: MeterReading mr } && mr.Text == remembered;
 
-    private static string OptionMeta(ActionOption o)
+    private string OptionMeta(ActionOption o)
     {
         var extra = new List<string>();
-        if (o.CostNok > 0) extra.Add($"{o.CostNok} NOK");
+        if (o.CostNok > 0) extra.Add($"{Session.Money(o.CostNok)}");
         if (o.Minutes > 0) extra.Add(Duration(o.Minutes));
         return string.Join(" · ", extra);
     }

@@ -61,6 +61,7 @@ public sealed partial class Game
                 _water.ResetSinceAboard();
                 RaiseArrivalSigns(); // she is here to be seen now
             }
+            WeekStep(t); // the friend's arrival and last night come at their hour, wherever the player is
             left -= step;
             if ((StartMinuteOfDay + ClockMinutes) % 1440 == 0) Daily(t, Day - 1, aboard);
         }
@@ -88,6 +89,7 @@ public sealed partial class Game
         }
 
         CalendarDaily(day);
+        DeliverLetters(t, day + 1);
         SeasonDaily(t, day, present);
         EventsDaily(t, day);
 
@@ -102,6 +104,12 @@ public sealed partial class Game
     {
         if (f.Progression is null || f.ActiveSinceDay is null || f.Spread is not null) return;
         var r = _boat.Rates;
+        // A progression with its own range rolls it on its own salt: no draw of the world stream, so no other fault's spread moves.
+        if (f.Progression.Spread is { Count: 2 } own)
+        {
+            f.Spread = own[0] + SeasonRoll(SaltFaultSpread, StableHash(f.Id), 0) * (own[1] - own[0]);
+            return;
+        }
         f.Spread = r.SpreadLo + _world.NextDouble() * (r.SpreadHi - r.SpreadLo);
     }
 
@@ -194,7 +202,7 @@ public sealed partial class Game
         double rate = spec.BaseRatePerDay * m;
         if (rate <= 0) return (null, null);
         double remaining = Math.Max(0, r.Threshold - f.Progress);
-        int max = (int)Math.Ceiling(remaining / (rate * r.SpreadLo));
+        int max = (int)Math.Ceiling(remaining / (rate * (spec.Spread is { Count: 2 } own ? own[0] : r.SpreadLo)));
 
         // Worst case, day by day. Day k from now is the one whose midnight run adds that day's progress.
         int lastAboard = _workMinutesToday > 0 ? Day : _lastAboardDay;
@@ -217,7 +225,7 @@ public sealed partial class Game
             double neglect = neglects
                 ? 1 + Math.Min(1, neglectBase + r.Neglect.PerDayAwayBeyond3 * Math.Max(0, Day + min - lastAboard - 3))
                 : 1.0;
-            progress += spec.BaseRatePerDay * r.SpreadHi * exposure * neglect;
+            progress += spec.BaseRatePerDay * (spec.Spread is { Count: 2 } own2 ? own2[1] : r.SpreadHi) * exposure * neglect;
             min++;
         }
         return (Math.Min(min, max), Math.Max(max, Math.Min(min, max)));
