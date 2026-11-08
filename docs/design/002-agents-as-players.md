@@ -66,6 +66,8 @@ Yes, as an architecture rule now and a dev tool soon; as a marketing promise onl
 
 Sonnet, with `prompt.md` as written, is the reference agent for difficulty. A fault is a good fault when Sonnet solves it in a moderate number of steps, with some wasted effort. If Sonnet solves it straight away, the loop is too shallow. If it fails, the fault is not diagnosable. Opus and Haiku give the upper and lower bounds. The playtest runs on demand, not in CI, because each run costs model usage and needs a logged-in `claude`.
 
+A run normally takes under a minute. `playtest.sh` kills the agent after `PLAYTEST_TIMEOUT` seconds (default 300) and says so; anyone waiting on a run should give up on the same scale, not hours.
+
 ## Playtest log
 
 | Date | Fault | Model | Solved | Steps | Game time | Money | Notes |

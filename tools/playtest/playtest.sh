@@ -2,6 +2,8 @@
 set -euo pipefail
 
 MODEL="${1:-sonnet}"
+# A run normally finishes in under a minute. Kill it after this many seconds.
+LIMIT="${PLAYTEST_TIMEOUT:-300}"
 case "$MODEL" in
   sonnet|opus|haiku) ;;
   *) echo "usage: $0 [sonnet|opus|haiku]" >&2; exit 2 ;;
@@ -49,7 +51,15 @@ fi
 
 echo "$CFG_JSON" > "$CFG"
 cd "$ROOT"
-env -u CLAUDECODE "${CMD[@]}" > "$OUT" || echo "claude exited non-zero (see $OUT)" >&2
+set +e
+env -u CLAUDECODE timeout --kill-after=10 "$LIMIT" "${CMD[@]}" > "$OUT"
+RC=$?
+set -e
+if [ "$RC" -eq 124 ] || [ "$RC" -eq 137 ]; then
+  echo "playtest TIMED OUT after ${LIMIT}s (model=$MODEL); partial trace at $TRACE" >&2
+elif [ "$RC" -ne 0 ]; then
+  echo "claude exited non-zero ($RC, see $OUT)" >&2
+fi
 
 echo "--- agent result (tail) ---"
 python3 - "$OUT" <<'PY' || echo "(could not read result)"
