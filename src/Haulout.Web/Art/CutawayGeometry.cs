@@ -21,13 +21,19 @@ public static class CutawayGeometry
     public const double TitleX = 24;
     public const double TitleY = 586;
 
-    // ---- yard: she is on the hard -----------------------------------------------------------------------------------
-    public const double GroundY = 572;
-    /// <summary>Yard concrete below the ground line (x, y, width, height).</summary>
-    public static readonly (double X, double Y, double W, double H) GroundTone = (8, 572, 984, 20);
+    // ---- scale -------------------------------------------------------------------------------------------------------
+    // LOA 8.5 m runs from the heel of the transom (x 46) to the stem head (x 937): 891 units, so 105 units per metre.
+    // Draft 1.5 m below the DWL puts the keel tip at y 539.5; the rudder blade goes 1.2 m below the DWL (y 508).
+    public const double UnitsPerMetre = 105;
 
-    /// <summary>Design waterline, a thin dashed reference only.</summary>
-    public const double WaterlineY = 395;
+    // ---- yard: she is on the hard -----------------------------------------------------------------------------------
+    /// <summary>Yard ground, just under the keel block that carries the keel tip.</summary>
+    public const double GroundY = 554;
+    /// <summary>Yard concrete below the ground line (x, y, width, height).</summary>
+    public static readonly (double X, double Y, double W, double H) GroundTone = (8, GroundY, 984, 592 - GroundY);
+
+    /// <summary>Design waterline, a thin dashed reference only: where the canoe body would meet the water.</summary>
+    public const double WaterlineY = 382;
     public const double WaterlineX1 = 36;
     public const double WaterlineX2 = 964;
     public const string WaterlineLabel = "DWL";
@@ -36,7 +42,7 @@ public static class CutawayGeometry
     private static string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
     private static string F(FormattableString s) => FormattableString.Invariant(s);
 
-    // ---- the hull: one fair canoe-body curve -------------------------------------------------------------------------
+    // ---- curves ------------------------------------------------------------------------------------------------------
     private readonly record struct Cubic(double X0, double Y0, double X1, double Y1, double X2, double Y2, double X3, double Y3)
     {
         public (double X, double Y) At(double t)
@@ -55,7 +61,9 @@ public static class CutawayGeometry
 
         public Cubic Reverse() => new(X3, Y3, X2, Y2, X1, Y1, X0, Y0);
 
-        public Cubic Shift(double dy) => new(X0, Y0 + dy, X1, Y1 + dy, X2, Y2 + dy, X3, Y3 + dy);
+        public Cubic Shift(double dy) => Shift(0, dy);
+
+        public Cubic Shift(double dx, double dy) => new(X0 + dx, Y0 + dy, X1 + dx, Y1 + dy, X2 + dx, Y2 + dy, X3 + dx, Y3 + dy);
 
         public string C() => F($" C{N(X1)},{N(Y1)} {N(X2)},{N(Y2)} {N(X3)},{N(Y3)}");
 
@@ -70,94 +78,137 @@ public static class CutawayGeometry
         }
     }
 
-    // Canoe body: stern quarter to the lowest point (horizontal tangent), then on to the forefoot and stem. Two cubics
-    // joined with the same tangent: one fair curve, no flat run. Keel and rudder are added on top of it, not cut into it.
-    private static readonly Cubic[] Skin =
+    /// <summary>A chain of cubics that is a function of x (strictly increasing x), with y lookup and sub-path data.</summary>
+    private sealed class Profile(params Cubic[] segs)
     {
-        new(74, 360, 100, 402, 300, 432, 520, 432),
-        new(520, 432, 700, 432, 860, 411, 915, 376),
-    };
-
-    private static (int Seg, double T) FindX(double x)
-    {
-        for (var i = 0; i < Skin.Length; i++)
+        private (int Seg, double T) FindX(double x)
         {
-            var s = Skin[i];
-            if (x < s.X0 - 1e-9 || x > s.X3 + 1e-9) continue;
-            double lo = 0, hi = 1;
-            for (var k = 0; k < 50; k++)
+            for (var i = 0; i < segs.Length; i++)
             {
-                var mid = (lo + hi) / 2;
-                if (s.At(mid).X < x) lo = mid; else hi = mid;
+                var s = segs[i];
+                if (x < s.X0 - 1e-9 || x > s.X3 + 1e-9) continue;
+                double lo = 0, hi = 1;
+                for (var k = 0; k < 50; k++)
+                {
+                    var mid = (lo + hi) / 2;
+                    if (s.At(mid).X < x) lo = mid; else hi = mid;
+                }
+                return (i, (lo + hi) / 2);
             }
-            return (i, (lo + hi) / 2);
+            throw new ArgumentOutOfRangeException(nameof(x));
         }
-        throw new ArgumentOutOfRangeException(nameof(x));
-    }
 
-    /// <summary>Hull skin y at a given x (stern quarter to stem).</summary>
-    public static double HullY(double x) { var (i, t) = FindX(x); return Skin[i].At(t).Y; }
+        public double Y(double x) { var (i, t) = FindX(x); return segs[i].At(t).Y; }
 
-    /// <summary>Curve segments of the skin from xa to xb (forward), shifted by dy.</summary>
-    private static List<Cubic> Curves(double xa, double xb, double dy)
-    {
-        var (i, ta) = FindX(xa); var (j, tb) = FindX(xb);
-        var list = new List<Cubic>();
-        if (i == j) list.Add(Skin[i].Sub(ta, tb));
-        else
+        private List<Cubic> Curves(double xa, double xb, double dy)
         {
-            list.Add(Skin[i].Sub(ta, 1));
-            for (var k = i + 1; k < j; k++) list.Add(Skin[k]);
-            list.Add(Skin[j].Sub(0, tb));
+            var (i, ta) = FindX(xa); var (j, tb) = FindX(xb);
+            var list = new List<Cubic>();
+            if (i == j) list.Add(segs[i].Sub(ta, tb));
+            else
+            {
+                list.Add(segs[i].Sub(ta, 1));
+                for (var k = i + 1; k < j; k++) list.Add(segs[k]);
+                list.Add(segs[j].Sub(0, tb));
+            }
+            return list.Select(c => c.Shift(dy)).ToList();
         }
-        return list.Select(c => c.Shift(dy)).ToList();
+
+        /// <summary>Curve from xa to xb (either direction) as path data continuing from the current point, offset by dy.</summary>
+        public string D(double xa, double xb, double dy = 0)
+        {
+            if (xa <= xb) return string.Concat(Curves(xa, xb, dy).Select(c => c.C()));
+            var list = Curves(xb, xa, dy);
+            list.Reverse();
+            return string.Concat(list.Select(c => c.Reverse().C()));
+        }
     }
 
-    /// <summary>Skin curve from xa to xb (either direction) as path data continuing from the current point, offset by dy.</summary>
-    private static string SkinD(double xa, double xb, double dy = 0)
-    {
-        if (xa <= xb) return string.Concat(Curves(xa, xb, dy).Select(c => c.C()));
-        var list = Curves(xb, xa, dy);
-        list.Reverse();
-        return string.Concat(list.Select(c => c.Reverse().C()));
-    }
+    // ---- the hull: canoe body, stem, sheer ---------------------------------------------------------------------------
+    // Canoe body in side section, stern to bow: the heel of a raked reverse transom (x 46, y 366), a short counter and a run
+    // that crosses the DWL at about x 95 (so a little stern overhang), the lowest point (y 434, horizontal tangent) at x 500,
+    // then up through a cut-away forefoot to x 874. Two cubics joined with the same tangent: one fair curve, no flat run.
+    private static readonly Profile Skin = new(
+        new Cubic(46, 366, 112, 396, 300, 434, 500, 434),
+        new Cubic(500, 434, 640, 434, 790, 424, 874, 398));
+
+    private const double SkinStartX = 46, SkinEndX = 874, StemHeadX = 937, StemHeadY = 232;
+
+    // Stem: leaves the forefoot with the skin's tangent and rakes about 17 degrees to the head; about 0.5 m of overhang at
+    // the DWL, a little more above.
+    private static readonly Cubic Stem = new(874, 398, 895, 391.5, 910, 320, StemHeadX, StemHeadY);
+    // Inner stem line: starts on the inner skin at x 866 with the same tangent, ends near the deck underside.
+    private static readonly Cubic StemIn = new(866, 393.4, 886, 387.5, 901, 316, 928, 225);
+
+    // Sheer: concave, lowest (y 294) a little aft of amidships at x 460, rising about 54 units (0.5 m) to the transom top, where it meets the cockpit coaming in one corner
+    // and about 62 (0.6 m) to the stem head. The coachroof stands on it; the cockpit coaming rises above it aft.
+    private const double TransomTopX = 73, TransomTopY = 240;
+    private static readonly Profile Sheer = new(
+        new Cubic(TransomTopX, TransomTopY, 190, 268, 330, 294, 460, 294),
+        new Cubic(460, 294, 600, 294, 800, 270, StemHeadX, StemHeadY));
+
+    /// <summary>Hull skin y at a given x (transom heel to forefoot).</summary>
+    public static double HullY(double x) => Skin.Y(x);
+
+    private static double SheerY(double x) => Sheer.Y(x);
+
+    private static string SkinD(double xa, double xb, double dy = 0) => Skin.D(xa, xb, dy);
+
+    private static string SheerD(double xa, double xb, double dy = 0) => Sheer.D(xa, xb, dy);
 
     private static string Pt(double x, double dy = 0) => F($"{N(x)},{N(HullY(x) + dy)}");
 
-    // Fin keel: deep, root chord about a third of the hull length, leading and trailing edges raked aft going down,
-    // a little shorter chord at the tip. Spade rudder well aft of it.
-    public const double KeelRootAft = 478, KeelRootFwd = 718, KeelTipAft = 440, KeelTipFwd = 585, KeelBottomY = 558;
-    public const double RudderTopAft = 118, RudderTopFwd = 152, RudderTipAft = 110, RudderTipFwd = 141, RudderBottomY = 472;
-    private const double StemX = 915;
+    // ---- fin keel and skeg-hung rudder ----------------------------------------------------------------------------
+    // Keel: root chord 189 units (1.8 m) from x 500 to 689, tip chord 131 (1.25 m) from 508 to 639; leading edge swept back
+    // about 24 degrees, trailing edge near vertical, tip squared with small rounded corners. Tip at DWL + 1.5 m.
+    public const double KeelRootAft = 500, KeelRootFwd = 689, KeelTipAft = 508, KeelTipFwd = 639;
+    public const double KeelBottomY = WaterlineY + 1.5 * UnitsPerMetre;   // 539.5
 
-    private static string KeelPoly() =>
-        F($"M{Pt(KeelRootAft)} L{N(KeelTipAft)},{N(KeelBottomY)} L{N(KeelTipFwd)},{N(KeelBottomY)} L{Pt(KeelRootFwd)} Z");
+    // Rudder: a raked blade hung behind a skeg, well aft. Hull attach from x 96 (trailing edge) to the stock at x 136; the
+    // blade goes down to DWL + 1.2 m (y 508), above the keel tip. The skeg is a short fixed fin ahead of the blade.
+    public const double RudderTrailingX = 96, RudderStockX = 136, RudderBottomY = WaterlineY + 1.2 * UnitsPerMetre;   // 508
+    private const double SkegForwardX = 200, SkegBottomY = 498;
 
-    /// <summary>Hull, keel and rudder as one path from the transom top round the bottom to the stem top (open).</summary>
+    private static string KeelOutline()
+    {
+        var yr = HullY(KeelRootAft); var yf = HullY(KeelRootFwd);
+        return F($"M{N(KeelRootAft)},{N(yr)} L{N(KeelTipAft - 0.6)},{N(KeelBottomY - 8)} Q{N(KeelTipAft)},{N(KeelBottomY)} {N(KeelTipAft + 8)},{N(KeelBottomY)}")
+             + F($" L{N(KeelTipFwd - 8)},{N(KeelBottomY)} Q{N(KeelTipFwd)},{N(KeelBottomY)} {N(KeelTipFwd + 3.3)},{N(KeelBottomY - 7.3)} L{N(KeelRootFwd)},{N(yf)}");
+    }
+
+    /// <summary>Hull, keel, rudder and stem as one open path from the transom top, round the bottom, to the stem head.</summary>
     private static string HullRun() =>
-        "M60,240 L74,360" + SkinD(74, RudderTopAft)
-        + F($" L{N(RudderTipAft)},{N(RudderBottomY - 12)} Q{N(RudderTipAft + 1)},{N(RudderBottomY)} {N((RudderTipAft + RudderTipFwd) / 2)},{N(RudderBottomY)} Q{N(RudderTipFwd - 1)},{N(RudderBottomY)} {N(RudderTipFwd)},{N(RudderBottomY - 12)} L{Pt(RudderTopFwd)}")
-        + SkinD(RudderTopFwd, KeelRootAft)
-        + F($" L{N(KeelTipAft)},{N(KeelBottomY)} L{N(KeelTipFwd)},{N(KeelBottomY)} L{Pt(KeelRootFwd)}")
-        + SkinD(KeelRootFwd, StemX)
-        + " Q955,300 940,224";
+        F($"M{N(TransomTopX)},{N(TransomTopY)} L{N(SkinStartX)},366")
+        + SkinD(SkinStartX, RudderTrailingX)
+        // rudder: trailing edge, rounded tip, then up its fore edge to the skeg's heel
+        + F($" L99,{N(RudderBottomY - 8)} Q99.6,{N(RudderBottomY)} 108,{N(RudderBottomY)} L124,{N(RudderBottomY)} L128,{N(SkegBottomY + 2)}")
+        // skeg: bottom, then its leading edge up and forward to the hull
+        + F($" L156,{N(SkegBottomY)} L{N(SkegForwardX)},{N(HullY(SkegForwardX))}")
+        + SkinD(SkegForwardX, KeelRootAft)
+        + KeelOutline().Replace("M", "L")   // the keel starts where the skin reaches the root: continue the path
+        + SkinD(KeelRootFwd, SkinEndX)
+        + Stem.C();
 
-    /// <summary>Hull outline incl. keel and rudder, closed; filled with paper.</summary>
-    public static readonly string HullFill = HullRun() + " Z";
+    /// <summary>Hull outline incl. keel and rudder, closed along the full sheer; filled with paper.</summary>
+    public static readonly string HullFill = HullRun() + SheerD(StemHeadX, TransomTopX) + " Z";
 
-    /// <summary>Hull outline, open (no line across the deck).</summary>
-    public static readonly string HullStroke = HullRun();
+    /// <summary>Hull outline, open, ending with the foredeck sheer back to the foot of the coachroof (heavy ink).</summary>
+    public static readonly string HullStroke = HullRun() + SheerD(StemHeadX, CoachroofFootX);
 
     /// <summary>Keel fin, for hatching (the lead).</summary>
-    public static readonly string KeelHatch = KeelPoly();
+    public static readonly string KeelHatch = KeelOutline() + " Z";
 
-    /// <summary>Inner skin, a thin line seven units inside the outer one.</summary>
+    /// <summary>The hinge line between skeg and rudder, from the stock down to the lower pintle.</summary>
+    private static string RudderHinge() => F($"M{N(RudderStockX)},{N(HullY(RudderStockX))} L127,{N(RudderBottomY - 2)}");
+
+    /// <summary>Inner skin, a thin line seven units inside the outer one, up the inside of the stem.</summary>
     public const double SkinThickness = 7;
-    private static readonly string InnerSkin = F($"M{Pt(84, -SkinThickness)}") + SkinD(84, 905, -SkinThickness);
+    private static readonly string InnerSkin =
+        F($"M{Pt(84, -SkinThickness)}") + SkinD(84, 866, -SkinThickness) + F($" L{N(StemIn.X0)},{N(StemIn.Y0)}") + StemIn.Sub(0, 0.9).C();
 
     /// <summary>Hull skin between outer and inner line, for light hatching.</summary>
     private static readonly string SkinBand =
-        F($"M{Pt(84)}") + SkinD(84, 905) + F($" L{Pt(905, -SkinThickness)}") + SkinD(905, 84, -SkinThickness) + " Z";
+        F($"M{Pt(84)}") + SkinD(84, 866) + F($" L{Pt(866, -SkinThickness)}") + SkinD(866, 84, -SkinThickness) + " Z";
 
     // ---- yard --------------------------------------------------------------------------------------------------------
     /// <summary>Cradle pad whose top edge is the hull curve between x1 and x2, t thick.</summary>
@@ -182,7 +233,7 @@ public static class CutawayGeometry
     /// <summary>Yard ladder leaning on the bow, from the ground to the foredeck.</summary>
     private static string Ladder()
     {
-        const double fl = 958, fr = 980, tl = 945, tr = 962, top = 214;
+        const double fl = 962, fr = 984, tl = 948, tr = 966, top = 236;
         var sb = new System.Text.StringBuilder(F($"M{fl},{GroundY} L{tl},{top} M{fr},{GroundY} L{tr},{top}"));
         for (var y = GroundY - 22.0; y > top + 10; y -= 22)
         {
@@ -192,29 +243,39 @@ public static class CutawayGeometry
         return sb.ToString();
     }
 
-    private const double BlockX1 = 436, BlockX2 = 620, BlockTop = 564;
+    // The keel stands on a timber block a little wider than the tip.
+    private const double BlockX1 = 494, BlockX2 = 654;
 
     /// <summary>Drawn behind the hull: ground line, joints, keel block, cradle stands, yard ladder.</summary>
     public static readonly ImmutableArray<DecorPath> Backdrop = ImmutableArray.Create(
         new DecorPath("detail", F($"M150,{GroundY} L136,592 M420,{GroundY} L412,592 M780,{GroundY} L792,592")),
         new DecorPath("ground", F($"M16,{GroundY} L984,{GroundY}")),
-        // timber block under the keel, with end grain and wedges
+        // timber block under the keel tip, with end grain and wedges
         new DecorPath("yard", F(
-            $"M{BlockX1},{BlockTop} L{BlockX2},{BlockTop} L{BlockX2},{GroundY} L{BlockX1},{GroundY} Z M490,{BlockTop} L490,{GroundY} M570,{BlockTop} L570,{GroundY} M{BlockX1},{GroundY} L{BlockX1 - 10},{GroundY} M{BlockX2},{GroundY} L{BlockX2 + 10},{GroundY} M470,{BlockTop} L470,{KeelBottomY + 2} M584,{BlockTop} L584,{KeelBottomY + 2}")),
-        new DecorPath("yard", Stand(176, 222, 14)),   // aft stand
-        new DecorPath("yard", Stand(332, 378, 14)),   // mid stand
-        new DecorPath("yard", Stand(828, 868, 22)),   // bow stand
+            $"M{BlockX1},{N(KeelBottomY)} L{BlockX2},{N(KeelBottomY)} L{BlockX2},{GroundY} L{BlockX1},{GroundY} Z M550,{N(KeelBottomY)} L550,{GroundY} M598,{N(KeelBottomY)} L598,{GroundY} M{BlockX1},{GroundY} L{BlockX1 - 10},{GroundY} M{BlockX2},{GroundY} L{BlockX2 + 10},{GroundY}")),
+        new DecorPath("yard", Stand(236, 282, 14)),   // aft stand
+        new DecorPath("yard", Stand(340, 386, 14)),   // mid stand
+        new DecorPath("yard", Stand(790, 832, 22)),   // bow stand
         new DecorPath("yard", Ladder()));
 
     // ---- topsides, rig ----------------------------------------------------------------------------------------------
-    /// <summary>Deck, bridge deck, coachroof: heavy ink. The aft face of the coachroof is the open companionway (dashed).</summary>
-    public static readonly ImmutableArray<DecorPath> Topsides = ImmutableArray.Create(
-        new DecorPath("hull-line", "M60,240 L78,240 M236,240 L270,238 M292,196 L650,196 L668,229 L940,224"),
-        new DecorPath("dash", "M270,238 L292,196"),
-        // headliner and deck undersides
-        new DecorPath("detail", "M298,204 L644,204 L664,229 M238,248 L272,246 M668,235 L936,230"));
+    // The coachroof stands on the sheer; its forward face rakes back from the roof edge (650, 196) to the foot at x 688.
+    private const double CoachroofFootX = 688;
+    private static readonly double CoachroofFootY = SheerY(CoachroofFootX);
 
-    /// <summary>Drawn over the hull and regions, never clickable: mast, boom, sprayhood, hatches, pulpit.</summary>
+    /// <summary>
+    /// Heavy ink above the hull: the stern seat and cockpit coaming, the bridge deck, the coachroof. The aft face of the
+    /// coachroof is the open companionway (dashed). The far side of the sheer is drawn thin where nothing else is.
+    /// </summary>
+    public static readonly ImmutableArray<DecorPath> Topsides = ImmutableArray.Create(
+        new DecorPath("hull-line", F($"M{N(TransomTopX)},{N(TransomTopY)} L236,240 L270,238 M292,196 L650,196 L{N(CoachroofFootX)},{N(CoachroofFootY)}")),
+        new DecorPath("dash", "M270,238 L292,196"),
+        // the sheer on the far side, seen through the saloon; hidden by the cockpit seat, steps and berth
+        new DecorPath("detail", F($"M392,{N(SheerY(392))}") + SheerD(392, CoachroofFootX)),
+        // headliner and deck undersides
+        new DecorPath("detail", F($"M298,204 L644,204 L683,{N(SheerY(683) + 6)}") + SheerD(683, 924, 6) + " M238,248 L272,246"));
+
+    /// <summary>Drawn over the hull and regions, never clickable: mast, boom, sprayhood, hatches, pulpit, rudder hinge.</summary>
     public static readonly ImmutableArray<DecorPath> Overlay = ImmutableArray.Create(
         // Mast stub through the coachroof, with the compression post below it.
         new DecorPath("rig-line", "M590,92 L598,92 L598,196 M590,92 L590,196"),
@@ -223,8 +284,11 @@ public static class CutawayGeometry
         new DecorPath("rig-line", "M104,142 L590,142 M104,150 L590,150 M104,142 L104,150 M578,146 L590,146"),
         // Sprayhood over the companionway.
         new DecorPath("sprayhood", "M300,196 L312,170 L346,170 L360,196 M322,170 L320,196 M338,170 L340,196"),
-        // Foredeck hatch and bow pulpit.
-        new DecorPath("ink-thin", "M778,227 L785,219 L827,219 L834,226 M900,225 L900,200 L936,200 L940,224 M900,213 L938,213"));
+        // Foredeck hatch and bow pulpit, both standing on the sheer.
+        new DecorPath("ink-thin", F($"M772,{N(SheerY(772))} L778,{N(SheerY(778) - 8)} L806,{N(SheerY(806) - 8)} L812,{N(SheerY(812))} M896,{N(SheerY(896))} L896,{N(SheerY(896) - 28)} L{N(StemHeadX - 3)},{N(SheerY(StemHeadX - 3) - 28)} L{N(StemHeadX - 3)},{N(SheerY(StemHeadX - 3))} M896,{N(SheerY(896) - 14)} L{N(StemHeadX - 3)},{N(SheerY(StemHeadX - 3) - 14)}")),
+        // Rudder: the hinge between skeg and blade
+        new DecorPath("ink-thin", RudderHinge()));
+
 
     // ---- interior: thin ink, decor only -----------------------------------------------------------------------------
     // Cockpit sole y292, cabin sole y392, bulkheads at x236 and x722, panel at x326.
@@ -232,21 +296,21 @@ public static class CutawayGeometry
     // engine under the steps | saloon | forepeak.
     public static readonly ImmutableArray<DecorPath> Interior = ImmutableArray.Create(
         new DecorPath("hatch-fill", SkinBand),
-        new DecorPath("hatch-fill", KeelPoly()),
+        new DecorPath("hatch-fill", KeelHatch),
         new DecorPath("ink-thin", InnerSkin),
 
         // cockpit well: aft wall, sole (the locker lid is a cover), seat line beyond the cut
-        new DecorPath("ink-thin", "M78,240 L78,292 L150,292 M220,292 L236,292"),
+        new DecorPath("ink-thin", "M75,240 L75,292 L150,292 M220,292 L236,292"),
         new DecorPath("furniture", "M80,264 L234,264 M80,264 L80,292"),
         // rudder stock up into the cockpit
         new DecorPath("detail", F($"M136,292 L136,{N(HullY(136) - SkinThickness)} M131,292 L141,292")),
         // cockpit / aft cabin bulkhead, and the forepeak bulkhead
-        new DecorPath("ink-thin", F($"M236,240 L236,{N(HullY(236) - SkinThickness)} M722,229 L722,{N(HullY(722) - SkinThickness)}")),
+        new DecorPath("ink-thin", F($"M236,240 L236,{N(HullY(236) - SkinThickness)} M722,{N(SheerY(722) + 6)} L722,{N(HullY(722) - SkinThickness)}")),
 
         // fuel tank in the cockpit locker, and the exhaust hose with its anti-siphon loop
         new DecorPath("tone-fill", "M150,326 L222,326 L222,374 L150,374 Z"),
         new DecorPath("ink-thin", "M150,326 L222,326 L222,374 L150,374 Z M186,326 L186,374 M150,340 L222,340"),
-        new DecorPath("detail", "M236,312 L126,312 Q114,312 114,303 Q114,296 104,296 Q94,296 92,306 L72,314 M222,360 L236,360"),
+        new DecorPath("detail", "M236,312 L126,312 Q114,312 114,303 Q114,296 104,296 Q94,296 92,306 L58,314 M222,360 L236,360"),
 
         // quarter berth: cushion, pillow, battery box with its battery
         new DecorPath("wood-fill", "M240,316 L324,316 L324,324 L240,324 Z"),
@@ -269,8 +333,8 @@ public static class CutawayGeometry
         new DecorPath("detail", F($"M576,416 L576,{N(HullY(580))} M584,416 L584,{N(HullY(580))} M520,396 L520,{N(HullY(520) - SkinThickness)} M660,396 L660,{N(HullY(660) - SkinThickness)}")),
 
         // forepeak: V-berth
-        new DecorPath("wood-fill", "M728,352 L918,346 L918,354 L728,360 Z"),
-        new DecorPath("furniture", "M728,352 L918,346 L918,354 L728,360 Z M732,352 Q734,342 746,342 L752,342 Q756,346 754,352"));
+        new DecorPath("wood-fill", "M728,352 L884,346 L884,354 L728,360 Z"),
+        new DecorPath("furniture", "M728,352 L884,346 L884,354 L728,360 Z M732,352 Q734,342 746,342 L752,342 Q756,346 754,352"));
 
     // ---- places: clickable regions that never overlap ---------------------------------------------------------------
     private const double StairTopY = 262, StairFootX = 372, StairFootY = 336;
@@ -280,7 +344,7 @@ public static class CutawayGeometry
     public static readonly ImmutableArray<PlaceShape> Places = ImmutableArray.Create(
         // Well plus locker, down to the skin.
         new PlaceShape("Cockpit",
-            F($"M60,240 L236,240 L236,{N(HullY(236))}") + SkinD(236, 74) + " Z",
+            F($"M76,240 L236,240 L236,{N(HullY(236))}") + SkinD(236, 62) + " Z",
             "Cockpit", 150, 258, 200, 292),
 
         // The steps and the air above them, in the hatch.
@@ -295,23 +359,25 @@ public static class CutawayGeometry
 
         // Saloon and the bilge below its sole, bounded by the engine's front, the companionway edge and the bulkhead.
         new PlaceShape("Saloon",
-            F($"M340,204 L644,204 L664,229 L722,232 L722,{N(HullY(722))}") + SkinD(722, 456) + " L456,320 L392,320 Z",
+            F($"M340,204 L644,204 L683,{N(SheerY(683) + 6)} L722,{N(SheerY(722) + 6)} L722,{N(HullY(722))}") + SkinD(722, 456) + " L456,320 L392,320 Z",
             "Saloon", 646, 290, 536, 392),
 
         // V-berth.
         new PlaceShape("Forepeak",
-            F($"M722,232 L936,226 L938,300 L{StemX},376") + SkinD(StemX, 722) + " Z",
+            F($"M722,{N(SheerY(722) + 6)}") + SheerD(722, 916, 6) + F($" L{N(StemIn.At(0.82).X)},{N(StemIn.At(0.82).Y)}")
+                + StemIn.Sub(0, 0.82).Reverse().C() + F($" L{Pt(866)}") + SkinD(866, 722) + " Z",
             "Forepeak", 790, 330, 810, 352),
 
         // A strip along the coachroof and foredeck.
         new PlaceShape("On deck",
-            "M236,240 L270,238 L292,196 L650,196 L668,229 L934,224.2 L934,194 L668,199 L650,166 L292,166 L270,206 L236,210 Z",
+            F($"M236,240 L270,238 L292,196 L650,196 L{N(CoachroofFootX)},{N(CoachroofFootY)}") + SheerD(CoachroofFootX, 930)
+                + F($" L930,{N(SheerY(930) - 34)}") + SheerD(930, CoachroofFootX, -34) + " L650,166 L292,166 L270,206 L236,210 Z",
             "On deck", 430, 186, 470, 196),
 
         // The ground around and under the hull, outside it. The ladder is at the bow.
         new PlaceShape("Beside the hull",
-            F($"M14,300 L67,300 L74,360") + SkinD(74, StemX) + F($" L985,376 L985,{GroundY} L14,{GroundY} Z"),
-            "Beside the hull", 20, 560, 936, 572));
+            F($"M14,300 L61.3,300 L{SkinStartX},366") + SkinD(SkinStartX, SkinEndX) + F($" L985,398 L985,{GroundY} L14,{GroundY} Z"),
+            "Beside the hull", 20, 570, 936, GroundY));
 
     // ---- covers, drawn in state --------------------------------------------------------------------------------------
     private const string Stairs = "M276,246 h19 v14.8 h19 v14.8 h19 v14.8 h19 v14.8 h19 v14.8";
@@ -433,10 +499,10 @@ public static class CutawayGeometry
         new("Deck", "Standing rig", "Standing rig", 610, 188, 'r'),
 
         // outside the hull: skin, keel, rudder, bottom paint
-        new("Hull, outside", "Hull", "Hull", 270, HullY(270), 'd'),
-        new("Hull, outside", "Antifouling", "Antifouling", 400, HullY(400), 'd'),
+        new("Hull, outside", "Hull", "Hull", 307, HullY(307), 'd'),
+        new("Hull, outside", "Antifouling", "Antifouling", 440, HullY(440), 'd'),
         new("Hull, outside", "Keel", "Keel", 560, 500, 'r'),
-        new("Hull, outside", "Rudder", "Rudder", 128, 430, 'l'),
+        new("Hull, outside", "Rudder", "Rudder", 116, 440, 'l'),
     };
 
     private sealed record Resolved(string Pos, double Dx, double Dy, string Label, char Side, double Lx, double Ly, string Anchor, bool Dense);

@@ -288,9 +288,35 @@
       "label": "At the bow"
     }
   ],
+  "kinds": [
+    { "id": "battery", "verbs": ["inspect", "measure", "charge", "replace"] },
+    { "id": "terminal", "verbs": ["inspect", "uncover", "measure", "clean", "replace"] },
+    { "id": "cable", "verbs": ["inspect", "uncover", "measure", "clean", "replace"] },
+    { "id": "ground-stud", "verbs": ["inspect", "uncover", "measure", "clean", "replace"] },
+    { "id": "switch", "verbs": ["inspect", "measure", "clean", "replace"] },
+    { "id": "solenoid", "verbs": ["inspect", "measure", "clean", "replace"] },
+    { "id": "starter", "verbs": ["inspect", "measure", "replace"] },
+    { "id": "panel", "verbs": ["inspect", "clean", "replace"] },
+    { "id": "glow-plug", "verbs": ["inspect", "measure", "replace"] },
+    { "id": "filter-with-bowl", "verbs": ["inspect", "check-filter-bowl", "replace"] },
+    { "id": "filter", "verbs": ["inspect", "replace"] },
+    { "id": "seacock", "verbs": ["inspect", "replace", "check-raw-water-flow"] },
+    { "id": "strainer", "verbs": ["inspect", "clean", "replace", "check-raw-water-flow"] },
+    { "id": "raw-water-pump", "verbs": ["inspect", "replace", "check-raw-water-flow"] },
+    { "id": "impeller", "verbs": ["inspect", "uncover", "replace", "check-raw-water-flow"] },
+    { "id": "exhaust-part", "verbs": ["inspect", "replace", "check-raw-water-flow"] },
+    { "id": "hull", "verbs": ["inspect", "clean"] },
+    { "id": "structure", "verbs": ["inspect"] },
+    { "id": "bilge", "verbs": ["inspect"] },
+    { "id": "tank", "verbs": ["inspect", "replace"] },
+    { "id": "pump", "verbs": ["inspect", "replace"] },
+    { "id": "hose", "verbs": ["inspect", "replace"] },
+    { "id": "fitting", "verbs": ["inspect", "replace"] }
+  ],
   "components": [
     {
       "id": "start-battery",
+      "kind": "battery",
       "name": "Start battery",
       "subsystem": "electrical",
       "position": "under-quarter-berth",
@@ -311,7 +337,6 @@
       "condition": 0.55,
       "wearYears": 6,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1900,
       "replaceMinutes": 60,
       "properties": {
@@ -459,6 +484,7 @@
     },
     {
       "id": "battery-switch",
+      "kind": "switch",
       "name": "Battery switch",
       "subsystem": "electrical",
       "position": "below-companionway",
@@ -485,7 +511,6 @@
       "condition": 0.6,
       "wearYears": 10,
       "seriesOhms": 0.0005,
-      "cleanable": true,
       "replaceCostNok": 450,
       "replaceMinutes": 60,
       "properties": {
@@ -494,6 +519,7 @@
     },
     {
       "id": "positive-terminal",
+      "kind": "terminal",
       "name": "Positive terminal",
       "subsystem": "electrical",
       "position": "under-quarter-berth",
@@ -522,7 +548,6 @@
       "condition": 0.7,
       "wearYears": 8,
       "seriesOhms": 0.0003,
-      "cleanable": true,
       "replaceCostNok": 60,
       "replaceMinutes": 30,
       "faults": [
@@ -581,6 +606,7 @@
     },
     {
       "id": "main-positive-cable",
+      "kind": "cable",
       "name": "Main positive cable",
       "subsystem": "electrical",
       "position": "under-quarter-berth",
@@ -599,15 +625,20 @@
         "red cable"
       ],
       "description": "A fat red cable, sleeve stiff with age but unbroken. It runs forward along the box wall.",
+      "removablePart": {
+        "name": "rubber boot",
+        "aliases": ["boot"],
+        "uncoveredText": "Under the boot the lug is clean and bright."
+      },
       "condition": 0.7,
       "wearYears": 15,
       "seriesOhms": 0.0015,
-      "cleanable": true,
       "replaceCostNok": 400,
       "replaceMinutes": 90
     },
     {
       "id": "negative-terminal",
+      "kind": "terminal",
       "name": "Negative terminal",
       "subsystem": "electrical",
       "position": "under-quarter-berth",
@@ -631,12 +662,11 @@
         "aliases": [
           "boot"
         ],
-        "uncoveredText": ""
+        "uncoveredText": "The clamp sits tight on the post."
       },
       "condition": 0.5,
       "wearYears": 8,
       "seriesOhms": 0.0003,
-      "cleanable": true,
       "replaceCostNok": 60,
       "replaceMinutes": 30,
       "faults": [
@@ -688,6 +718,7 @@
     },
     {
       "id": "negative-cable",
+      "kind": "cable",
       "name": "Negative cable",
       "subsystem": "electrical",
       "position": "under-quarter-berth",
@@ -706,15 +737,20 @@
         "ground cable"
       ],
       "description": "A black cable of the same gauge as its red twin, a little greener at the lugs.",
+      "removablePart": {
+        "name": "rubber boot",
+        "aliases": ["boot"],
+        "uncoveredText": "Under the boot the lug is clean and bright."
+      },
       "condition": 0.65,
       "wearYears": 15,
       "seriesOhms": 0.0015,
-      "cleanable": true,
       "replaceCostNok": 400,
       "replaceMinutes": 90
     },
     {
       "id": "engine-ground-stud",
+      "kind": "ground-stud",
       "name": "Engine ground stud",
       "subsystem": "electrical",
       "position": "engine-bay-side",
@@ -733,10 +769,14 @@
         "engine ground"
       ],
       "description": "A brass stud on the engine foot with a ring lug and a nut. Dull, but it holds.",
+      "removablePart": {
+        "name": "rubber cap",
+        "aliases": ["cap"],
+        "uncoveredText": "The nut sits tight on the thread."
+      },
       "condition": 0.7,
       "wearYears": 12,
       "seriesOhms": 0.0005,
-      "cleanable": true,
       "replaceCostNok": 80,
       "replaceMinutes": 30,
       "faults": [
@@ -790,6 +830,7 @@
     },
     {
       "id": "starter-solenoid",
+      "kind": "solenoid",
       "name": "Starter solenoid",
       "subsystem": "electrical",
       "position": "engine-bay-side",
@@ -809,12 +850,12 @@
       "condition": 0.6,
       "wearYears": 10,
       "seriesOhms": 0.001,
-      "cleanable": true,
       "replaceCostNok": 900,
       "replaceMinutes": 90
     },
     {
       "id": "starter-motor",
+      "kind": "starter",
       "name": "Starter motor",
       "subsystem": "electrical",
       "position": "engine-bay-side",
@@ -835,7 +876,6 @@
       "wearYears": 12,
       "seriesOhms": 0.045,
       "note": "seriesOhms 0.045 is an unverified placeholder, decision 2",
-      "cleanable": false,
       "replaceCostNok": 3800,
       "replaceMinutes": 180,
       "faults": [
@@ -888,6 +928,7 @@
     },
     {
       "id": "ignition-panel",
+      "kind": "panel",
       "name": "Ignition panel",
       "subsystem": "electrical",
       "position": "cockpit",
@@ -910,12 +951,12 @@
       "condition": 0.6,
       "wearYears": 12,
       "seriesOhms": null,
-      "cleanable": true,
       "replaceCostNok": 1100,
       "replaceMinutes": 90
     },
     {
       "id": "fuel-tank",
+      "kind": "tank",
       "name": "Fuel tank",
       "subsystem": "fuel",
       "position": "under-cockpit-locker",
@@ -936,7 +977,6 @@
       "condition": 0.7,
       "wearYears": 30,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 5200,
       "replaceMinutes": 360,
       "properties": {
@@ -1028,6 +1068,7 @@
     },
     {
       "id": "fuel-shutoff",
+      "kind": "fitting",
       "name": "Fuel shutoff valve",
       "subsystem": "fuel",
       "position": "under-cockpit-locker",
@@ -1050,7 +1091,6 @@
       "condition": 0.7,
       "wearYears": 20,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 350,
       "replaceMinutes": 45,
       "properties": {
@@ -1059,6 +1099,7 @@
     },
     {
       "id": "fuel-supply-line",
+      "kind": "hose",
       "name": "Fuel supply line",
       "subsystem": "fuel",
       "position": "engine-bay-side",
@@ -1085,12 +1126,12 @@
       "condition": 0.6,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 260,
       "replaceMinutes": 60
     },
     {
       "id": "primary-filter",
+      "kind": "filter-with-bowl",
       "name": "Primary fuel filter / water separator",
       "subsystem": "fuel",
       "position": "under-cockpit-locker",
@@ -1112,7 +1153,6 @@
       "condition": 0.45,
       "wearYears": 2,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 45,
       "properties": {
         "waterMinutes": 0
@@ -1159,6 +1199,7 @@
     },
     {
       "id": "lift-pump",
+      "kind": "pump",
       "name": "Lift pump",
       "subsystem": "fuel",
       "position": "engine-bay-front",
@@ -1179,12 +1220,12 @@
       "condition": 0.65,
       "wearYears": 12,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 780,
       "replaceMinutes": 90
     },
     {
       "id": "secondary-filter",
+      "kind": "filter",
       "name": "Secondary fuel filter",
       "subsystem": "fuel",
       "position": "engine-bay-front",
@@ -1205,11 +1246,11 @@
       "condition": 0.6,
       "wearYears": 2,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 45
     },
     {
       "id": "injection-pump",
+      "kind": "pump",
       "name": "Injection pump",
       "subsystem": "fuel",
       "position": "engine-bay-side",
@@ -1229,12 +1270,12 @@
       "condition": 0.7,
       "wearYears": 25,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 6400,
       "replaceMinutes": 300
     },
     {
       "id": "injectors",
+      "kind": "fitting",
       "name": "Injectors",
       "subsystem": "fuel",
       "position": "engine-bay-front",
@@ -1261,12 +1302,12 @@
       "condition": 0.6,
       "wearYears": 10,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 2400,
       "replaceMinutes": 180
     },
     {
       "id": "fuel-return-line",
+      "kind": "hose",
       "name": "Fuel return line",
       "subsystem": "fuel",
       "position": "engine-bay-side",
@@ -1287,12 +1328,12 @@
       "condition": 0.6,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 160,
       "replaceMinutes": 45
     },
     {
       "id": "raw-water-seacock",
+      "kind": "seacock",
       "name": "Raw-water seacock",
       "subsystem": "cooling",
       "position": "bilge-under-saloon",
@@ -1314,7 +1355,6 @@
       "condition": 0.6,
       "wearYears": 25,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1200,
       "replaceMinutes": 180,
       "properties": {
@@ -1435,6 +1475,7 @@
     },
     {
       "id": "raw-water-strainer",
+      "kind": "strainer",
       "name": "Raw-water strainer",
       "subsystem": "cooling",
       "position": "bilge-under-saloon",
@@ -1455,12 +1496,12 @@
       "condition": 0.6,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": true,
       "replaceCostNok": 950,
       "replaceMinutes": 60
     },
     {
       "id": "raw-water-pump",
+      "kind": "raw-water-pump",
       "name": "Raw-water pump",
       "subsystem": "cooling",
       "position": "engine-bay-front",
@@ -1481,7 +1522,6 @@
       "condition": 0.55,
       "wearYears": 10,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1400,
       "replaceMinutes": 120,
       "properties": { "waterHeld": 1 },
@@ -1552,6 +1592,7 @@
     },
     {
       "id": "impeller",
+      "kind": "impeller",
       "name": "Raw-water impeller",
       "subsystem": "cooling",
       "position": "engine-bay-front",
@@ -1571,7 +1612,6 @@
       "condition": 0.35,
       "wearYears": 2,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 60,
       "properties": {
         "vaneFactor": 1
@@ -1629,6 +1669,7 @@
     },
     {
       "id": "heat-exchanger",
+      "kind": "fitting",
       "name": "Heat exchanger",
       "subsystem": "cooling",
       "position": "engine-bay-front",
@@ -1655,7 +1696,6 @@
       "condition": 0.55,
       "wearYears": 20,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 3200,
       "replaceMinutes": 240,
       "faults": [
@@ -1712,6 +1752,7 @@
     },
     {
       "id": "thermostat",
+      "kind": "fitting",
       "name": "Thermostat",
       "subsystem": "cooling",
       "position": "engine-bay-front",
@@ -1731,12 +1772,12 @@
       "condition": 0.6,
       "wearYears": 8,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 260,
       "replaceMinutes": 60
     },
     {
       "id": "coolant",
+      "kind": "fitting",
       "name": "Coolant",
       "subsystem": "cooling",
       "position": "engine-bay-front",
@@ -1757,12 +1798,12 @@
       "condition": 0.6,
       "wearYears": 4,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 450,
       "replaceMinutes": 60
     },
     {
       "id": "exhaust-elbow",
+      "kind": "exhaust-part",
       "name": "Exhaust elbow",
       "subsystem": "cooling",
       "position": "engine-bay-side",
@@ -1783,12 +1824,12 @@
       "condition": 0.5,
       "wearYears": 8,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1800,
       "replaceMinutes": 120
     },
     {
       "id": "exhaust-hose",
+      "kind": "exhaust-part",
       "name": "Exhaust hose",
       "subsystem": "cooling",
       "position": "under-cockpit-locker",
@@ -1815,7 +1856,6 @@
       "condition": 0.6,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1500,
       "replaceMinutes": 180,
       "faults": [
@@ -1861,6 +1901,7 @@
     },
     {
       "id": "anti-siphon-loop",
+      "kind": "hose",
       "name": "Anti-siphon loop",
       "subsystem": "cooling",
       "position": "under-cockpit-locker",
@@ -1882,12 +1923,12 @@
       "condition": 0.55,
       "wearYears": 10,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 300,
       "replaceMinutes": 60
     },
     {
       "id": "engine-block",
+      "kind": "fitting",
       "name": "Engine block",
       "subsystem": "engine",
       "position": "engine-bay-front",
@@ -1915,12 +1956,12 @@
       "condition": 0.6,
       "wearYears": 40,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 24000,
       "replaceMinutes": 1200
     },
     {
       "id": "engine-oil",
+      "kind": "fitting",
       "name": "Engine oil",
       "subsystem": "engine",
       "position": "engine-bay-front",
@@ -1941,11 +1982,11 @@
       "condition": 0.5,
       "wearYears": 1,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 45
     },
     {
       "id": "oil-filter",
+      "kind": "filter",
       "name": "Oil filter",
       "subsystem": "engine",
       "position": "engine-bay-front",
@@ -1964,12 +2005,12 @@
       "condition": 0.55,
       "wearYears": 1,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 120,
       "replaceMinutes": 30
     },
     {
       "id": "alternator",
+      "kind": "fitting",
       "name": "Alternator",
       "subsystem": "engine",
       "position": "engine-bay-front",
@@ -1989,12 +2030,12 @@
       "condition": 0.6,
       "wearYears": 12,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 2200,
       "replaceMinutes": 120
     },
     {
       "id": "alternator-belt",
+      "kind": "fitting",
       "name": "Alternator belt",
       "subsystem": "engine",
       "position": "engine-bay-front",
@@ -2015,7 +2056,6 @@
       "condition": 0.55,
       "wearYears": 2,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 20,
       "faults": [
         {
@@ -2063,6 +2103,7 @@
     },
     {
       "id": "glow-plugs",
+      "kind": "glow-plug",
       "name": "Glow plugs",
       "subsystem": "engine",
       "position": "engine-bay-side",
@@ -2083,7 +2124,6 @@
       "condition": 0.6,
       "wearYears": 8,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 640,
       "replaceMinutes": 90,
       "note": "healthyOhms 0.8 is an unverified placeholder, decision 4",
@@ -2093,6 +2133,7 @@
     },
     {
       "id": "hull",
+      "kind": "hull",
       "name": "Hull",
       "subsystem": "hull",
       "position": "hull-exterior",
@@ -2113,7 +2154,6 @@
       "condition": 0.6,
       "wearYears": 40,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 0,
       "replaceMinutes": 0,
       "belowWaterline": true,
@@ -2146,6 +2186,7 @@
     },
     {
       "id": "keel",
+      "kind": "structure",
       "name": "Keel",
       "subsystem": "hull",
       "position": "hull-exterior",
@@ -2165,13 +2206,13 @@
       "condition": 0.65,
       "wearYears": 50,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 0,
       "replaceMinutes": 0,
       "belowWaterline": true
     },
     {
       "id": "rudder",
+      "kind": "structure",
       "name": "Rudder",
       "subsystem": "hull",
       "position": "hull-exterior",
@@ -2191,13 +2232,13 @@
       "condition": 0.6,
       "wearYears": 30,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 0,
       "replaceMinutes": 0,
       "belowWaterline": true
     },
     {
       "id": "standing-rig",
+      "kind": "structure",
       "name": "Standing rig",
       "subsystem": "hull",
       "position": "deck",
@@ -2231,12 +2272,12 @@
       "condition": 0.55,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 0,
       "replaceMinutes": 0
     },
     {
       "id": "antifouling",
+      "kind": "fitting",
       "name": "Antifouling",
       "subsystem": "hull",
       "position": "hull-exterior",
@@ -2257,7 +2298,6 @@
       "condition": 0.45,
       "wearYears": 2,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 1600,
       "replaceMinutes": 480,
       "belowWaterline": true,
@@ -2300,6 +2340,7 @@
     },
     {
       "id": "nav-lights",
+      "kind": "fitting",
       "name": "Navigation lights",
       "subsystem": "electrical",
       "position": "deck",
@@ -2322,7 +2363,6 @@
       "condition": 0.6,
       "wearYears": 10,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 250,
       "replaceMinutes": 30,
       "replaceText": "You fit a new lens on the bicolour light and seal the gasket.",
@@ -2363,6 +2403,7 @@
     },
     {
       "id": "cockpit-drains",
+      "kind": "fitting",
       "name": "Cockpit drain hoses",
       "subsystem": "hull",
       "position": "under-cockpit-locker",
@@ -2385,7 +2426,6 @@
       "condition": 0.5,
       "wearYears": 12,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 40,
       "belowWaterline": false,
       "replaceText": "You fit new stainless hose clamps, two to each hose tail.",
@@ -2501,6 +2541,7 @@
     },
     {
       "id": "lifelines",
+      "kind": "fitting",
       "name": "Lifelines",
       "subsystem": "hull",
       "position": "deck",
@@ -2528,7 +2569,6 @@
       "condition": 0.5,
       "wearYears": 15,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 900,
       "replaceMinutes": 120,
       "replaceText": "You fit new lifeline terminals and tension the wires.",
@@ -2569,6 +2609,7 @@
     },
     {
       "id": "sprayhood",
+      "kind": "fitting",
       "name": "Sprayhood",
       "subsystem": "hull",
       "position": "cockpit",
@@ -2590,7 +2631,6 @@
       "condition": 0.6,
       "wearYears": 8,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 3500,
       "replaceMinutes": 240,
       "replaceText": "You fit a new sprayhood on the frame: the canvas laced on, the zips run, the window clear.",
@@ -2645,6 +2685,7 @@
     },
     {
       "id": "mooring-lines",
+      "kind": "fitting",
       "name": "Mooring lines",
       "subsystem": "hull",
       "position": "at-the-bow",
@@ -2669,13 +2710,13 @@
       "condition": 0.55,
       "wearYears": 4,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceMinutes": 30,
       "replaceText": "You make up a pair of new lines on the bow cleats, with chafe sleeves at the fairleads.",
       "properties": { "chafe": 0 }
     },
     {
       "id": "bilge",
+      "kind": "bilge",
       "name": "Bilge",
       "subsystem": "hull",
       "position": "bilge-under-saloon",
@@ -2695,12 +2736,12 @@
       "condition": 1.0,
       "wearYears": 50,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 0,
       "replaceMinutes": 0
     },
     {
       "id": "bilge-pump",
+      "kind": "pump",
       "name": "Bilge pump",
       "subsystem": "hull",
       "position": "bilge-under-saloon",
@@ -2721,7 +2762,6 @@
       "condition": 0.75,
       "wearYears": 8,
       "seriesOhms": null,
-      "cleanable": false,
       "replaceCostNok": 650,
       "replaceMinutes": 45,
       "properties": {

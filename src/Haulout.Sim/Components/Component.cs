@@ -40,7 +40,9 @@ public sealed class Component
     public IReadOnlyList<string> Aliases => Spec.Aliases;
     public string Description => Spec.Description;
     public double? SeriesOhms => Spec.SeriesOhms;
-    public bool Cleanable => Spec.Cleanable;
+    public ComponentKind? Kind => Spec.Kind;
+    /// <summary>Whether this kind of part offers the verb (one source of truth for what can be done to it).</summary>
+    public bool HasVerb(string verb) => Spec.Kind?.Verbs.Contains(verb) ?? verb == Verb.Inspect;
     public int ReplaceCostNok => Spec.ReplaceCostNok;
     public int ReplaceMinutes => Spec.ReplaceMinutes;
     public IReadOnlyDictionary<string, double> Properties => Spec.Properties;

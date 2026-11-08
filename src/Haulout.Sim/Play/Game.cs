@@ -234,18 +234,22 @@ public sealed partial class Game
 
         Add("inspect", "Inspect", sight, 5, 0);
 
-        if (c.RemovablePart is { } part)
+        // Every verb below comes from the component's kind, never from its faults or its id (002 finding 2).
+        if (c.HasVerb(Verb.Uncover) && c.RemovablePart is { } part)
             Add("uncover", $"Pull back the {part.Name}",
                 SeaWorkRefusal() ?? touch ?? (_uncovered.Contains(c.Id) ? AlreadyUncovered(part) : null), 2, 0);
 
-        if (c.Id == "start-battery" || c.Id == "glow-plugs")
-            Add("measure", "Measure", SeaWorkRefusal() ?? touch, 10, 0);
-        else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
-            Add("measure", "Measure", SeaWorkRefusal() ?? touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
+        if (c.HasVerb(Verb.Measure))
+        {
+            // Parts in the crank loop are only read while she cranks, which needs the remote start button.
+            bool crankLoop = EngineInputsBuilder.LoopOrder.Contains(c.Id);
+            Add("measure", "Measure",
+                SeaWorkRefusal() ?? touch ?? (crankLoop && !hasButton ? "Needs someone to crank while you hold the probes: a remote start button." : null), 10, 0);
+        }
 
-        if (c.Cleanable || CanRedoByClean(c) || c.Id == HullId)
+        if (c.HasVerb(Verb.Clean))
             Add("clean", "Clean", SeaWorkRefusal() ?? AfloatRefusal(c) ?? touch ?? WetRefusal(c), c.Id == HullId ? _boat.Fouling.CleanMinutes : 30, 0);
-        if (c.ReplaceCostNok > 0)
+        if (c.HasVerb(Verb.Replace))
         {
             bool spare = SpareFor(c.Id) is not null;
             var (partNok, notStocked) = spare ? (0, null) : ReplacePartHere(c);
@@ -253,9 +257,9 @@ public sealed partial class Game
                 ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? notStocked ?? (spare ? null : MoneyRefusal(partNok)),
                 c.ReplaceMinutes, partNok);
         }
-        if (c.Id == "start-battery") Add("charge", "Charge", YardGate() ?? touch, 480, 0);
-        if (c.Id == "primary-filter") Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
-        if (RawWaterParts.Contains(c.Id))
+        if (c.HasVerb(Verb.Charge)) Add("charge", "Charge", YardGate() ?? touch, 480, 0);
+        if (c.HasVerb(Verb.CheckFilterBowl)) Add("check-filter-bowl", "Check filter bowl", touch, 10, 0);
+        if (c.HasVerb(Verb.CheckRawWaterFlow))
             Add("check-raw-water-flow", "Check flow",
                 !ExhaustOutletPlaces.Contains(_placeId) ? NoOutletMessage
                 : _running ? null : "Only tells you anything with the engine running.", 5, 0);
@@ -263,10 +267,6 @@ public sealed partial class Game
         AddProblemOptions(c, options);
         return new ComponentActionsView(name, true, c.Name, options);
     }
-
-    /// <summary>Parts on the raw-water side, where watching the exhaust flow is the natural check.</summary>
-    private static readonly string[] RawWaterParts =
-        ["raw-water-seacock", "raw-water-strainer", "raw-water-pump", "impeller", "exhaust-elbow", "exhaust-hose"];
 
     // --------------------------------------------------------------- commands
 
@@ -475,6 +475,7 @@ public sealed partial class Game
     private CommandResult DoMeasure(Turn t, string name)
     {
         if (!ResolveComponent("measure", name, needTouch: true, out var c, out var rejected, pre: _ => SeaWorkRefusal())) return rejected!;
+        if (!c.HasVerb(Verb.Measure)) return Reject("measure", $"There's nothing on the {c.Name.ToLowerInvariant()} to put a multimeter to.");
 
         var inputs = EngineInputsBuilder.Build(_boat);
         var reading = EngineModel.Attempt(inputs).Electrical;
@@ -580,20 +581,21 @@ public sealed partial class Game
     private CommandResult DoUncover(Turn t, string name)
     {
         if (!ResolveComponent("uncover", name, needTouch: true, out var c, out var rejected, pre: _ => SeaWorkRefusal())) return rejected!;
-        if (c.RemovablePart is not { } part) return Reject("uncover", $"There's nothing to pull back on the {c.Name.ToLowerInvariant()}.");
+        if (!c.HasVerb(Verb.Uncover) || c.RemovablePart is not { } part) return Reject("uncover", $"There's nothing to pull back on the {c.Name.ToLowerInvariant()}.");
         if (!_uncovered.Add(c.Id)) return Reject("uncover", AlreadyUncovered(part));
 
-        t.Narrative.Add(part.UncoverText ?? $"You peel the {part.Name} back off the clamp.");
-        if (part.UncoveredText.Length > 0) t.Narrative.Add(part.UncoveredText);
+        // Pulling the boot back is the same act on every part of a kind; what is under it is seen on Inspect.
+        // Narrating it here leaked the fault: "clean and bright" on one terminal, silence on the other (002 finding 2).
+        t.Narrative.Add(part.UncoverText ?? $"You peel the {part.Name} back off the clamp. What's under it is bare to look at now.");
         return Accept(t, "uncover", 2, 0, null, $"Pulled back the {part.Name} on the {c.Name.ToLowerInvariant()}.");
     }
 
     private CommandResult DoClean(Turn t, string name)
     {
         if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected,
-                pre: x => SeaWorkRefusal() ?? (x.Cleanable || CanRedoByClean(x) || x.Id == HullId ? AfloatRefusal(x) : null))) return rejected!;
+                pre: x => SeaWorkRefusal() ?? (x.HasVerb(Verb.Clean) ? AfloatRefusal(x) : null))) return rejected!;
         if (c.Id == HullId) return DoCleanHull(t, c);
-        if (!c.Cleanable && !CanRedoByClean(c)) return Reject("clean", "Nothing to clean there.");
+        if (!c.HasVerb(Verb.Clean)) return Reject("clean", "Nothing to clean there.");
         if (WetRefusal(c) is { } wet) return Reject("clean", wet);
 
         ShutDownEngine(t);
@@ -629,8 +631,8 @@ public sealed partial class Game
     private CommandResult DoReplace(Turn t, string name)
     {
         if (!ResolveComponent("replace", name, needTouch: true, out var c, out var rejected,
-                pre: x => x.ReplaceCostNok > 0 ? ReplaceGate(x) : null)) return rejected!;
-        if (c.ReplaceCostNok <= 0) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
+                pre: x => x.HasVerb(Verb.Replace) ? ReplaceGate(x) : null)) return rejected!;
+        if (!c.HasVerb(Verb.Replace)) return Reject("replace", $"The {c.Name.ToLowerInvariant()} is not something you can replace in the yard this spring.");
         if (WetRefusal(c) is { } wet) return Reject("replace", wet);
         var spare = SpareFor(c.Id);
         var (cost, notStocked) = spare is null ? ReplacePartHere(c) : (0, null);
@@ -663,7 +665,7 @@ public sealed partial class Game
     {
         if (YardGate() is { } away) return Reject("charge", away);
         if (!ResolveComponent("charge", name, needTouch: true, out var c, out var rejected)) return rejected!;
-        if (c.Id != "start-battery") return Reject("charge", "Only a battery takes a charge.");
+        if (!c.HasVerb(Verb.Charge)) return Reject("charge", "Only a battery takes a charge.");
 
         ShutDownEngine(t);
         foreach (var f in c.ActiveFaults.Where(f => f.FixedBy.Contains(PlayerAction.Charge)).ToList()) f.Clear();
@@ -678,7 +680,7 @@ public sealed partial class Game
 
     private CommandResult DoCheckFilterBowl(Turn t)
     {
-        var filter = _boat.Get("primary-filter");
+        var filter = _boat.Components.First(x => x.HasVerb(Verb.CheckFilterBowl));
         if (!_seen.Contains(filter.Id)) return Reject("check-filter-bowl", "You haven't found a fuel filter yet.");
         if (_reach.Refusal(filter, _placeId, needTouch: true) is { } refusal) return Reject("check-filter-bowl", refusal);
         var before = t.Narrative.Count;

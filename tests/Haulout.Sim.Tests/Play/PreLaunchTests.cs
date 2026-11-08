@@ -770,7 +770,8 @@ public class PreLaunchTests
         var g = NewGame();
         Walk.Near(g, "fuel tank");
         Assert.Empty(Ok(g.Execute(new Inspect("fuel tank"))).NewlyDiscovered);
-        Assert.Empty(Ok(g.Execute(new Measure("fuel tank"))).NewlyDiscovered);
+        // 002 finding 2: a tank is not a part the meter reads, so Measure is refused, free, whatever is wrong with it.
+        Assert.False(g.Execute(new Measure("fuel tank")).Accepted);
         Assert.DoesNotContain(WaterName, OpenNames(g));
 
         var bowl = Ok(g.Execute(new CheckFilterBowl()));

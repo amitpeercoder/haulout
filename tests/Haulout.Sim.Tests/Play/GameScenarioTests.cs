@@ -265,7 +265,8 @@ public class GameScenarioTests
         Assert.DoesNotContain("bright", Text(g.Execute(new Inspect("positive terminal"))));
         var pull = g.Execute(new Uncover("positive terminal"));
         Assert.True(pull.Accepted);
-        Assert.Contains("clean and bright", Text(pull));
+        // Uncover only pulls the boot back; the look is Inspect (002 finding 2: the narration leaked the fault).
+        Assert.DoesNotContain("bright", Text(pull));
         var look = g.Execute(new Inspect("positive terminal"));
         Assert.Contains("clean and bright", Text(look));
         Assert.Empty(look.NewlyDiscovered);
@@ -300,7 +301,7 @@ public class GameScenarioTests
     }
 
     [Fact]
-    public void Uncover_is_offered_for_the_terminals_and_the_pump_cover_only()
+    public void Uncover_is_offered_for_every_booted_connection_and_the_pump_cover_only()
     {
         var g = NewGame();
         Walk.Near(g, "negative terminal");
@@ -310,7 +311,9 @@ public class GameScenarioTests
         var withPart = new List<string>();
         foreach (var f in ((AboardView)g.Ask(new Aboard())).Components)
             if (((ComponentActionsView)g.Ask(new ComponentActions(f.Name))).Options.Any(o => o.Verb == "uncover")) withPart.Add(f.Name);
-        Assert.Equal(["Negative terminal", "Positive terminal", "Raw-water impeller"], withPart.Order().ToList());
+        // 002 finding 2: uncover follows the kind of part (terminals, cables, the ground stud, the impeller; the stud sits in the engine bay, not seen here), not the fault.
+        Assert.Equal(["Main positive cable", "Negative cable", "Negative terminal", "Positive terminal", "Raw-water impeller"],
+            withPart.Order().ToList());
     }
 
     private static List<string> PlayThrough(Game g)

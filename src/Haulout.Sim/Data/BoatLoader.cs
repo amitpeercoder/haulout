@@ -39,17 +39,19 @@ public static class BoatLoader
         var positions = dto.Positions.Select(p => new Position(p.Id, p.Label));
 
         var chandlery = dto.Chandlery ?? [];
+        var kinds = BuildKinds(dto.Kinds);
         var components = dto.Components.Select(c =>
         {
             // Decision 007/1: a part the chandlery sells costs what the chandlery charges. The price lives on the shop item;
             // the component's replace price and the parts of a DIY fix by replacing it are taken from it.
             var part = chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == c.Id);
             int replaceCostNok = PartPrice(part, c.ReplaceCostNok, $"component '{c.Id}' replaceCostNok");
+            var kind = ResolveKind(c, kinds, replaceCostNok);
             var spec = new ComponentSpec(
                 c.Subsystem, c.Position,
                 (c.Reach ?? []).Select(r => new ReachEntry(r.Place, r.Cover, r.Visible, r.Reachable)).ToList(),
                 c.Aliases ?? [], c.Description ?? "",
-                c.SeriesOhms, c.Cleanable, replaceCostNok, c.ReplaceMinutes,
+                c.SeriesOhms, kind, replaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
                 c.BelowWaterline, c.ReplaceText, c.NeedsDry);
@@ -130,6 +132,46 @@ public static class BoatLoader
             chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale);
     }
 
+    private static Dictionary<string, ComponentKind> BuildKinds(List<KindDto>? dtos)
+    {
+        var kinds = new Dictionary<string, ComponentKind>();
+        foreach (var k in dtos ?? [])
+        {
+            if (kinds.ContainsKey(k.Id)) throw new ArgumentException($"Duplicate kind '{k.Id}'.");
+            foreach (var v in k.Verbs)
+                if (!Verb.All.Contains(v)) throw new ArgumentException($"Kind '{k.Id}' names an unknown verb '{v}'.");
+            if (!k.Verbs.Contains(Verb.Inspect)) throw new ArgumentException($"Kind '{k.Id}' must offer inspect.");
+            kinds[k.Id] = new ComponentKind(k.Id, k.Verbs.ToHashSet());
+        }
+        return kinds;
+    }
+
+    /// <summary>
+    /// A component's kind decides its verbs, never its faults (002 finding 2). The kind must agree with the rest of the component's data:
+    /// uncover exactly when it has a removable part, replace exactly when it has a replace price, and every fault a verb fixes
+    /// must be one the kind offers. A boat with no kinds table (a test fixture) gives every part inspect alone.
+    /// </summary>
+    private static ComponentKind? ResolveKind(ComponentDto c, Dictionary<string, ComponentKind> kinds, int replaceCostNok)
+    {
+        if (c.Kind is null)
+        {
+            if (kinds.Count > 0) throw new ArgumentException($"Component '{c.Id}' has no kind.");
+            return null;
+        }
+        if (!kinds.TryGetValue(c.Kind, out var kind)) throw new ArgumentException($"Component '{c.Id}' has unknown kind '{c.Kind}'.");
+        if (kind.Verbs.Contains(Verb.Uncover) != (c.RemovablePart is not null))
+            throw new ArgumentException($"Component '{c.Id}' (kind '{kind.Id}'): uncover is offered exactly when it has a removablePart.");
+        if (kind.Verbs.Contains(Verb.Replace) != (replaceCostNok > 0))
+            throw new ArgumentException($"Component '{c.Id}' (kind '{kind.Id}'): replace is offered exactly when it has a replace price.");
+        foreach (var f in c.Faults ?? [])
+        {
+            foreach (var (action, verb) in new[] { (PlayerAction.Clean, Verb.Clean), (PlayerAction.Charge, Verb.Charge), (PlayerAction.Replace, Verb.Replace) })
+                if ((f.FixedBy ?? []).Contains(action) && !kind.Verbs.Contains(verb))
+                    throw new ArgumentException($"Fault '{f.Id}' is fixed by {verb}, but component '{c.Id}' is of kind '{kind.Id}', which has no {verb} verb.");
+        }
+        return kind;
+    }
+
     /// <summary>
     /// Routes as written in the data carry no distance or course: both are derived from the two ports' chart positions (design note 009),
     /// distance to 0.1 nm and course to the whole degree, 0 to 359. A route whose ports lack a position, a leftover distance or course,
@@ -196,6 +238,7 @@ public static class BoatLoader
         public List<PlaceDto> Places { get; set; } = [];
         public List<CoverDto> Covers { get; set; } = [];
         public List<PositionDto> Positions { get; set; } = [];
+        public List<KindDto>? Kinds { get; set; }
         public List<ComponentDto> Components { get; set; } = [];
         public EconomyDto? Economy { get; set; }
         public SurveyDto? Survey { get; set; }
@@ -442,7 +485,7 @@ public static class BoatLoader
         public double? SeriesOhms { get; set; }
         /// <summary>Authoring note, ignored by the sim.</summary>
         public string? Note { get; set; }
-        public bool Cleanable { get; set; }
+        public string? Kind { get; set; }
         /// <summary>Omitted when the chandlery sells the part (decision 007/1): the shop item's price is used.</summary>
         public int? ReplaceCostNok { get; set; }
         public int ReplaceMinutes { get; set; }
@@ -452,6 +495,12 @@ public static class BoatLoader
         public bool BelowWaterline { get; set; }
         public string? ReplaceText { get; set; }
         public bool NeedsDry { get; set; }
+    }
+
+    private sealed class KindDto
+    {
+        public string Id { get; set; } = "";
+        public List<string> Verbs { get; set; } = [];
     }
 
     private sealed class RemovablePartDto

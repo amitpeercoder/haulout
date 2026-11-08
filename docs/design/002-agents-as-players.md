@@ -92,6 +92,8 @@ A run normally takes under a minute. `playtest.sh` kills the agent after `PLAYTE
 Finding 1: the visible green bloom on inspect made the multimeter unnecessary. Hidden under the boot since 86a9faa.
 Finding 2 (after hiding): a model still skips the meter if an Uncover verb is offered on the suspect part. A verb list is a hint. Options: offer Uncover on every booted/covered part so it carries no signal, or make the boot something you notice only on inspect ("the boot could be pulled back").
 
+*Done:* which verbs a component offers depends only on what kind of part it is, never on whether it has a fault: `sloop28.json` has a `kinds` table (each kind lists its verbs) and every component names a `kind`; `ComponentActions` and the command handlers both read the kind, the loader refuses a kind that contradicts the data (a removable part without `uncover`, a replace price without `replace`, a fault fixed by a verb the kind lacks), and `VerbKindTests` checks that the options do not move with the faults.
+
 ### Finding 3: a long wait at a mooring is blind
 
 The sinking in the 008 run took two months of nobody looking. The sim is right that she sinks (rule 3: consequences delayed, never hidden), but in a real marina someone rings you when a boat sits low. Proposed: a plain `WaitDays` is interrupted the way `WaitUntilSpring` already is when the water passes the sole at a mooring ("The harbourmaster rang: she's sitting low"), with the days actually waited reported. The player still has to go and find the leak. For Amit.

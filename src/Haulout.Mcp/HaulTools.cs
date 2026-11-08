@@ -33,18 +33,18 @@ public sealed class HaulTools(GameSession session)
         session.Do("inspect", new Inspect(component), ("component", component));
 
     [McpServerTool(Name = "uncover"), Description(
-        "Pull back a small removable part (a boot or cap) on something you can reach, to see what is underneath. Takes 2 minutes, free.")]
+        "Pull back a small removable part (a boot or cap) on something you can reach, to see what is underneath. Takes 2 minutes, free. Refused, free, for parts of a kind that have nothing to pull back.")]
     public string Uncover([Description("Name of a part you have found.")] string component) =>
         session.Do("uncover", new Uncover(component), ("component", component));
 
     [McpServerTool(Name = "measure"), Description(
-        "Put the multimeter on a part you have found and can get a hand to from where you are. Takes 10 minutes, free (2 minutes if there is nothing a meter can read there). " +
+        "Put the multimeter on a part you have found and can get a hand to from where you are. Takes 10 minutes, free. Refused, free, for parts a meter has nothing to read on. " +
         "Readings of the electrical system while the starter is cranking need a remote start button from the chandlery (see buy); without one only the battery's resting voltage can be read.")]
     public string Measure([Description("Name of a part you have found.")] string component) =>
         session.Do("measure", new Measure(component), ("component", component));
 
     [McpServerTool(Name = "clean"), Description(
-        "Clean and tighten a part you have found. Takes 30 minutes, free. Stops the engine first if it is running. Does nothing for parts that cannot be cleaned.")]
+        "Clean and tighten a part you have found. Takes 30 minutes, free. Stops the engine first if it is running. Refused, free, for parts of a kind that cannot be cleaned; cleaning a part that was fine takes the same time and finds nothing.")]
     public string Clean([Description("Name of a part you have found.")] string component) =>
         session.Do("clean", new Clean(component), ("component", component));
 

@@ -303,9 +303,6 @@ public sealed partial class Game
 
     // ------------------------------------------------------------------ the player's own work
 
-    private bool CanRedoByClean(Component c) =>
-        c.ActiveFaults.Any(f => f.Discovered && f.FixedBy.Contains(PlayerAction.Clean));
-
     /// <summary>Early jobs in a system can come out poor. Nothing is said: it surfaces later, on inspection.</summary>
     private void MaybePoorJob(Component c)
     {
@@ -320,7 +317,7 @@ public sealed partial class Game
             var poor = new Fault(
                 $"{PoorJobPrefix}{c.Id}-{++_poorJobs}", template.Name, c.Id, new FaultEffect(FaultEffectKind.None, 0),
                 [new FaultReveal(PlayerAction.Inspect, template.Reveal, true)],
-                [PlayerAction.Clean, PlayerAction.Replace],
+                c.HasVerb(Verb.Clean) ? [PlayerAction.Clean, PlayerAction.Replace] : [PlayerAction.Replace], // only a verb the kind offers can mend it
                 onHardOnly: c.BelowWaterline, consequence: template.Consequence, costLaterNok: template.CostLaterNok,
                 diy: template.Diy, yard: template.Yard);
             poor.ActivateOn(Day);
