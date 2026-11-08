@@ -165,6 +165,9 @@ public static class BoatLoader
             throw new ArgumentException($"Component '{c.Id}' (kind '{kind.Id}'): replace is offered exactly when it has a replace price.");
         foreach (var f in c.Faults ?? [])
         {
+            // A non-discovering uncovered inspect reveal stands in for the part's uncoveredText (decision 2026-11-08): it needs a part to stand in for.
+            if ((f.Reveals ?? []).Any(r => r.Action == PlayerAction.Inspect && r.NeedsUncovered && !r.Discovers) && c.RemovablePart is null)
+                throw new ArgumentException($"Fault '{f.Id}' has a non-discovering uncovered inspect reveal, but component '{c.Id}' has no removablePart to stand in for.");
             foreach (var (action, verb) in new[] { (PlayerAction.Clean, Verb.Clean), (PlayerAction.Charge, Verb.Charge), (PlayerAction.Replace, Verb.Replace) })
                 if ((f.FixedBy ?? []).Contains(action) && !kind.Verbs.Contains(verb))
                     throw new ArgumentException($"Fault '{f.Id}' is fixed by {verb}, but component '{c.Id}' is of kind '{kind.Id}', which has no {verb} verb.");

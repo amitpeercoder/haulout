@@ -95,7 +95,7 @@ public class AdapterQueryTests
         Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
         Assert.False(Option(g, "negative terminal", "uncover").Available);
         g.Execute(new Inspect("negative terminal"));
-        Assert.True(Found(g, "Negative terminal").KnownProblem);
+        Assert.False(Found(g, "Negative terminal").KnownProblem); // decision (Amit, 2026-11-08): the look under the boot discovers nothing
 
         Assert.True(g.Execute(new Buy("remote start button")).Accepted);
         Assert.True(Option(g, "negative terminal", "measure").Available);

@@ -469,9 +469,15 @@ public sealed partial class Game
             SeeFouling();
         }
         if (c.Id == MooringLinesId && Band.Pick(_boat.Mooring.ChafeWords, Chafe) is { Length: > 0 } chafed) t.Narrative.Add(chafed);
-        if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
+        // Under the boot the eye sees something suggestive, never conclusive (decision 2026-11-08). A fault's non-discovering
+        // uncovered inspect reveal stands in for the part's uncoveredText, so the corroded look replaces the healthy one and is not an extra line.
+        var standIn = off ? c.ActiveFaults.Select(f => f.RevealFor(PlayerAction.Inspect, uncovered: true))
+            .FirstOrDefault(r => r is { Discovers: false, NeedsUncovered: true }) : null;
+        if (standIn is not null) t.Narrative.Add(standIn.Text);
+        else if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
         foreach (var f in c.ActiveFaults.ToList())
         {
+            if (f.RevealFor(PlayerAction.Inspect, uncovered: off) is { Discovers: false, NeedsUncovered: true }) continue;
             Reveal(t, f, PlayerAction.Inspect, uncovered: off);
             if (f.Discovered && f.Present) t.Narrative.Add($"You know what this is: {f.Name}.");
         }

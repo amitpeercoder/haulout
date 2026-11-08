@@ -243,9 +243,13 @@ public class GameScenarioTests
         Assert.Empty(pull.NewlyDiscovered);
         Assert.StartsWith("You peel the rubber boot back off the clamp.", Text(pull));
 
+        // Decision (Amit, 2026-11-08): the look under the boot is suggestive on both terminals and discovers nothing.
         var look = g.Execute(new Inspect("negative terminal"));
-        Assert.Contains("crusted green-white", Text(look));
-        Assert.Contains(look.NewlyDiscovered, k => k.Name == "Corroded negative terminal");
+        Assert.Contains("white bloom along the edge", Text(look));
+        Assert.Empty(look.NewlyDiscovered);
+        Assert.DoesNotContain("You know what this is", Text(look));
+        Assert.Empty(Status(g).DiscoveredFaults);
+        Assert.DoesNotContain(((LogView)g.Ask(new Logbook())).Entries, e => e.Text.StartsWith("Found"));
         Assert.Contains(((LogView)g.Ask(new Logbook())).Entries, e => e.Text == "Pulled back the rubber boot on the negative terminal.");
     }
 
@@ -268,9 +272,49 @@ public class GameScenarioTests
         // Uncover only pulls the boot back; the look is Inspect (002 finding 2: the narration leaked the fault).
         Assert.DoesNotContain("bright", Text(pull));
         var look = g.Execute(new Inspect("positive terminal"));
-        Assert.Contains("clean and bright", Text(look));
+        // Decision (Amit, 2026-11-08): no "clean and bright"; the healthy look is suggestive too.
+        Assert.Contains("a trace of white bloom at the edge", Text(look));
         Assert.Empty(look.NewlyDiscovered);
         Assert.Empty(Status(g).DiscoveredFaults);
+    }
+
+    [Fact]
+    public void Uncovered_terminals_read_alike_and_only_the_meter_or_the_clean_resolves_them()
+    {
+        // Decision (Amit, 2026-11-08): the two inspect texts differ only in degree words.
+        var g = WithButton(NewGame());
+        Walk.Near(g, "positive terminal");
+        Assert.True(g.Execute(new Uncover("positive terminal")).Accepted);
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
+        var pos = Text(g.Execute(new Inspect("positive terminal")));
+        var negR = g.Execute(new Inspect("negative terminal"));
+        var neg = Text(negR);
+        Assert.Empty(negR.NewlyDiscovered);
+        Assert.Empty(Status(g).DiscoveredFaults);
+        string[] Tail(string x) => x[(x.IndexOf("Dull grey", StringComparison.Ordinal))..].Split(' ');
+        string[] p = Tail(pos), n = Tail(neg);
+        Assert.Equal(p.Length - 3, n.Length); // "a trace of" is three words; "at" and "along" swap one for one
+        var degree = new HashSet<string> { "a", "trace", "of", "at", "along" };
+        Assert.Equal(p.Where(w => !degree.Contains(w)), n.Where(w => !degree.Contains(w)));
+
+        var m = Do(g, "negative terminal", x => new Measure(x));
+        Assert.Contains(m.NewlyDiscovered, k => k.Name == "Corroded negative terminal");
+        Assert.Contains("6.24", Text(m));
+    }
+
+    [Fact]
+    public void Cleaning_the_uncovered_negative_terminal_still_discovers_and_fixes_it()
+    {
+        // Decision (Amit, 2026-11-08): the clean pulls the clamp and finds the crust.
+        var g = NewGame();
+        Walk.Near(g, "negative terminal");
+        Assert.True(g.Execute(new Uncover("negative terminal")).Accepted);
+        Assert.Empty(g.Execute(new Inspect("negative terminal")).NewlyDiscovered);
+        var c = g.Execute(new Clean("negative terminal"));
+        Assert.True(c.Accepted);
+        Assert.Contains("green-white crust", Text(c));
+        Assert.Contains(c.NewlyDiscovered, k => k.Name == "Corroded negative terminal");
+        Assert.DoesNotContain("white bloom along", Text(g.Execute(new Inspect("negative terminal"))));
     }
 
     [Fact]

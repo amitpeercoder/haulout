@@ -543,7 +543,7 @@
         "aliases": [
           "boot"
         ],
-        "uncoveredText": "Under the boot the lead is clean and bright."
+        "uncoveredText": "Dull grey lead, a trace of white bloom at the edge of the clamp, the bolt snug."
       },
       "condition": 0.7,
       "wearYears": 8,
@@ -628,7 +628,7 @@
       "removablePart": {
         "name": "rubber boot",
         "aliases": ["boot"],
-        "uncoveredText": "Under the boot the lug is clean and bright."
+        "uncoveredText": "Dull grey lug, a trace of white bloom where it meets the cable, the nut snug."
       },
       "condition": 0.7,
       "wearYears": 15,
@@ -662,7 +662,7 @@
         "aliases": [
           "boot"
         ],
-        "uncoveredText": "The clamp sits tight on the post."
+        "uncoveredText": "Dull grey lead, a trace of white bloom at the edge of the clamp, the bolt snug."
       },
       "condition": 0.5,
       "wearYears": 8,
@@ -680,8 +680,8 @@
           "reveals": [
             {
               "action": "inspect",
-              "text": "The lead under the boot is crusted green-white, the crust eating into the clamp.",
-              "discovers": true,
+              "text": "Dull grey lead, white bloom along the edge of the clamp, the bolt snug.",
+              "discovers": false,
               "needsUncovered": true
             },
             {
@@ -740,7 +740,7 @@
       "removablePart": {
         "name": "rubber boot",
         "aliases": ["boot"],
-        "uncoveredText": "Under the boot the lug is clean and bright."
+        "uncoveredText": "Dull grey lug, a trace of white bloom where it meets the cable, the nut snug."
       },
       "condition": 0.65,
       "wearYears": 15,
@@ -772,7 +772,7 @@
       "removablePart": {
         "name": "rubber cap",
         "aliases": ["cap"],
-        "uncoveredText": "The nut sits tight on the thread."
+        "uncoveredText": "Dull brass, a trace of bloom where the lug meets the stud, the nut snug."
       },
       "condition": 0.7,
       "wearYears": 12,

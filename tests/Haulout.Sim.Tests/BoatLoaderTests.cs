@@ -134,8 +134,9 @@ public class BoatLoaderTests
         Assert.Equal(FaultEffectKind.SeriesOhms, f.Effect.Kind);
         Assert.Equal(0.060, f.Effect.Value);
         Assert.Null(f.RevealFor(PlayerAction.Inspect));
+        // Decision (Amit, 2026-11-08): the look under the boot is suggestive, never conclusive, so it no longer discovers.
         var crust = f.RevealFor(PlayerAction.Inspect, uncovered: true)!;
-        Assert.True(crust.Discovers);
+        Assert.False(crust.Discovers);
         Assert.True(crust.NeedsUncovered);
         Assert.True(f.RevealFor(PlayerAction.Measure)!.Discovers);
         Assert.Null(f.RevealFor(PlayerAction.Look));

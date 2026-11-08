@@ -134,9 +134,9 @@ public class VerbKindTests
     {
         var g = Fresh(healthy: true);
         var r = Walk.Do(g, "negative cable", n => new Uncover(n));
-        Assert.DoesNotContain("clean and bright", string.Join(" ", r.Narrative)); // the look is Inspect's job
+        Assert.DoesNotContain("trace of", string.Join(" ", r.Narrative)); // the look is Inspect's job (decision 2026-11-08: suggestive, not "clean and bright")
         var look = g.Execute(new Inspect("negative cable"));
-        Assert.Contains("clean and bright", string.Join(" ", look.Narrative));
+        Assert.Contains("trace of white bloom where it meets the cable", string.Join(" ", look.Narrative));
     }
 
     [Fact]

@@ -68,7 +68,7 @@ public class PreLaunchTests
     // ------------------------------------------------------------------ 1. lifecycle
 
     [Fact]
-    public void Survey_investigate_item_only_flags_the_part_then_inspecting_discovers_the_fault()
+    public void Survey_investigate_item_only_flags_the_part_then_measuring_discovers_the_fault()
     {
         var g = NewGame();
         Survey(g);
@@ -80,8 +80,13 @@ public class PreLaunchTests
         Assert.Contains(Ready(g).ToInvestigate, i => i.Component == "Starter motor");
 
         Ok(Walk.Do(g, "negative terminal", n => new Uncover(n)));
+        // Decision (Amit, 2026-11-08): the look under the boot discovers nothing; the meter does.
         var inspected = Ok(g.Execute(new Inspect("negative terminal")));
-        Assert.Contains(inspected.NewlyDiscovered, k => k.Name == corroded);
+        Assert.Empty(inspected.NewlyDiscovered);
+        Assert.Contains(Aboard(g).Components, c => c.Name == "Starter motor" && c.Flagged);
+        Ok(g.Execute(new Buy("remote start button")));
+        var measured = Ok(Walk.Do(g, "negative terminal", n => new Measure(n)));
+        Assert.Contains(measured.NewlyDiscovered, k => k.Name == corroded);
 
         Assert.DoesNotContain(Aboard(g).Components, c => c.Name == "Starter motor" && c.Flagged);
         Assert.DoesNotContain(Ready(g).ToInvestigate, i => i.Component == "Starter motor");
