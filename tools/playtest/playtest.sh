@@ -40,7 +40,7 @@ CMD=(claude -p "$(cat "$HERE/prompt.md")"
   --mcp-config "$CFG" --strict-mcp-config
   --allowedTools "mcp__haulout__*"
   --disallowedTools "Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Task,Agent,NotebookEdit"
-  --model "$MODEL" --output-format json --max-turns 60)
+  --model "$MODEL" --output-format json --max-turns 250)
 
 if [ -n "$DRY" ]; then
   echo "# config -> $CFG"; echo "$CFG_JSON"
