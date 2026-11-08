@@ -91,7 +91,7 @@ public sealed partial class Game
             bool phone = stoppedBy.Any(IsPhoneCall);
             t.Narrative.Add(phone
                 ? $"You meant to {meant}; the phone rang on day {waited}."
-                : $"You meant to {meant}; you came back on day {waited}: something on her wants your attention.");
+                : $"You meant to {meant}; you came back after {waited} {(waited == 1 ? "day" : "days")}: something on her wants your attention.");
         }
         else if (complete is not null) t.Narrative.Add(complete);
 

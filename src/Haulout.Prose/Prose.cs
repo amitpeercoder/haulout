@@ -599,5 +599,6 @@ public static class Prose
     private static string Duration(int minutes) =>
         minutes >= 1440 && minutes % 1440 == 0 ? (minutes == 1440 ? "1 day" : $"{minutes / 1440} days") :
         minutes >= 1440 ? $"{Duration(minutes / 1440 * 1440)} {Duration(minutes % 1440)}" :
-        minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes} min";
+        minutes >= 60 && minutes % 60 == 0 ? $"{minutes / 60} h" :
+        minutes >= 60 ? $"{minutes / 60} h {minutes % 60} min" : $"{minutes} min";
 }
