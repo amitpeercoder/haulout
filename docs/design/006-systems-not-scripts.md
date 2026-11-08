@@ -224,3 +224,13 @@ Tests changed: `GameScenarioTests.Full_play_through_via_the_facade` counts log e
 ### (done) Away-escalation fix
 
 An escalation or spawn that happens in an idle tick (the player is away) discovers nothing and writes no narrative: the successor wakes Latent, its cause line is kept (`_pendingCause`) and told in `Discover`, just before the "Found:" line, when the player finds it by the normal reveal path. A fault may carry `arrivalSign: { text }` (`drain-hose-failed` does; `seacock-seized` has none); on coming back aboard, `ArrivalAlerts` raises each such successor's sign as an alert and marks it Symptomatic, with no "Found:" line. The present-player case is unchanged: an aboard tick crossing midnight, and the launch-time `onLaunch` escalation, still tell the escalation text, write the cause line and Discover a known successor on the spot, because the player is there to see it. What the player knows does not change until they look: a known fault that escalated unseen stays in Readiness (its range line is dropped), the known list and the component marker until the successor is found, and `defer`, `undefer` and `yard-fix` still name it (the yard puts right whatever is there; if the successor is fixed unfound the old item moves to Fixed). The sinking card still says what the insurer's man found.
+
+## Decisions (Amit, 2026-11-08, accepting the proposed defaults)
+
+1. Weep rates stay as placeholders, marked unverified: seacock 0.05 L/h, failed drain hose 60 L/h, rain 1.5 L/mm through rusted clamps.
+2. Insurance pays 60 % of 180 000 NOK, void if a *Before launch* survey item was deferred **or left open** at launch.
+3. Neglect baseline: a careful owner visits twice a week; the factor rises beyond three days away.
+4. A weeping seacock does not leak on the hard; seawater ingress counts only afloat.
+5. Cockpit drain through-hulls are just below the waterline: a failed drain hose can sink her at the mooring.
+6. Seacock seizing is driven by frost; rain counts only with the floorboards up. Weakest physical claim in the round, marked unverified.
+7. Pump calibration accepted: the burnt-out-pump chain needs a hose off or very heavy rain, and should be rare.
