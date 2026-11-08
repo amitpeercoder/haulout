@@ -240,3 +240,15 @@ Chandlery prices and minutes; Skjærvik–Hestholmen 14 nm on 040°, Lyngskjær 
 - Played the console end to end (survey, clean the terminal, replace the seacock, yard-fix the fuel, start, launch, buy an impeller, plan, depart, overheat in hour 2, heave to, stop, replace the impeller from the spares, start, motor, arrive at Hestholmen after 5 h). The slipping belt (latent) spoke on its own under way. Accepted step 2's `Electrical.DrawFromEffective` (the under-way draw first brings the hidden live charge down to the legacy 60 % cap). The battery alert at sea now reads "… V and falling." instead of "this morning". The playtest give-up limit is raised from 40 to 150 tool calls (a full trip cannot fit in 40).
 - Open questions for Amit: (1) chandlery prices disagree with the components' replace prices (belt 220 vs 90, secondary element 160 vs 220, oil 300 vs 320); which wins? (2) Should a tow go where you ask, not only back to the port you left? (3) Fuses and the 2 m hose have no use yet: keep them as carried spares or cut? (4) Is a tired impeller overheating within two hours under load plausible, and should an overheating diesel stop itself (90 min placeholder) or seize? (5) Should a tow be allowed into a negative balance? (6) Hestholmen has a shop; should it?
 - Cuts: the forecast is not logged at departure (only the real weather is); weather is one record per day, so the wind does not change within a passage; no fuel consumption; no chart.
+
+## Decisions (Amit, 2026-11-08, accepting the proposed defaults)
+
+1. Where a chandlery price and a part's replace price disagree, the chandlery price wins; Replace uses it.
+2. A tow goes to the nearer port, not wherever you ask.
+3. Fuses and hose stay as spares; the water model will use the hose.
+4. A tired impeller overheating within two hours under load is accepted; an overheating diesel stops itself, seizing is a later escalation.
+5. A tow may take the balance below zero. Debt is real; the economy round handles it.
+6. Hestholmen has a small shop: filters and impellers, at a markup.
+7. Default departure day 150 and 14 nm stay.
+8. Tow fee flat at 6 000 NOK for now.
+9. Forecast as a line per day.
