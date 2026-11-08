@@ -31,6 +31,7 @@ public static class Prose
         foreach (var line in result.Narrative) sb.AppendLine(line);
         if (!result.Accepted) return sb.ToString();
 
+        if (result.Observation is MeterReading { Gap: { } gap }) sb.AppendLine(CircuitGapLine(gap));
         if (result.Observation is TripResultView trip) AppendTripSummary(sb, trip, result.Narrative);
         if (result.Observation is HauloutView lift) AppendLiftSummary(sb, lift);
         if (result.Observation is ListingView listing) sb.Append(Letter(listing.Letter));
@@ -48,6 +49,16 @@ public static class Prose
         }
         if (!lookFirst) AppendAlerts(sb, result.Alerts);
         return sb.ToString();
+    }
+
+    /// <summary>The sum the player can do with their own readings. Names no part (002 finding 4).</summary>
+    public static string CircuitGapLine(CircuitGap gap)
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        if (gap.Ordinary) return "Nothing lost in the starting circuit beyond what a sound one loses.";
+        return gap.AccountedFor
+            ? "Nothing lost in the starting circuit that your readings don't account for."
+            : $"{gap.GapVolts.ToString("F1", ci)} V lost somewhere in the starting circuit while cranking; your readings so far account for {gap.AccountedVolts.ToString("F2", ci)} V of it.";
     }
 
     private static void AppendAlerts(StringBuilder sb, IReadOnlyList<Alert>? alerts)

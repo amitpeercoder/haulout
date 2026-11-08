@@ -62,7 +62,26 @@ public sealed record InspectionView(string ComponentName, string Text) : Observa
 /// Kind: "volts-resting" | "volts-cranking" | "volts-drop" | "volts-at-starter" | "ohms".
 /// CrankingVolts is only set on the start battery's reading: the terminal voltage while cranking.
 /// </summary>
-public sealed record MeterReading(string ComponentName, string Kind, double? Value, string Unit, string Text, double? CrankingVolts = null) : Observation;
+public sealed record MeterReading(string ComponentName, string Kind, double? Value, string Unit, string Text, double? CrankingVolts = null,
+    CircuitGap? Gap = null) : Observation;
+
+/// <summary>
+/// What the player can add up once the starter has been measured while cranking (002 finding 4): GapVolts is the battery's
+/// cranking voltage minus the starter's, from the same model; AccountedVolts is the sum of the drops the player has
+/// measured today (as shown to them). It names no part.
+/// </summary>
+public sealed record CircuitGap(double GapVolts, double AccountedVolts)
+{
+    /// <summary>A sound chain loses about 1.2 V between the posts and the starter while cranking; up to this is ordinary, not a gap.</summary>
+    public const double OrdinaryLossVolts = 2.0;
+
+    /// <summary>Unaccounted volts at or below this read as "your readings account for it".</summary>
+    public const double AccountedForToleranceVolts = 0.5;
+
+    public double UnaccountedVolts => GapVolts - AccountedVolts;
+    public bool Ordinary => GapVolts <= OrdinaryLossVolts;
+    public bool AccountedFor => !Ordinary && UnaccountedVolts <= AccountedForToleranceVolts;
+}
 
 public sealed record StartAttemptView(string Outcome, string Description, bool LabouredCrank) : Observation;
 

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Haulout.Sim\Haulout.Sim.csproj" />
+    <ProjectReference Include="..\Haulout.Prose\Haulout.Prose.csproj" />
   </ItemGroup>
 
 </Project>

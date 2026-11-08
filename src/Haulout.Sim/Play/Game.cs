@@ -48,6 +48,13 @@ public sealed partial class Game
     private bool _running;
     private bool _finished;
     private bool _measureNoted;
+    /// <summary>The cranking readings the player was shown on <see cref="_meterDay"/>: drops by component id, and the starter's voltage (002 finding 4).</summary>
+    private readonly Dictionary<string, double> _shownDrops = [];
+    private double? _shownStarterVolts;
+    private double? _shownBatteryCrankingVolts;
+    private int _meterDay = -1;
+    /// <summary>A shown reading older than this against the current chain is stale (a part was cleaned or replaced since).</summary>
+    private const double StaleReadingVolts = 0.03;
     private StartOutcome? _lastStart;
 
     /// <summary>The player-luck stream (poor jobs).</summary>
@@ -512,17 +519,20 @@ public sealed partial class Game
                 : $"Resting at {ocv.ToString("F2", ci)} V. Nothing flows when you crank, so it does not dip.";
             meter = new MeterReading(c.Name, "volts-resting", ocv, "V", text, cranking);
             log = $"Measured the start battery: {ocv.ToString("F2", ci)} V resting, {cranking.ToString("F2", ci)} V cranking.";
+            if (reading.CircuitClosed) meter = meter with { Gap = NoteCrankingReading(reading, c.Id, cranking) };
         }
         else if (c.Id == EngineInputsBuilder.StarterId)
         {
             double v = reading.DropVolts[c.Id];
             meter = new MeterReading(c.Name, "volts-at-starter", v, "V", $"{v.ToString("F2", ci)} V at the starter while cranking.");
             log = $"Measured at the starter while cranking: {v.ToString("F2", ci)} V.";
+            meter = meter with { Gap = NoteCrankingReading(reading, c.Id, v) };
         }
         else if (reading.DropVolts.TryGetValue(c.Id, out var drop))
         {
             meter = new MeterReading(c.Name, "volts-drop", drop, "V", $"{drop.ToString("F2", ci)} V lost across the {c.Name.ToLowerInvariant()} while cranking.");
             log = $"Measured across the {c.Name.ToLowerInvariant()} while cranking: {drop.ToString("F2", ci)} V.";
+            meter = meter with { Gap = NoteCrankingReading(reading, c.Id, drop) };
         }
         else if (c.Id == "glow-plugs")
         {
@@ -549,6 +559,36 @@ public sealed partial class Game
         t.Narrative.Add(meter.Text);
         foreach (var f in c.ActiveFaults.ToList()) Reveal(t, f, PlayerAction.Measure);
         return Accept(t, "measure", 10, 0, meter, log);
+    }
+
+    /// <summary>
+    /// Records what the meter showed and, once the starter has been read today, returns the gap the player can add up.
+    /// Readings from an earlier day are forgotten; a reading that no longer matches the current chain (the part was
+    /// cleaned or replaced since) is dropped, and the gap is always taken from the current chain.
+    /// </summary>
+    private CircuitGap? NoteCrankingReading(ElectricalReading now, string id, double volts)
+    {
+        if (Day != _meterDay)
+        {
+            _shownDrops.Clear();
+            _shownStarterVolts = null;
+            _shownBatteryCrankingVolts = null;
+            _meterDay = Day;
+        }
+        double shown = Math.Round(volts, 2);
+        if (id == EngineInputsBuilder.StarterId) _shownStarterVolts = shown;
+        else if (id == "start-battery") _shownBatteryCrankingVolts = shown;
+        else _shownDrops[id] = shown;
+
+        foreach (var stale in _shownDrops.Where(kv => Math.Abs(kv.Value - now.DropVolts.GetValueOrDefault(kv.Key)) > StaleReadingVolts).Select(kv => kv.Key).ToList())
+            _shownDrops.Remove(stale);
+        if (_shownStarterVolts is { } sv && Math.Abs(sv - now.StarterVolts) > StaleReadingVolts) _shownStarterVolts = null;
+
+        if (_shownBatteryCrankingVolts is { } bv && Math.Abs(bv - now.BatteryTerminalVolts) > StaleReadingVolts) _shownBatteryCrankingVolts = null;
+
+        // The gap needs both ends as the player has seen them; the figure itself is the current chain's.
+        if (_shownStarterVolts is null || _shownBatteryCrankingVolts is null || !now.CircuitClosed) return null;
+        return new CircuitGap(now.BatteryTerminalVolts - now.StarterVolts, _shownDrops.Values.Sum());
     }
 
     private CommandResult DoStart(Turn t)

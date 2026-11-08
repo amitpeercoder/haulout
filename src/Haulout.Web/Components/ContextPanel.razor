@@ -52,6 +52,7 @@
             {
                 <section class="result @(sr.Accepted ? "" : "refused")">
                     @foreach (var line in sr.Narrative) { <p>@line</p> }
+                    @if (sr.Accepted && sr.Observation is MeterReading { Gap: { } gap }) { <p data-circuit-gap>@Haulout.Prose.Prose.CircuitGapLine(gap)</p> }
                     @if (sr.Accepted && (sr.MinutesTaken > 0 || sr.CostNok > 0)) { <p class="cost">@Cost(sr)</p> }
                 </section>
             }
@@ -177,6 +178,7 @@
             {
                 <section class="result @(lr.Accepted ? "" : "refused")">
                     @foreach (var line in lr.Narrative) { <p>@line</p> }
+                    @if (lr.Accepted && lr.Observation is MeterReading { Gap: { } gap }) { <p data-circuit-gap>@Haulout.Prose.Prose.CircuitGapLine(gap)</p> }
                     @if (lr.Accepted && (lr.MinutesTaken > 0 || lr.CostNok > 0)) { <p class="cost">@Cost(lr)</p> }
                 </section>
             }

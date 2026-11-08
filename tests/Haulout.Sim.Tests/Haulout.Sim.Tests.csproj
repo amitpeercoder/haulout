@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Haulout.Sim\Haulout.Sim.csproj" />
+    <ProjectReference Include="..\..\src\Haulout.Prose\Haulout.Prose.csproj" />
   </ItemGroup>
 
 </Project>
