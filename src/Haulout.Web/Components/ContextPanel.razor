@@ -32,9 +32,136 @@
         <button class="@(Session.Tab == PanelTab.Here ? "on" : "")" data-tab="here" @onclick="() => Session.ShowTab(PanelTab.Here)">Here</button>
         <button class="@(Session.Tab == PanelTab.Readiness ? "on" : "")" data-tab="readiness" @onclick="() => Session.ShowTab(PanelTab.Readiness)">Readiness @if (unseen > 0) { <span class="badge" data-badge="alerts" title="The boat has told you something">@unseen</span> }</button>
         <button class="@(Session.Tab == PanelTab.Trip ? "on" : "")" data-tab="trip" @onclick="() => Session.ShowTab(PanelTab.Trip)">Trip</button>
+        <button class="@(Session.Tab == PanelTab.Season ? "on" : "")" data-tab="season" @onclick="() => Session.ShowTab(PanelTab.Season)">Season</button>
     </nav>
 
-    @if (Session.Tab == PanelTab.Trip)
+    @if (Session.Tab == PanelTab.Season)
+    {
+        var se = Session.Season;
+        var sale = Session.Sale;
+        <section class="season">
+            @if (Session.Closing is { } sold)
+            {
+                <section class="closing" data-closing>
+                    <h2>Sold.</h2>
+                    @foreach (var line in sold.Lines) { <p>@line</p> }
+                    <p class="cost">Day @sold.Day · @sold.PriceNok NOK · @sold.Days days · @sold.HoursWorked h of your own work · @sold.Trips @(sold.Trips == 1 ? "trip" : "trips") · @sold.Tows @(sold.Tows == 1 ? "tow" : "tows")</p>
+                </section>
+            }
+            @if (Session.LastResult is { } sr && sr.Observation is not ClosingView)
+            {
+                <section class="result @(sr.Accepted ? "" : "refused")">
+                    @foreach (var line in sr.Narrative) { <p>@line</p> }
+                    @if (sr.Accepted && (sr.MinutesTaken > 0 || sr.CostNok > 0)) { <p class="cost">@Cost(sr)</p> }
+                </section>
+            }
+            <p data-season-text>@se.Text</p>
+
+            @if (!sale.Sold)
+            {
+                <h3>The yard</h3>
+                <p>
+                    @if (se.BookedDay is { } booked) { <span data-booked>Your slot: day @booked.</span> }
+                    else if (se.FirstFreeDay is { } free) { <span data-first-free>First free slot: day @free.</span> }
+                    else { <span>The yard is full for the autumn.</span> }
+                    Slots run from day @se.SlotsFromDay to day @se.SlotsToDay. Lift @se.LiftNok NOK, winter storage @se.StorageNok NOK@(se.BookedDay is null ? "" : $"; changing the booking costs {se.ChangeFeeNok} NOK"). An emergency lift is @se.EmergencyLiftNok NOK.
+                </p>
+                <div class="row">
+                    @if (Offered(se, "book-haulout"))
+                    {
+                        <input type="number" data-input="book-day" placeholder="day" @bind="_bookDay" />
+                        <button data-action="book-haulout" disabled="@(_bookDay is null)" @onclick="BookClicked">Book</button>
+                    }
+                    @if (Offered(se, "haul-out"))
+                    {
+                        <button class="primary" data-action="haul-out" @onclick="() => Session.HaulOut()">Haul out</button>
+                    }
+                </div>
+
+                <h3>The hull</h3>
+                <div class="options">
+                    @if (Offered(se, "scrub"))
+                    {
+                        <div class="option"><button data-action="scrub" @onclick="() => Session.Scrub()">Scrub<span class="meta">from the cockpit, at anchor or a mooring; takes part of it off</span></button></div>
+                    }
+                    @if (Offered(se, "clean-hull"))
+                    {
+                        <div class="option"><button data-action="clean-hull" @onclick="() => Session.CleanHull()">Clean hull<span class="meta">on the hard, your own work</span></button></div>
+                    }
+                    @if (Offered(se, "wash-hull"))
+                    {
+                        <div class="option"><button data-action="yard-wash" @onclick="() => Session.WashHull()">Yard wash<span class="meta">the yard pressure-washes her; they bill it</span></button></div>
+                    }
+                </div>
+
+                @if (se.Tasks.Count > 0)
+                {
+                    <h3>Winter work</h3>
+                    @foreach (var task in se.Tasks)
+                    {
+                        <div class="task" data-task="@task.Command">
+                            <p><strong>@task.Name</strong> @if (task.Done) { <span class="done" data-done>done</span> }</p>
+                            <p class="faint">@Duration(task.Minutes)@(task.CostNok > 0 ? $" · {task.CostNok} NOK" : "") · @task.Risk</p>
+                            <div class="row">
+                                @if (!task.Done && (TaskVerb(task.Command) is not { } verb || Offered(se, verb)))
+                                {
+                                    <button data-action="@task.Command" @onclick="() => Session.RunLayupTask(task.Command)">@task.Name</button>
+                                }
+                                @if (task.Command == "battery ashore")
+                                {
+                                    @if (Offered(se, "battery-aboard")) { <button data-action="battery-aboard" @onclick="() => Session.BatteryAboard()">Battery aboard</button> }
+                                    @if (Offered(se, "winter-charger")) { <button data-action="charger" @onclick="() => Session.WinterCharger()">Charger</button> }
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                @if (Offered(se, "wait-until-spring"))
+                {
+                    <div class="options">
+                        <div class="option"><button data-action="wait-until-spring" @onclick="() => Session.WaitUntilSpring()">Wait until spring</button></div>
+                    </div>
+                }
+
+                <h3>The sale</h3>
+                @if (sale.Letter is { } letter)
+                {
+                    <article class="letter" data-letter>
+                        <p class="faint">@letter.Broker, day @letter.Day</p>
+                        @foreach (var l in letter.Lines) { <p>@l.Text: @(l.Nok > 0 ? "+" : "")@l.Nok NOK</p> }
+                        <p><strong>She is worth about @letter.ValueNok NOK.</strong>@(letter.AskNok is { } a ? $" You are asking {a} NOK." : "")</p>
+                        @foreach (var line in letter.Text) { <p class="faint">@line</p> }
+                    </article>
+                }
+                @if (Offered(se, "list-for-sale"))
+                {
+                    <div class="row">
+                        <input type="number" data-input="ask" placeholder="ask, NOK" @bind="_ask" />
+                        <button data-action="list-for-sale" disabled="@(_ask is null or <= 0)" @onclick="ListClicked">List for sale</button>
+                    </div>
+                }
+                @foreach (var v in sale.Viewings)
+                {
+                    <div class="viewing @(v.Open ? "" : "lapsed")" data-viewing="@v.Number">
+                        <p><strong>Viewing @v.Number</strong> · day @v.Day · their value @v.ValueNok NOK · offer @v.OfferNok NOK @(v.Open ? $"open until day {v.HoldsUntilDay}" : "(lapsed)")</p>
+                        @foreach (var f in v.Findings) { <p class="faint">@f</p> }
+                        @if (v.Findings.Count == 0) { <p class="faint">Their surveyor found nothing.</p> }
+                        @if (v.Open && Offered(se, "accept-offer"))
+                        {
+                            <button data-action="accept-offer" @onclick="() => Session.AcceptOffer(v.Number)">Accept @v.OfferNok NOK</button>
+                        }
+                    </div>
+                }
+                @if (Offered(se, "keep"))
+                {
+                    <div class="options">
+                        <div class="option"><button data-action="keep" @onclick="() => Session.Keep()">Keep<span class="meta">carry her into next season</span></button></div>
+                    </div>
+                }
+            }
+        </section>
+    }
+    else if (Session.Tab == PanelTab.Trip)
     {
         var trip = Session.Trip;
         <section class="trip">
@@ -105,7 +232,7 @@
         var rd = Session.Readiness;
         var sv = Session.Survey;
         <section class="readiness">
-            <p>Day @rd.Day · deadline day @rd.LaunchDeadlineDay (@DaysToGo(rd.DaysToDeadline)) · @MoneyWords.BalanceShort(rd.BalanceNok)</p>
+            <p>Day @rd.Day · @(rd.SeasonLead ?? $"deadline day {rd.LaunchDeadlineDay} ({DaysToGo(rd.DaysToDeadline)})") · @MoneyWords.BalanceShort(rd.BalanceNok)</p>
             <div class="options">
                 @if (!sv.Ordered)
                 {
@@ -269,6 +396,32 @@
 </aside>
 
 @code {
+    private int? _bookDay;
+    private int? _ask;
+
+    /// <summary>The season action the sim would accept now (it gives the same refusal the command does); everything else stays hidden.</summary>
+    private static bool Offered(SeasonView se, string verb) => se.Actions is null || se.Actions.Any(a => a.Verb == verb && a.Available);
+
+    /// <summary>The action behind a winter task's button, or null for a task that has none of its own (the oil change).</summary>
+    private static string? TaskVerb(string command) => command switch
+    {
+        "winterise" => "winterise-engine",
+        "fill tank" => "fill-tank",
+        "battery ashore" => "battery-ashore",
+        "fit cover" => "fit-winter-cover",
+        _ => null,
+    };
+
+    private void BookClicked()
+    {
+        if (_bookDay is { } d) Session.BookHaulout(d);
+    }
+
+    private void ListClicked()
+    {
+        if (_ask is { } a) Session.ListForSale(a);
+    }
+
     protected override void OnInitialized() => Session.Changed += OnChanged;
 
     private void OnChanged() => InvokeAsync(StateHasChanged);

@@ -268,4 +268,172 @@ public class ProseTests
         Assert.Contains("Put right at sea: Replaced the impeller from the spares aboard.", text);
         Assert.Single(text.Split('\n'), l => l.Contains("The party is in full swing."));
     }
+
+    [Fact]
+    public void The_season_view_prints_its_line_and_the_prices_and_the_status_carries_the_season_line()
+    {
+        var view = new SeasonView(262, 1, 262, "autumn", "Autumn. Haulout booked for day 270, 8 days away.", true, false, 96, 270, null,
+            255, 300, 7000, 9000, 500, 9000, false, [], false, null, 0, false);
+        var text = P.Query(view);
+        Assert.Contains("Autumn. Haulout booked for day 270, 8 days away.", text);
+        Assert.Contains("The yard lifts boats from day 255 to day 300.", text);
+        Assert.Contains("A lift costs 7000 NOK and winter storage on the hard 9000 NOK; changing a booking costs 500 NOK; the emergency lift costs 9000 NOK.", text);
+
+        var status = P.Query(new StatusView(262, "08:00", 0, 0, null, false, true, [], [], "Cockpit", Season: view.Text));
+        Assert.Contains(view.Text, status);
+        Assert.DoesNotContain("Autumn.", P.Query(new StatusView(262, "08:00", 0, 0, null, false, true, [], [], "Cockpit")));
+    }
+
+    [Fact]
+    public void The_season_view_lists_the_winter_tasks_done_and_to_do_with_their_command_minutes_price_and_risk()
+    {
+        var tasks = new[]
+        {
+            new LayupTask("Winterise the engine", true, 90, 250, "winterise", "Raw water left in the engine can freeze."),
+            new LayupTask("Fill the tank", false, 30, 484, "fill tank", "A part-empty tank breathes damp air."),
+            new LayupTask("Change the oil", false, 45, 0, "replace engine oil", "Old oil sits in the sump."),
+        };
+        var view = new SeasonView(270, 1, 270, "autumn", "Autumn. She is laid up on the hard for the winter.", false, true, 96, null, null,
+            255, 300, 7000, 9000, 500, 9000, true, tasks, false, null, 0, false);
+        var text = P.Query(view);
+        Assert.Contains("The winter work on her:", text);
+        Assert.Contains("  Done: Winterise the engine.", text);
+        Assert.Contains("  To do: Fill the tank (fill tank; 30 min, 484 NOK). Left alone: A part-empty tank breathes damp air.", text);
+        Assert.Contains("  To do: Change the oil (replace engine oil; 45 min). Left alone: Old oil sits in the sump.", text);
+        Assert.DoesNotContain("The winter work", P.Query(view with { Tasks = [] }));
+    }
+
+    [Fact]
+    public void The_lift_card_adds_the_bill_and_the_trip_state_lists_the_routes_out()
+    {
+        var card = new HauloutView(270, 7000, 9000, "Under the waterline: clean paint.", ["The crane lifts her out.", "Under the waterline: clean paint."]);
+        var res = new CommandResult(true, "haul-out", ["The crane lifts her out.", "Under the waterline: clean paint."], 120, 16000, card, [], false, true, []);
+        var text = P.Result(res, new StatusView(270, "10:00", 0, 0, null, false, true, [], [], "Cockpit"));
+        Assert.Contains("Lift 7000 NOK, winter storage 9000 NOK: 16000 NOK in all, in the logbook.", text);
+        Assert.Single(text.Split('\n'), l => l.StartsWith("Under the waterline: clean paint.", StringComparison.Ordinal));
+
+        var trip = P.Query(new TripView(false, "Skjærvik", null, null, 0, 0, null, 0, false, null, false, "She lies at Skjærvik.",
+            ["Hestholmen, 14 nm", "Storholmen, 26 nm"]));
+        Assert.Contains("Routes out: Hestholmen, 14 nm; Storholmen, 26 nm.", trip);
+        Assert.DoesNotContain("Routes out", P.Query(new TripView(false, "Skjærvik", null, null, 0, 0, null, 0, false, null, false, "She lies at Skjærvik.")));
+    }
+
+    private static ValuationLetter SomeLetter(int? ask) => new(
+        85, "Holm & Datter, yacht brokers",
+        [
+            new ValuationLine("Base value of a 28-footer of her kind", 180000),
+            new ValuationLine("Seized raw-water seacock, at the yard's price", -4800),
+            new ValuationLine("Five years of engine hours with no service entry, at 3000 NOK each", -15000),
+        ],
+        160200, ask, ["A buyer's surveyor will go over her for themselves."]);
+
+    [Fact]
+    public void The_listing_prints_the_letter_as_a_letter_with_the_lines_the_value_the_ask_and_the_brokers_words()
+    {
+        var letter = SomeLetter(150000);
+        var res = new CommandResult(true, "list-for-sale", ["You list her at 150000 NOK."], 30, 0, new ListingView(letter), [], false, false, []);
+        var text = P.Result(res, new StatusView(85, "08:30", 30, 0, null, false, false, [], [], "Cockpit"));
+        Assert.Contains("Holm & Datter, yacht brokers", text);
+        Assert.Contains("Valuation, day 85.", text);
+        Assert.Contains("  Base value of a 28-footer of her kind: +180000 NOK", text);
+        Assert.Contains("  Seized raw-water seacock, at the yard's price: -4800 NOK", text);
+        Assert.Contains("The broker values her at 160200 NOK.", text);
+        Assert.Contains("You are asking 150000 NOK, 10200 NOK under that.", text);
+        Assert.Contains("A buyer's surveyor will go over her for themselves.", text);
+        Assert.Contains("You are asking 170000 NOK, 9800 NOK over that.", P.Letter(SomeLetter(170000)));
+        Assert.DoesNotContain("asking", P.Letter(SomeLetter(null)));
+    }
+
+    [Fact]
+    public void The_sale_view_prints_the_listing_the_viewings_with_their_findings_and_whether_each_offer_is_open()
+    {
+        var viewings = new[]
+        {
+            new ViewingReport(1, 80, ["Water in the fuel tank: 2800 NOK at the yard.", "Slipping alternator belt: 450 NOK at the yard."], 152000, 140000, 87, false),
+            new ViewingReport(2, 84, [], 160200, 150000, 91, true),
+        };
+        var text = P.Query(new SaleView(true, 150000, SomeLetter(150000), viewings, false));
+        Assert.Contains("Listed for sale at 150000 NOK.", text);
+        Assert.Contains("Viewing 1, day 80: their surveyor found:", text);
+        Assert.Contains("  Water in the fuel tank: 2800 NOK at the yard.", text);
+        Assert.Contains("They value her at 152000 NOK and offer 140000 NOK, which lapsed on day 87.", text);
+        Assert.Contains("Viewing 2, day 84: their surveyor found nothing wrong.", text);
+        Assert.Contains("They value her at 160200 NOK and offer 150000 NOK, open until day 91.", text);
+        Assert.Contains("'accept' takes the best open offer", text);
+
+        Assert.Contains("Not listed for sale.", P.Query(new SaleView(false, null, SomeLetter(null), [], false)));
+        Assert.Contains("No one has been to look at her yet.", P.Query(new SaleView(true, 150000, SomeLetter(150000), [], false)));
+        var sold = P.Query(new SaleView(false, null, null, viewings, true));
+        Assert.Contains("She's sold.", sold);
+        Assert.DoesNotContain("accept", sold);
+    }
+
+    [Fact]
+    public void The_closing_card_is_the_narrative_plus_the_balance_and_the_game_over_note_and_a_viewing_document_reads_as_the_sale()
+    {
+        string[] lines = ["Sold on day 85 for 150000 NOK, to the buyer who viewed her on day 80.", "You spent 4200 NOK on her over 10 days, and 3 hours of your own work.", "Trips made: 0. Tows: 0."];
+        var card = new ClosingView(85, 150000, 4200, 170800, 10, 3, 0, 0, lines);
+        var res = new CommandResult(true, "accept-offer", ["You shake hands.", .. lines], 0, 0, card, [], false, false, []);
+        var text = P.Result(res, new StatusView(85, "08:30", 180, 4200, null, false, false, [], [], "Cockpit", Sold: true));
+        foreach (var line in lines) Assert.Single(text.Split('\n'), l => l.TrimEnd() == line);
+        Assert.Contains("Money left: 170800 NOK. The game is over; the logbook still reads.", text);
+        Assert.Contains("She's sold.", P.Query(new StatusView(85, "08:30", 180, 4200, null, false, false, [], [], "Cockpit", Sold: true)));
+
+        var log = P.Query(new LogView([new LogEntry(80, "12:00", "A buyer looked her over.", 0, "viewing 1"), new LogEntry(81, "09:00", "Surveyed.", 0, "survey report")]));
+        Assert.Contains("A buyer looked her over. (sale)", log);
+        Assert.Contains("Surveyed. (read survey)", log);
+    }
+
+    // ------------------------------------------------------------------ the second pass (design note 008)
+
+    [Fact]
+    public void Readiness_leads_with_the_launch_deadline_before_the_first_launch_and_with_the_season_after()
+    {
+        // Before the first launch: today's deadline line, unchanged.
+        var before = P.Query(new ReadinessView(10, 96, 86, 15000, false, [], [], []));
+        Assert.Contains("Day 10. Launch deadline: day 96 (86 days to go). Money left: 15000 NOK. She's ashore.", before);
+
+        // Launched: the season leads and the stale deadline is not mentioned, in each of the states.
+        var states = new[]
+        {
+            "Haulout booked for day 258.",
+            "No slot booked: the yard lifts from day 255 to day 300; the first free slot is day 258.",
+            "No slot booked: the yard is full for the autumn; the emergency lift is all that's left.",
+            "Winter: 3 of 5 tasks done. Left: Fill the tank; Fit the winter cover.",
+            "She's sold.",
+        };
+        foreach (var lead in states)
+        {
+            var text = P.Query(new ReadinessView(269, 96, -173, 15000, true, [], [], [], Afloat: true, SeasonLead: lead));
+            Assert.Contains($"Day 269. {lead} Money left: 15000 NOK. She's in the water.", text);
+            Assert.DoesNotContain("deadline", text);
+            Assert.DoesNotContain("days past", text);
+        }
+
+        // After a Keep the lead is null and the new deadline shows again.
+        var kept = P.Query(new ReadinessView(300, 456, 156, 15000, true, [], [], []));
+        Assert.Contains("Launch deadline: day 456 (156 days to go).", kept);
+    }
+
+    [Fact]
+    public void Status_marks_a_fixed_problem_and_keeps_the_open_ones_plain()
+    {
+        var status = new StatusView(5, "08:00", 0, 0, null, false, false,
+            [new KnownFault("f-1", "Weeping seacock", "Raw-water seacock", Fixed: true), new KnownFault("f-2", "Tired impeller", "Impeller")],
+            [], "Cockpit");
+        var text = P.Query(status);
+        Assert.Contains("  Known: Weeping seacock (Raw-water seacock) - fixed", text);
+        Assert.Contains("  Known: Tired impeller (Impeller)\n", text.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("f-1", text);
+    }
+
+    [Fact]
+    public void Status_leads_with_the_season_once_launched_and_the_deadline_before()
+    {
+        var before = P.Query(new StatusView(5, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 1000, 96));
+        Assert.Contains("Money left: 1000 NOK. Launch deadline: day 96.", before);
+        var after = P.Query(new StatusView(100, "08:00", 0, 0, null, false, false, [], [], "Cockpit", 1000, 96, Launched: true, SeasonLead: "Haulout booked for day 258."));
+        Assert.Contains("Money left: 1000 NOK. Haulout booked for day 258.", after);
+        Assert.DoesNotContain("Launch deadline", after);
+    }
 }

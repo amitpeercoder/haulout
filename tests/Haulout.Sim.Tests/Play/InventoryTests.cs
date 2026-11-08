@@ -158,7 +158,7 @@ public class InventoryTests
         var empty = Inv(g);
         Assert.Empty(empty.Aboard);
         Assert.Equal("the yard chandlery", empty.Shop);
-        Assert.Equal(9, empty.ForSale.Count);
+        Assert.Equal(10, empty.ForSale.Count);
         Assert.Contains(new ShopLine("impeller", 350, 15), empty.ForSale);
 
         Ok(g.Execute(new Buy("belt")));
@@ -166,7 +166,7 @@ public class InventoryTests
         var full = Inv(g);
         Assert.Contains(new InventoryLine("alternator belt", 1, false), full.Aboard);
         Assert.Contains(new InventoryLine("remote start button", 1, true), full.Aboard);
-        Assert.Equal(9, full.ForSale.Count);
+        Assert.Equal(10, full.ForSale.Count);
     }
 
     [Fact]

@@ -35,6 +35,20 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(Anchor), "anchor")]
 [JsonDerivedType(typeof(TurnBack), "turn-back")]
 [JsonDerivedType(typeof(CallTow), "call-tow")]
+[JsonDerivedType(typeof(BookHaulout), "book-haulout")]
+[JsonDerivedType(typeof(HaulOut), "haul-out")]
+[JsonDerivedType(typeof(Scrub), "scrub")]
+[JsonDerivedType(typeof(WashHull), "wash-hull")]
+[JsonDerivedType(typeof(WinteriseEngine), "winterise-engine")]
+[JsonDerivedType(typeof(FillTank), "fill-tank")]
+[JsonDerivedType(typeof(BatteryAshore), "battery-ashore")]
+[JsonDerivedType(typeof(BatteryAboard), "battery-aboard")]
+[JsonDerivedType(typeof(WinterCharger), "winter-charger")]
+[JsonDerivedType(typeof(FitWinterCover), "fit-winter-cover")]
+[JsonDerivedType(typeof(WaitUntilSpring), "wait-until-spring")]
+[JsonDerivedType(typeof(ListForSale), "list-for-sale")]
+[JsonDerivedType(typeof(AcceptOffer), "accept-offer")]
+[JsonDerivedType(typeof(Keep), "keep")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -94,6 +108,37 @@ public sealed record TurnBack() : Command;
 /// <summary>At sea, anywhere: call the towboat. Costs the tow and the best part of a day; ends the trip at the nearer port along the route.</summary>
 public sealed record CallTow() : Command;
 
+/// <summary>
+/// Ring the yard and book the crane for an absolute game day (design note 008). A phone call: 0 minutes, anywhere but at sea.
+/// Changing an existing booking costs a fee.
+/// </summary>
+public sealed record BookHaulout(int Day) : Command;
+/// <summary>At Skjærvik, afloat, from the cockpit with the engine running, on the booked day: motor to the crane and be lifted out.</summary>
+public sealed record HaulOut() : Command;
+/// <summary>Afloat in port or at anchor, from the cockpit or on deck: scrub what you can reach at the waterline. Takes a part of the growth off, never all.</summary>
+public sealed record Scrub() : Command;
+/// <summary>On the hard at the yard: the yard pressure-washes the hull for a price. Takes all the growth off.</summary>
+public sealed record WashHull() : Command;
+
+/// <summary>On the hard, from the companionway with the steps off: drain the raw-water side of the engine and run antifreeze through it (design note 008).</summary>
+public sealed record WinteriseEngine() : Command;
+/// <summary>At a port with fuel: top the tank up. A full tank has no room for damp air to condense in.</summary>
+public sealed record FillTank() : Command;
+/// <summary>On the hard, from the quarter berth with the battery box lid off: carry the start battery to the yard's battery room for the winter.</summary>
+public sealed record BatteryAshore() : Command;
+/// <summary>On the hard, from the quarter berth: fit the start battery again.</summary>
+public sealed record BatteryAboard() : Command;
+/// <summary>On the hard: clip the yard's charger on the battery aboard, so it is held full all winter. Disconnected at launch.</summary>
+public sealed record WinterCharger() : Command;
+/// <summary>On the hard, on deck: rig the winter cover over the deck. Kept for later winters; taken off at launch.</summary>
+public sealed record FitWinterCover() : Command;
+/// <summary>Not at sea: leave her day by day to the next day 75 of the year, coming back early if the boat has something to tell you or your haulout slot comes.</summary>
+public sealed record WaitUntilSpring() : Command;
+
+public sealed record ListForSale(int AskNok) : Command;
+public sealed record AcceptOffer(int? Offer = null) : Command;
+public sealed record Keep() : Command;
+
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(Briefing), "briefing")]
@@ -109,6 +154,8 @@ public sealed record CallTow() : Command;
 [JsonDerivedType(typeof(Inventory), "inventory")]
 [JsonDerivedType(typeof(PlanTrip), "plan-trip")]
 [JsonDerivedType(typeof(Trip), "trip")]
+[JsonDerivedType(typeof(Season), "season")]
+[JsonDerivedType(typeof(Sale), "sale")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -137,3 +184,8 @@ public sealed record PlanTrip(string? Destination = null, int? DepartDay = null)
 
 /// <summary>Where she is on the passage: at a port, or at sea with the position, the mode and the nearest shelter. Costs no time.</summary>
 public sealed record Trip() : Query;
+
+/// <summary>The yard calendar and the season: the booked slot, the first free slot, what lifting costs. Costs no time.</summary>
+public sealed record Season() : Query;
+
+public sealed record Sale() : Query;

@@ -33,6 +33,8 @@ public sealed partial class Game
     /// <summary>She is on the hard for the whole slice; the ground beside the hull is only there then.</summary>
     private bool _onTheHard = true;
     private readonly Reach _reach;
+    /// <summary>Components that are not aboard: the start battery in the yard's battery room.</summary>
+    private readonly HashSet<string> _gone = [];
     private const string StartPlaceId = "cockpit";
     private const string BelowPlaceId = "companionway";
     private const string HatchId = "companionway-hatch";
@@ -52,7 +54,7 @@ public sealed partial class Game
     private readonly IRandom _random;
     /// <summary>The world stream: draws each fault's spread when it becomes active.</summary>
     private readonly IRandom _world;
-    /// <summary>The daily weather, absolute game days 0 to 720.</summary>
+    /// <summary>The daily weather, absolute game days 0 to 1080 (three years).</summary>
     private readonly WeatherSeries _weather;
 
     public Game(Boat boat, int startDay = 75, IRandom? random = null, int worldSeed = DefaultSeed, WeatherSeries? weather = null)
@@ -61,14 +63,17 @@ public sealed partial class Game
         _worldSeed = worldSeed;
         _portId = boat?.Trips?.Home ?? "";
         _boat = boat ?? throw new ArgumentNullException(nameof(boat));
+        _launchDeadlineDay = boat.Economy.LaunchDeadlineDay;
         _startDay = startDay;
         _random = random ?? new SeededRandom(DefaultSeed);
         _world = new SeededRandom(worldSeed * 7919 + 17);
-        _reach = new Reach(boat, _removed);
+        _reach = new Reach(boat, _removed, _gone);
         _lastAboardDay = startDay;
         _water = new WaterSystem(boat);
         foreach (var cover in boat.Covers.Where(c => c.StartsOff)) _removed.Add(cover.Id);
         InitSkills();
+        if (boat.TryGet(MooringLinesId, out var mooringLines))
+            _chafeSeen = mooringLines.State[ChafeProperty] = boat.Mooring.StartChafe;
         foreach (var f in boat.AllFaults)
         {
             f.ActivateOn(startDay);
@@ -95,12 +100,13 @@ public sealed partial class Game
                 "She stands on the hard in her cradle, grey light and a cold wind off the water.",
                 "The yard hose is rigged to the raw-water intake, so the engine can run ashore.",
                 "You're standing in the cockpit, the companionway hatch slid open.",
-                $"The yard has her down for launch on day {_boat.Economy.LaunchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
+                $"The yard has her down for launch on day {_launchDeadlineDay}. You have {_boat.Economy.StartingBalanceNok} NOK for the spring.",
+                "The season runs on past the launch, to the autumn haulout at the yard, the winter on the hard and a sale.",
             ]),
             Status => new StatusView(
-                Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, _discovered.Where(k => FaultById(k.Id) is not { Escalated: true } || Superseded(FaultById(k.Id)!)).ToList(), ToolNames(), CurrentPlace.Name,
-                Balance, _boat.Economy.LaunchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today), _sunk,
-                UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea),
+                Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, KnownStatus(), ToolNames(), CurrentPlace.Name,
+                Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today), _sunk,
+                UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea, SeasonLine(), _sold, ReadinessSeasonLead()),
             Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
             Weather => TodayView(),
             Notices => new NoticesView(TakeUnread()),
@@ -112,6 +118,8 @@ public sealed partial class Game
             Inventory => InventorySnapshot(),
             PlanTrip q => PlanTripSnapshot(q.Destination, q.DepartDay),
             Trip => TripSnapshot(),
+            Season => SeasonSnapshot(),
+            Sale => SaleSnapshot(),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -141,6 +149,22 @@ public sealed partial class Game
         new("turn back", null, "At sea: give up the passage and head for the port you left"),
         new("call tow", null, "At sea: call the towboat (costs money and the best part of a day)"),
         new("trip", null, "Where you are on the passage"),
+        new("season", null, "The yard calendar: your slot, the first free slot and what lifting costs"),
+        new("book haulout", "day", "Ring the yard and book a slot to be lifted out (free; changing the booking costs a fee)"),
+        new("haul out", null, "At the yard, afloat, on your booked day, engine running: be lifted out for the winter (costs the lift and the storage)"),
+        new("scrub", null, "Afloat, from the cockpit or on deck: scrub what you can reach at the waterline (takes part of the growth off)"),
+        new("yard wash", null, "On the hard at the yard: the yard pressure-washes the hull (costs money)"),
+        new("winterise", null, "On the hard, from the companionway with the steps off: drain the engine's raw-water side and run antifreeze through (1.5 h, a little money)"),
+        new("fill tank", null, "At a port with fuel: top the tank up with diesel (half an hour, the diesel)"),
+        new("battery ashore", null, "On the hard, from the quarter berth with the battery box lid off: carry the battery to the yard's battery room for the winter (costs money)"),
+        new("battery aboard", null, "On the hard, from the quarter berth: fit the battery again"),
+        new("charger", null, "On the hard: clip the yard's charger on the battery aboard for the winter (costs money; off again at launch)"),
+        new("fit cover", null, "On the hard, on deck: rig the winter cover over the deck (the cover costs money the first time; off again at launch)"),
+        new("wait until spring", null, "Leave her for the winter, day by day, coming back early if she has something to tell you or your slot comes"),
+        new("list for sale", "nok", "On the hard at the yard: list her with the broker at your asking price and get the broker's valuation letter (half an hour)"),
+        new("accept offer", "offer", "Sell her to the best open offer, or to the numbered one: the game ends with the closing card"),
+        new("keep", null, "Keep her for another season: the launch deadline moves to next spring and the logbook starts again"),
+        new("sale", null, "The broker's letter, your listing, the viewings and the offers"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
         new("order survey", null, "Hire the surveyor to go over her (costs money and a day)"),
         new("read survey", null, "Read the surveyor's report"),
@@ -199,8 +223,9 @@ public sealed partial class Game
         if (r.Match is not { } c) return new ComponentActionsView(name, false, null, []);
 
         bool hasButton = OwnsButton;
-        string? sight = _reach.Refusal(c, _placeId, false);
-        string? touch = _reach.Refusal(c, _placeId, true);
+        bool ashore = c.Id == Electrical.BatteryId && IsBatteryAshore;
+        string? sight = ashore ? BatteryAshoreMessage : _reach.Refusal(c, _placeId, false);
+        string? touch = ashore ? BatteryAshoreMessage : _reach.Refusal(c, _placeId, true);
         var options = new List<ActionOption>();
         void Add(string verb, string label, string? reason, int minutes, int cost) =>
             options.Add(new(verb, label, reason is null, reason, minutes, cost));
@@ -216,7 +241,8 @@ public sealed partial class Game
         else if (EngineInputsBuilder.LoopOrder.Contains(c.Id))
             Add("measure", "Measure", SeaWorkRefusal() ?? touch ?? (hasButton ? null : "Needs someone to crank while you hold the probes: a remote start button."), 10, 0);
 
-        if (c.Cleanable || CanRedoByClean(c)) Add("clean", "Clean", SeaWorkRefusal() ?? AfloatRefusal(c) ?? touch ?? WetRefusal(c), 30, 0);
+        if (c.Cleanable || CanRedoByClean(c) || c.Id == HullId)
+            Add("clean", "Clean", SeaWorkRefusal() ?? AfloatRefusal(c) ?? touch ?? WetRefusal(c), c.Id == HullId ? _boat.Fouling.CleanMinutes : 30, 0);
         if (c.ReplaceCostNok > 0)
         {
             bool spare = SpareFor(c.Id) is not null;
@@ -246,6 +272,7 @@ public sealed partial class Game
     {
         ArgumentNullException.ThrowIfNull(command);
         if (_sunk) return Reject(command.GetType().Name.ToLowerInvariant(), SunkMessage);
+        if (_sold) return Reject(command.GetType().Name.ToLowerInvariant(), SoldMessage);
         var turn = new Turn();
         return command switch
         {
@@ -280,6 +307,20 @@ public sealed partial class Game
             Anchor => DoAnchor(turn),
             TurnBack => DoTurnBack(turn),
             CallTow => DoCallTow(turn),
+            BookHaulout c => DoBookHaulout(turn, c.Day),
+            HaulOut => DoHaulOut(turn),
+            Scrub => DoScrub(turn),
+            WashHull => DoWashHull(turn),
+            WinteriseEngine => DoWinteriseEngine(turn),
+            FillTank => DoFillTank(turn),
+            BatteryAshore => DoBatteryAshore(turn),
+            BatteryAboard => DoBatteryAboard(turn),
+            WinterCharger => DoWinterCharger(turn),
+            FitWinterCover => DoFitWinterCover(turn),
+            WaitUntilSpring => DoWaitUntilSpring(turn),
+            ListForSale c => DoListForSale(turn, c.AskNok),
+            AcceptOffer c => DoAcceptOffer(turn, c.Offer),
+            Keep => DoKeep(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -332,8 +373,10 @@ public sealed partial class Game
         var place = CurrentPlace;
         _visited.Add(place.Id);
         MarkSeen(t);
+        RevealSpawnedByLook(t);
         t.Narrative.Add(place.Description);
         if (SoleLine(place) is { } soleLook) t.Narrative.Add(soleLook);
+        if (OverTheSideLine(place) is { } overTheSide) t.Narrative.Add(overTheSide);
         foreach (var cover in _boat.Covers.Where(c => c.PlaceId == place.Id))
             t.Narrative.Add($"The {Words.CoverName(cover)} {Words.Is(cover)} {Words.State(cover, _removed.Contains(cover.Id))}.");
         t.Narrative.Add(SeeLine(place));
@@ -411,6 +454,12 @@ public sealed partial class Game
         bool off = _uncovered.Contains(c.Id);
         t.Narrative.Add(c.Description + " " + WearPhrase(c.Condition));
         if (c.Id == BilgeId) t.Narrative.Add($"In the bilge: {_boat.Water.Words(_water.Level)}.");
+        if (c.Id == HullId && Band.Pick(_boat.Fouling.HullWords, Fouling) is { Length: > 0 } below)
+        {
+            t.Narrative.Add($"Under the waterline: {below}.");
+            SeeFouling();
+        }
+        if (c.Id == MooringLinesId && Band.Pick(_boat.Mooring.ChafeWords, Chafe) is { Length: > 0 } chafed) t.Narrative.Add(chafed);
         if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
         foreach (var f in c.ActiveFaults.ToList())
         {
@@ -503,8 +552,9 @@ public sealed partial class Game
     {
         if (_placeId != "cockpit") return Reject("start", KeyMessage);
         if (_running) return Reject("start", "The engine is already running.");
+        if (IsBatteryAshore) return Reject("start", BatteryAshoreStartMessage);
 
-        var result = EngineModel.Attempt(EngineInputsBuilder.Build(_boat));
+        var result = EngineModel.Attempt(EngineInputsBuilder.Build(_boat), new GameClock(Day).MonthName);
         _lastStart = result.Outcome;
         t.Narrative.Add(result.Description);
         if (result.Outcome != StartOutcome.Nothing) Electrical.Crank(_boat); // a start that cranks takes its share of the charge
@@ -539,7 +589,8 @@ public sealed partial class Game
     private CommandResult DoClean(Turn t, string name)
     {
         if (!ResolveComponent("clean", name, needTouch: true, out var c, out var rejected,
-                pre: x => SeaWorkRefusal() ?? (x.Cleanable || CanRedoByClean(x) ? AfloatRefusal(x) : null))) return rejected!;
+                pre: x => SeaWorkRefusal() ?? (x.Cleanable || CanRedoByClean(x) || x.Id == HullId ? AfloatRefusal(x) : null))) return rejected!;
+        if (c.Id == HullId) return DoCleanHull(t, c);
         if (!c.Cleanable && !CanRedoByClean(c)) return Reject("clean", "Nothing to clean there.");
         if (WetRefusal(c) is { } wet) return Reject("clean", wet);
 
@@ -561,6 +612,7 @@ public sealed partial class Game
             }
             t.Narrative.Add("Cleaned and tightened. It looks right now.");
             text = string.Join(" ", t.Narrative);
+            CountMaintenance();
         }
         if (bootWasOff && c.RemovablePart is { } part)
         {
@@ -598,7 +650,9 @@ public sealed partial class Game
             t.Narrative.Add(runsClean);
             text += " " + runsClean;
         }
-        MaybePoorJob(c);
+        if (c.Id == EngineOilId) _oilChangedDay = Day;
+        if (_boat.Sale.ServiceComponents.Contains(c.Id)) _serviceSeasons.Add(_seasonIndex);
+        if (c.Id != MooringLinesId) MaybePoorJob(c); // the poor-job templates are about paint; new lines are just new lines
         return Accept(t, "replace", c.ReplaceMinutes, cost, new RepairView(c.Name, text),
             spare is null ? $"Replaced the {c.Name.ToLowerInvariant()}." : $"Replaced the {c.Name.ToLowerInvariant()} from the spares aboard.");
     }
@@ -725,6 +779,11 @@ public sealed partial class Game
                 : Reject(action, $"You haven't found anything called '{name.Trim()}' yet.");
             return false;
         }
+        if (r.Match.Id == Electrical.BatteryId && IsBatteryAshore)
+        {
+            rejected = Reject(action, BatteryAshoreMessage);
+            return false;
+        }
         var refusal = pre?.Invoke(r.Match) ?? _reach.Refusal(r.Match, _placeId, needTouch);
         rejected = refusal is null ? null : Reject(action, refusal);
         return refusal is null;
@@ -748,6 +807,7 @@ public sealed partial class Game
     {
         var stamp = TimeOfDay;
         int day = Day;
+        if (CountsAsMaintenance(action)) _maintenanceEntries++;
         if (logText is not null)
         {
             _log.Add(new LogEntry(day, stamp, logText, costNok));

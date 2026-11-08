@@ -48,7 +48,7 @@ public sealed partial class Game
     }
 
     /// <summary>The refusals before Replace: at sea the spare, in port the yard rule for work below the waterline.</summary>
-    private string? ReplaceGate(Component c) => AtSea ? SeaWorkRefusal() ?? SpareRefusal(c) : AfloatRefusal(c);
+    private string? ReplaceGate(Component c) => AtSea ? SeaWorkRefusal() ?? SpareRefusal(c) : AfloatRefusal(c) ?? AntifoulingRefusal(c);
 
     /// <summary>What the shop at this port charges for the item (its markup applied); null when it doesn't stock it.</summary>
     private int? PriceHere(ChandleryItem item) =>
@@ -77,6 +77,8 @@ public sealed partial class Game
     private (int CostNok, string? Refusal) ReplacePartHere(Component c)
     {
         var part = _boat.Chandlery.FirstOrDefault(i => !i.Tool && i.ForComponent == c.Id);
+        if (CurrentPort is { Shop: false } noShop)
+            return (0, $"There's no shop at {noShop.Name}, and no spare {part?.Name ?? c.Name.ToLowerInvariant()} aboard.");
         if (part is null) return (c.ReplaceCostNok, null);
         return PriceHere(part) is { } price ? (price, null) : (0, NotStockedMessage(part));
     }
@@ -86,7 +88,7 @@ public sealed partial class Game
         var aboard = _boat.Chandlery.Where(i => _inventory.GetValueOrDefault(i.Id) > 0)
             .Select(i => new InventoryLine(i.Name, _inventory[i.Id], i.Tool)).ToList();
         if (AtSea) return new InventoryView(aboard, null, []);
-        return new InventoryView(aboard, ShopName, StockHere().Select(i => new ShopLine(i.Name, PriceHere(i)!.Value, i.Minutes)).ToList());
+        return new InventoryView(aboard, CurrentPort is { Shop: false } ? null : ShopName, StockHere().Select(i => new ShopLine(i.Name, PriceHere(i)!.Value, i.Minutes)).ToList());
     }
 
     private string ShopName => CurrentPort?.ShopName ?? "the chandlery";
@@ -97,6 +99,7 @@ public sealed partial class Game
     private CommandResult DoBuy(Turn t, string item)
     {
         if (AtSea) return Reject("buy", ChandleryAshoreMessage);
+        if (CurrentPort is { Shop: false } noShop) return Reject("buy", $"There's no shop at {noShop.Name}.");
         var r = FindItem(item);
         if (r.Match is not { } shopItem)
             return r.Kind == ResolutionKind.Ambiguous

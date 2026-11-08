@@ -32,7 +32,8 @@ public static class EngineModel
     public const double RoughInjectorCondition = 0.3;
     public const double OverheatBelowFlow = 0.25;
 
-    public static StartResult Attempt(EngineInputs inputs)
+    /// <param name="monthName">The month the light is told in ("March"); the Engine layer does not know the clock, the caller says it. Null: just "grey light".</param>
+    public static StartResult Attempt(EngineInputs inputs, string? monthName = null)
     {
         ArgumentNullException.ThrowIfNull(inputs);
 
@@ -61,11 +62,12 @@ public static class EngineModel
         // Laboured only applies to outcomes where the engine actually cranked (rules 4-7).
         bool laboured = rule >= 4 && reading.StarterVolts < LabouredCrankBelowStarterVolts;
 
-        return new StartResult(outcome, rule, reading, overheat, laboured, Describe(outcome, overheat, laboured));
+        return new StartResult(outcome, rule, reading, overheat, laboured, Describe(outcome, overheat, laboured, monthName));
     }
 
-    private static string Describe(StartOutcome outcome, bool overheat, bool laboured)
+    private static string Describe(StartOutcome outcome, bool overheat, bool laboured, string? monthName)
     {
+        string light = monthName is { Length: > 0 } ? $"grey {monthName} light" : "grey light";
         string text = outcome switch
         {
             StartOutcome.Nothing => "You turn the key. Nothing happens. The cockpit stays quiet and the cold sits in your hands.",
@@ -74,14 +76,14 @@ public static class EngineModel
             StartOutcome.CranksNoFire => "The engine cranks briskly and evenly, round after round, and never catches. The smell of cold diesel stays out of the exhaust.",
             StartOutcome.FiresAndDies => "It catches, coughs twice, shudders, and dies. The silence afterwards is longer than it should be.",
             StartOutcome.RunsRough => "The engine starts and settles into a lumpy, hunting idle. The note rises and sags, and the cockpit shakes with it.",
-            StartOutcome.Runs => "The engine catches and settles to a steady note. The cockpit hums quietly under the grey March light.",
+            StartOutcome.Runs => $"The engine catches and settles to a steady note. The cockpit hums quietly under the {light}.",
             _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
         };
         if (laboured)
         {
             text = outcome switch
             {
-                StartOutcome.Runs => "The starter drags her round, slow and laboured, before she catches and settles to a steady note. The cockpit hums quietly under the grey March light.",
+                StartOutcome.Runs => $"The starter drags her round, slow and laboured, before she catches and settles to a steady note. The cockpit hums quietly under the {light}.",
                 StartOutcome.CranksNoFire => "The starter drags the engine round, slow and laboured, and she never catches. The smell of cold diesel stays out of the exhaust.",
                 StartOutcome.FiresAndDies => "The starter drags her round, slow and laboured. She catches, coughs twice, shudders, and dies. The silence afterwards is longer than it should be.",
                 StartOutcome.RunsRough => "The starter drags her round, slow and laboured, before she catches and settles into a lumpy, hunting idle. The note rises and sags, and the cockpit shakes with it.",

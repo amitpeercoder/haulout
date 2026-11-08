@@ -126,7 +126,7 @@ public static class BoatLoader
 
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
-            chandlery, trips, dto.Sea, dto.Forecast);
+            chandlery, trips, dto.Sea, dto.Forecast, dto.Yard, dto.Fouling, dto.Mooring, dto.Layup, dto.Sale);
     }
 
     /// <summary>
@@ -149,7 +149,10 @@ public static class BoatLoader
         var items = el.ValueKind == JsonValueKind.Array ? el.EnumerateArray().ToList() : [el];
         return items.Select(i => new SpawnRule(
             i.GetProperty("when").GetString() ?? throw new InvalidOperationException("A spawn rule needs 'when'."),
-            i.GetProperty("atLeast").GetDouble())).ToList();
+            i.GetProperty("atLeast").GetDouble(),
+            i.TryGetProperty("spread", out var spread) && spread.ValueKind == JsonValueKind.True,
+            i.TryGetProperty("repeats", out var repeats) && repeats.ValueKind == JsonValueKind.True,
+            i.TryGetProperty("cause", out var cause) && cause.ValueKind == JsonValueKind.String ? cause.GetString() : null)).ToList();
     }
 
     private sealed class BoatDto
@@ -170,6 +173,11 @@ public static class BoatLoader
         public TripsDto? Trips { get; set; }
         public SeaRules? Sea { get; set; }
         public ForecastRules? Forecast { get; set; }
+        public YardRules? Yard { get; set; }
+        public FoulingRules? Fouling { get; set; }
+        public MooringRules? Mooring { get; set; }
+        public LayupRules? Layup { get; set; }
+        public SaleRules? Sale { get; set; }
     }
 
     private sealed class TripsDto

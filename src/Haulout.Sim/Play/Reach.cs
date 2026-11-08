@@ -10,19 +10,26 @@ internal sealed class Reach
 {
     private readonly Boat _boat;
     private readonly IReadOnlySet<string> _removed;
+    private readonly IReadOnlySet<string> _gone;
 
-    public Reach(Boat boat, IReadOnlySet<string> removedCovers)
+    /// <summary>Components in <paramref name="goneComponents"/> are not aboard (the battery in the yard's battery room): never seen, never touched.</summary>
+    public Reach(Boat boat, IReadOnlySet<string> removedCovers, IReadOnlySet<string>? goneComponents = null)
     {
         _boat = boat;
         _removed = removedCovers;
+        _gone = goneComponents ?? new HashSet<string>();
     }
 
     private bool Applies(ReachEntry e) => e.CoverId is null || _removed.Contains(e.CoverId);
 
     public bool Visible(Component c, string placeId) =>
-        c.Reach.Any(e => e.PlaceId == placeId && e.Visible && Applies(e));
+        !_gone.Contains(c.Id) && c.Reach.Any(e => e.PlaceId == placeId && e.Visible && Applies(e));
 
     public bool Reachable(Component c, string placeId) =>
+        !_gone.Contains(c.Id) && c.Reach.Any(e => e.PlaceId == placeId && e.Reachable && Applies(e));
+
+    /// <summary>Where the component could be touched if it were aboard: for putting it back.</summary>
+    public bool ReachableWhenFitted(Component c, string placeId) =>
         c.Reach.Any(e => e.PlaceId == placeId && e.Reachable && Applies(e));
 
     public List<Component> VisibleAt(string placeId) =>

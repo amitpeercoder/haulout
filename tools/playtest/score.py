@@ -66,7 +66,22 @@ def trip_fields(rows):
         "towed": towed,
         "sank": "yes" if sank else "no",
         "hours_at_sea": round(minutes_at_sea / 60, 1),
-        "goal": "yes" if goal else "no",
+        "trip_goal": "yes" if goal else "no",
+    }
+
+
+def season_fields(rows):
+    """The season goal (design note 008): hauled out at the yard, laid up, and the boat sold (or kept). Old traces score no."""
+    hauled = any(r.get("tool") == "haul_out" and r.get("accepted") for r in rows)
+    listed = any(r.get("tool") == "list_for_sale" and r.get("accepted") for r in rows)
+    sold = any(r.get("sold") or (r.get("tool") == "accept_offer" and r.get("accepted")) for r in rows)
+    kept = any(r.get("tool") == "keep" and r.get("accepted") for r in rows)
+    return {
+        "hauled_out": "yes" if hauled else "no",
+        "listed": "yes" if listed else "no",
+        "sold": "yes" if sold else "no",
+        "kept": "yes" if kept else "no",
+        "goal": "yes" if (hauled and (sold or kept)) else "no",
     }
 
 
@@ -114,6 +129,7 @@ def main(argv):
         "decoys": decoys,
         "rejected": sum(1 for r in upto if r.get("accepted") is False),
         **trip_fields(rows),
+        **season_fields(rows),
         "model": m.group(1) if m else "unknown",
         "trace": path,
     }

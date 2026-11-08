@@ -9,6 +9,10 @@ header {
     padding: 0.5rem 1rem 0.5rem 3.2rem;
     border-bottom: 1px solid var(--ink);
 }
+.seasonline {
+    font-family: var(--face-type); font-size: 0.8rem; color: var(--ink-faint);
+    padding: 0.2rem 1rem 0.4rem 3.2rem; border-bottom: 1px solid var(--ink);
+}
 .scroll {
     flex: 1; min-height: 0; overflow-y: auto;
     display: flex; flex-direction: column-reverse;

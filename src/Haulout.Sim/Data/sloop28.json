@@ -282,6 +282,10 @@
     {
       "id": "below-companionway",
       "label": "Below the companionway, above the engine"
+    },
+    {
+      "id": "at-the-bow",
+      "label": "At the bow"
     }
   ],
   "components": [
@@ -393,6 +397,63 @@
             "nok": 2600,
             "leadDays": 1
           }
+        },
+        {
+          "id": "battery-dead",
+          "atSea": {
+            "text": "The battery is dead; nothing will start the engine, and the bilge pump has nothing to run on."
+          },
+          "name": "Frozen, dead battery",
+          "effect": {
+            "kind": "stateOfCharge",
+            "value": 0
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "internalOhms",
+              "op": "multiply",
+              "value": 25
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "electrical.frozenNights",
+            "atLeast": 2,
+            "spread": true,
+            "repeats": true,
+            "cause": "The battery has frozen and split. It came on after {n} night{s} of frost with the battery flat and left aboard."
+          },
+          "reveals": [
+            {
+              "action": "measure",
+              "text": "The meter reads next to nothing at rest, and under the starter it collapses to nothing at all.",
+              "discovers": true
+            },
+            {
+              "action": "inspect",
+              "text": "The case is swollen at the sides and a crack weeps along one seam: the frost has had the electrolyte.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "She will not start, and the bilge pump has nothing to run on.",
+          "costLaterNok": 1900,
+          "laterNote": null,
+          "diy": {
+            "how": "Fit a new battery",
+            "partsNok": 1900,
+            "minutes": 60
+          },
+          "yard": {
+            "how": "The yard fits a new battery",
+            "nok": 2600,
+            "leadDays": 1
+          },
+          "note": "UNVERIFIED (design note 008): that a flat lead-acid battery freezes and splits after a couple of frosty nights is a domain claim not yet checked with Amit."
         }
       ]
     },
@@ -879,7 +940,8 @@
       "replaceCostNok": 5200,
       "replaceMinutes": 360,
       "properties": {
-        "litres": 40
+        "litres": 40,
+        "fuelLitres": 18
       },
       "faults": [
         {
@@ -915,6 +977,52 @@
             "nok": 2800,
             "leadDays": 2
           }
+        },
+        {
+          "id": "water-in-fuel-condensation",
+          "atSea": {
+            "text": "When the sea gets up, the engine may cough and die.",
+            "spare": "primary-filter-element"
+          },
+          "name": "Water in the fuel tank",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "dormant": true,
+          "spawn": {
+            "when": "fuel.condensationDays",
+            "atLeast": 40,
+            "spread": true,
+            "repeats": true,
+            "cause": "Water has condensed in the fuel tank. It came on over the winter: about {n} cold nights' worth of damp air in a tank left part empty."
+          },
+          "reveals": [
+            {
+              "action": "checkFilterBowl",
+              "text": "Under the diesel a cloudy line of water sits in the bottom of the bowl, grey where it meets the fuel. You drain it off into a jar.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [],
+          "properties": {
+            "diyDrainDays": 3
+          },
+          "onHardOnly": false,
+          "consequence": "In a seaway the water is stirred up into the filter: the engine fires and dies when you need it.",
+          "costLaterNok": 4200,
+          "laterNote": "a tow if she stops in the wrong place",
+          "diy": {
+            "how": "Drain the filter bowl on three separate days, then fit a new primary filter element",
+            "partsNok": 180,
+            "minutes": 75
+          },
+          "yard": {
+            "how": "The yard drains and polishes the tank and changes the filters",
+            "nok": 2800,
+            "leadDays": 2
+          },
+          "note": "UNVERIFIED (design note 008): that a part-empty tank over a cold winter grows water in the diesel at this rate is not checked against a real boat."
         }
       ]
     },
@@ -1375,7 +1483,72 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 1400,
-      "replaceMinutes": 120
+      "replaceMinutes": 120,
+      "properties": { "waterHeld": 1 },
+      "faults": [
+        {
+          "id": "raw-water-pump-cracked",
+          "atSea": {
+            "text": "The cooling water will be weak the whole way, and the pump body leaks into the bilge."
+          },
+          "name": "Cracked raw-water pump body",
+          "effect": {
+            "kind": "rawWaterFlowFactor",
+            "value": 0.6
+          },
+          "effects": [
+            {
+              "kind": "property",
+              "property": "leakLitresPerHour",
+              "op": "add",
+              "value": 0.5
+            }
+          ],
+          "dormant": true,
+          "spawn": {
+            "when": "cooling.frostHoursWithWater",
+            "atLeast": 24,
+            "spread": true,
+            "repeats": true,
+            "cause": "The raw-water pump body has cracked. It came on after {n} hours of frost with raw water left in the engine."
+          },
+          "reveals": [
+            {
+              "action": "look",
+              "text": "A crust of white salt and a few dried drips on the engine bay floor, right under the raw-water pump.",
+              "discovers": false
+            },
+            {
+              "action": "inspect",
+              "text": "A hairline crack runs along the bronze pump body from the inlet flange, a bead of salt water standing in it.",
+              "discovers": true
+            },
+            {
+              "action": "checkRawWaterFlow",
+              "text": "The water at the exhaust comes in weak, uneven spurts.",
+              "discovers": false
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "The engine runs short of cooling water and the pump body leaks into the bilge whenever she is afloat.",
+          "costLaterNok": 4500,
+          "laterNote": "a tow home if the engine overheats at sea",
+          "diy": {
+            "how": "Fit a new raw-water pump",
+            "partsNok": 1400,
+            "minutes": 120
+          },
+          "yard": {
+            "how": "The yard mechanic fits a new raw-water pump",
+            "nok": 2100,
+            "leadDays": 2
+          },
+          "note": "UNVERIFIED (design note 008): that raw water left in the pump over frost cracks the body is a domain claim not yet checked with Amit; the 24 frost hours are a placeholder."
+        }
+      ]
     },
     {
       "id": "impeller",
@@ -1484,7 +1657,58 @@
       "seriesOhms": null,
       "cleanable": false,
       "replaceCostNok": 3200,
-      "replaceMinutes": 240
+      "replaceMinutes": 240,
+      "faults": [
+        {
+          "id": "heat-exchanger-cracked",
+          "atSea": {
+            "text": "The cooling water will be weak, and the engine will run hot under load."
+          },
+          "name": "Cracked heat exchanger",
+          "effect": {
+            "kind": "rawWaterFlowFactor",
+            "value": 0.7
+          },
+          "dormant": true,
+          "spawn": {
+            "when": "cooling.frostHoursWithWater",
+            "atLeast": 48,
+            "spread": true,
+            "repeats": true,
+            "cause": "The heat exchanger has split. It came on after {n} hours of frost with raw water left in the engine."
+          },
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "Along the seam of the heat exchanger a split has opened, with coolant weeping out and a green crust drying round it.",
+              "discovers": true
+            },
+            {
+              "action": "checkRawWaterFlow",
+              "text": "The water at the exhaust comes in weaker spurts than you would like.",
+              "discovers": false
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "Coolant weeps out of the split and the engine runs hot under load.",
+          "costLaterNok": 6500,
+          "laterNote": "a tow home if the engine overheats at sea",
+          "diy": {
+            "how": "Fit a new heat exchanger",
+            "partsNok": 3200,
+            "minutes": 240
+          },
+          "yard": {
+            "how": "The yard mechanic fits a new heat exchanger",
+            "nok": 4600,
+            "leadDays": 3
+          },
+          "note": "UNVERIFIED (design note 008): that frost splits the heat exchanger when raw water is left in it is a domain claim not yet checked with Amit; the 48 frost hours are a placeholder."
+        }
+      ]
     },
     {
       "id": "thermostat",
@@ -1893,6 +2117,7 @@
       "replaceCostNok": 0,
       "replaceMinutes": 0,
       "belowWaterline": true,
+      "properties": { "fouling": 0 },
       "faults": [
         {
           "id": "hull-old-paint-blisters",
@@ -2343,6 +2568,113 @@
       ]
     },
     {
+      "id": "sprayhood",
+      "name": "Sprayhood",
+      "subsystem": "hull",
+      "position": "cockpit",
+      "reach": [
+        {
+          "place": "cockpit",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "spray hood",
+        "dodger",
+        "hood",
+        "canvas hood"
+      ],
+      "description": "A navy canvas sprayhood on a stainless frame over the companionway, the clear window gone milky and the zips stiff with salt.",
+      "condition": 0.6,
+      "wearYears": 8,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceCostNok": 3500,
+      "replaceMinutes": 240,
+      "replaceText": "You fit a new sprayhood on the frame: the canvas laced on, the zips run, the window clear.",
+      "faults": [
+        {
+          "id": "sprayhood-torn",
+          "name": "Torn sprayhood",
+          "effect": {
+            "kind": "none",
+            "value": 0
+          },
+          "dormant": true,
+          "spawn": {
+            "when": "deck.snowDays",
+            "atLeast": 4,
+            "spread": true,
+            "repeats": true,
+            "cause": "The sprayhood has split along its seams. It came on after {n} day{s} of snow lying on it with no cover on her."
+          },
+          "reveals": [
+            {
+              "action": "look",
+              "text": "The sprayhood sags on its frame, the canvas puckered along the top seams.",
+              "discovers": false
+            },
+            {
+              "action": "inspect",
+              "text": "The top seams have split along the stitching, rotten where the snow lay on them, and daylight shows through.",
+              "discovers": true
+            }
+          ],
+          "fixedBy": [
+            "replace"
+          ],
+          "onHardOnly": false,
+          "consequence": "Rain and spray come into the cockpit through the split. It is untidy and wet, and no worse than that.",
+          "costLaterNok": 0,
+          "laterNote": "nothing worse; it only gets wetter in the cockpit",
+          "diy": {
+            "how": "Fit a new sprayhood",
+            "partsNok": 3500,
+            "minutes": 240
+          },
+          "yard": {
+            "how": "The sailmaker makes and fits a new sprayhood",
+            "nok": 4800,
+            "leadDays": 7
+          },
+          "note": "UNVERIFIED (design note 008): that snow lying on an uncovered sprayhood splits it is a domain claim not yet checked with Amit; the 4 snow days are a placeholder."
+        }
+      ]
+    },
+    {
+      "id": "mooring-lines",
+      "name": "Mooring lines",
+      "subsystem": "hull",
+      "position": "at-the-bow",
+      "reach": [
+        {
+          "place": "on-deck",
+          "cover": null,
+          "visible": true,
+          "reachable": true
+        }
+      ],
+      "aliases": [
+        "mooring lines",
+        "mooring line",
+        "bow lines",
+        "bow line",
+        "mooring warps",
+        "warps",
+        "lines"
+      ],
+      "description": "Three-strand mooring lines, grey-green with age, spliced eyes over the bow cleats and worn pale where they run through the fairleads.",
+      "condition": 0.55,
+      "wearYears": 4,
+      "seriesOhms": null,
+      "cleanable": false,
+      "replaceMinutes": 30,
+      "replaceText": "You make up a pair of new lines on the bow cleats, with chafe sleeves at the fairleads.",
+      "properties": { "chafe": 0 }
+    },
+    {
       "id": "bilge",
       "name": "Bilge",
       "subsystem": "hull",
@@ -2731,13 +3063,14 @@
     { "id": "engine-oil", "name": "engine oil (4 L)", "aliases": ["oil", "engine oil"], "priceNok": 300, "minutes": 15, "forComponent": "engine-oil" },
     { "id": "hose-clamps", "name": "hose clamps (10)", "aliases": ["hose clamps", "clamps"], "priceNok": 120, "minutes": 15, "forComponent": "cockpit-drains" },
     { "id": "fuses", "name": "fuses (5)", "aliases": ["fuses", "fuse"], "priceNok": 60, "minutes": 15 },
-    { "id": "hose", "name": "hose (2 m)", "aliases": ["hose", "2 m hose", "length of hose"], "priceNok": 250, "minutes": 15 }
+    { "id": "hose", "name": "hose (2 m)", "aliases": ["hose", "2 m hose", "length of hose"], "priceNok": 250, "minutes": 15 },
+    { "id": "mooring-lines", "name": "mooring lines", "aliases": ["lines", "mooring line", "bow lines", "warps", "mooring warps"], "priceNok": 600, "minutes": 30, "forComponent": "mooring-lines" }
   ],
   "trips": {
     "home": "skjaervik",
     "ports": [
       {
-        "id": "skjaervik", "name": "Skjærvik", "aliases": ["home", "skjaervik", "the yard", "yard"], "yard": true, "shopName": "the yard chandlery",
+        "id": "skjaervik", "name": "Skjærvik", "aliases": ["home", "skjaervik", "the yard", "yard"], "yard": true, "shopName": "the yard chandlery", "fuel": true,
         "arrivalLines": [
           "The mooring buoy comes up out of the grey, and you hook it on the second try.",
           "She swings to the wind, and the yard sheds stand where you left them.",
@@ -2753,10 +3086,29 @@
           "By evening the regatta party has spilled down onto the jetty, lanterns lit, someone playing a fiddle badly and nobody minding.",
           "You sit in the cockpit with a mug and listen. She got you here."
         ]
+      },
+      {
+        "id": "storholmen", "name": "Storholmen", "aliases": ["storholmen"], "yard": false, "shopName": "the harbour kiosk", "fuel": true,
+        "stock": ["primary-filter-element", "secondary-filter-element", "impeller"], "priceFactor": 1.3,
+        "arrivalLines": [
+          "Storholmen is a low island with a white light on its point and a harbour no bigger than a yard.",
+          "A fuel pump on the quay, a kiosk with a tin roof, and a woman who looks up from her crossword just long enough to nod you in.",
+          "The wind drops behind the breakwater. The engine ticks as it cools, and you think about how far home is."
+        ]
+      },
+      {
+        "id": "kvitnes", "name": "Kvitnes", "aliases": ["kvitnes", "the anchorage"], "yard": false, "shop": false,
+        "arrivalLines": [
+          "Kvitnes is a bay of white shingle inside a ring of low hills, and nothing built on it but a boathouse with no door.",
+          "The anchor finds the sand on the second try, and she swings quietly to it.",
+          "Gulls, the slap of water along the hull, and not another boat in sight. It is very still."
+        ]
       }
     ],
     "routes": [
-      { "from": "skjaervik", "to": "hestholmen", "distanceNm": 14, "courseDeg": 40, "shelter": [ { "name": "Lyngskjær", "atNm": 7 } ] }
+      { "from": "skjaervik", "to": "hestholmen", "distanceNm": 14, "courseDeg": 40, "shelter": [ { "name": "Lyngskjær", "atNm": 7 } ] },
+      { "from": "skjaervik", "to": "storholmen", "distanceNm": 26, "courseDeg": 300, "shelter": [ { "name": "Måkeskjær", "atNm": 12 } ] },
+      { "from": "kvitnes", "to": "hestholmen", "distanceNm": 9, "courseDeg": 300, "shelter": [] }
     ],
     "tow": { "nok": 6000, "hours": 6, "lostHours": 18 }
   },
@@ -2772,6 +3124,57 @@
     "departMinutes": 10, "heaveToMinutes": 5, "anchorMinutes": 15, "turnBackMinutes": 2
   },
   "forecast": { "maxLeadDays": 3, "forceErrorChance": [0, 0.3, 0.5, 0.7], "rainFlipChance": [0, 0.1, 0.2, 0.3] },
+  "yard": {
+    "windowFromDayOfYear": 255, "windowToDayOfYear": 300, "driftFromDayOfYear": 240, "driftMaxDaysPerWeek": 7, "minLeadDays": 1,
+    "liftNok": 7000, "storageNok": 9000, "changeFeeNok": 500, "washNok": 1200, "washMinutes": 120, "hauloutMinutes": 120,
+    "autumnFromDayOfYear": 240
+  },
+  "fouling": {
+    "baseGrowthPerDay": 0.008, "waterLagDays": 20, "growthFromC": 6, "fullGrowthC": 15, "paintProtection": 0.9,
+    "spread": [0.6, 1.6], "maxKnotsLost": 1.2, "loadPerGrowth": 0.5,
+    "cleanMinutes": 240, "scrubMinutes": 120, "scrubFraction": 0.4, "paintNeedsCleanBelow": 0.1, "showFrom": 0.05, "paintThinBelow": 0.5, "compareStep": 0.04,
+    "waterlineWords": [
+      { "under": 0.05, "text": "" },
+      { "under": 0.15, "text": "a faint green film at the waterline" },
+      { "under": 0.3, "text": "a green film along the waterline, thicker toward the stern" },
+      { "under": 0.45, "text": "a green beard at the waterline" },
+      { "under": 0.6, "text": "a long green beard at the waterline, with the first barnacles in it" },
+      { "under": 0.8, "text": "weed streaming from the waterline and barnacles where the paint has worn" },
+      { "under": null, "text": "a thick beard of weed, and barnacles where the paint has gone" }
+    ],
+    "hullWords": [
+      { "under": 0.05, "text": "clean paint, a little slime at most" },
+      { "under": 0.15, "text": "a thin green slime over the paint that a cloth would wipe off" },
+      { "under": 0.3, "text": "a green film over the paint that a brush would take off" },
+      { "under": 0.45, "text": "a green fur on the hull and the first barnacles on the keel and the rudder" },
+      { "under": 0.6, "text": "a green fur on the hull and barnacles starting on the keel and the rudder" },
+      { "under": 0.8, "text": "weed in tails along the hull and barnacles on the keel, the rudder and the waterline" },
+      { "under": null, "text": "weed in long tails and barnacles crusting the keel, the rudder and the waterline, so thick that the paint is hardly to be seen" }
+    ]
+  },
+  "mooring": {
+    "startChafe": 0.4, "fromForce": 7, "chafeByForce": [0.05, 0.09, 0.14],
+    "spread": [0.6, 1.6], "partAt": 1.0, "warnFrom": 0.25, "partedRepairNok": 4000,
+    "chafeWords": [
+      { "under": 0.25, "text": "The lines are sound: the lay is tight and the eyes are clean at the cleats." },
+      { "under": 0.5, "text": "A little fuzz where the lines run through the fairleads, nothing that matters yet." },
+      { "under": 0.75, "text": "Strands have rubbed through at the fairleads and the lines are badly chafed. One more blow could finish them." },
+      { "under": null, "text": "The lines are chafed almost through, a few strands holding." }
+    ]
+  },
+  "layup": {
+    "winteriseMinutes": 90, "antifreezeNok": 250, "fillMinutes": 30, "dieselNokPerLitre": 22, "fullAt": 0.9,
+    "batteryMinutes": 30, "batteryRoomNok": 400, "chargerMinutes": 20, "chargerNok": 600, "coverMinutes": 120, "coverNok": 2500,
+    "drawPerDay": 0.006, "frostHoursPerDegree": 3, "maxFrostHoursPerNight": 14, "condensationBelowNightC": 5,
+    "freezeBelowCharge": 0.25, "snowBelowC": 1, "springDayOfYear": 75, "seasonFromDayOfYear": 60
+  },
+  "sale": {
+    "baseNok": 180000, "undocumentedYearsAtPurchase": 4, "perUndocumentedYearNok": 3000, "perEntryNok": 600, "entriesCap": 12,
+    "springBonus": 0.04, "autumnDiscount": 0.04, "floorFraction": 0.3, "foulingFindFrom": 0.2, "findChance": 0.85,
+    "viewingChancePerDay": 0.2, "askSensitivity": 3, "seasonViewingFactor": { "spring": 1.3, "summer": 1.0, "autumn": 0.6, "winter": 0.6 },
+    "offerSpread": [0.88, 1.02], "offerHoldsDays": 7, "listMinutes": 30, "broker": "Holm & Datter, yacht brokers",
+    "serviceComponents": ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"]
+  },
   "placeholders": [
     "PLACEHOLDER (decision 007/6): the harbour shop at Hestholmen stocks only filter elements and impellers, at 1.3 times the yard chandlery price.",
     "PLACEHOLDER (design note 006): rates.weatherGates (the wind force from which nobody goes on deck or launches, the rain in mm from which a paint job is refused) are placeholders for Amit to calibrate.",
@@ -2791,6 +3194,19 @@
     "PLACEHOLDER (design note 007): sea { motoring 5 kn; sailing in force 3 to 5 at 4.0, 5.0 and 5.5 kn, not closer than 45 degrees to the wind; heave-to drift 0.5 kn; anchoring within 1 nm of shelter; tow 3 kn; sea state by wind force }.",
     "PLACEHOLDER (design note 007): sea { waves add 50 % per sea state to seawater leaks; spray 2 L/h per sea state with the hatch open from sea state 2; the tank is stirred from sea state 3 and bites after 2 hours; impeller sheds 0.3 x (1 - condition) of its vanes per load hour; the engine stops itself after 90 overheat minutes; 0.05 of a charge an hour drawn under way }.",
     "PLACEHOLDER (design note 007): sea { depart 10 min, heave-to 5, anchor 15, turn back 2 }; forecast { 3 days of lead, force error chance 0 / 0.3 / 0.5 / 0.7 by lead day, rain flip chance 0 / 0.1 / 0.2 / 0.3 }.",
-    "PLACEHOLDER (design note 007): the atSea sentence on each fault names the consequence under way, and the vaneFactor (impeller) and waterMinutes (primary filter) properties start at 1 and 0."
+    "PLACEHOLDER (design note 007): the atSea sentence on each fault names the consequence under way, and the vaneFactor (impeller) and waterMinutes (primary filter) properties start at 1 and 0.",
+    "PLACEHOLDER (design note 008): trips { Skjaervik to Storholmen 26 nm on 300 degrees with shelter at Maakeskjaer 12 nm out; Kvitnes 9 nm from Hestholmen on 120 degrees, the way back on 300 }, the arrival lines of both, fuel at Skjaervik and Storholmen, no shop at Kvitnes, and the Storholmen kiosk (stock as Hestholmen's, 1.3 times the chandlery price).",
+    "PLACEHOLDER (design note 008): yard { window day 255 to 300 of the year, first free slot drifting later by 0 to 7 days for every week after day 240, at least 1 day ahead; lift 7000 NOK, winter storage 9000 NOK, a booking change 500 NOK, the yard's hull wash 1200 NOK and 120 min, the haulout 120 min; a lift on or after day 240 of the year is the autumn lift }.",
+    "UNVERIFIED (design note 008): the haulout season (day 255 to 300, mid-September to late October) and the busy-yard drift are not checked against a real Nordic yard.",
+    "PLACEHOLDER (design note 008): fouling { growth 0.008 a day at full temperature (water 6 to 15 degrees C, mean of the last 20 days), spread 0.6 to 1.6 drawn at each launch, antifouling condition cuts it by 0.9 x its condition; a fully grown hull loses 1.2 knots and puts 50 % more load on the impeller; clean the hull 240 min, scrub 120 min taking 40 %; antifouling cannot be painted over growth of 0.1 or more; growth shows from 0.05; paint reads as thin under condition 0.5; a look says more or less than the last look when the words are the same and the growth moved by 0.04 }, and the waterline and hull word bands (seven each). Calibrated over 20 seeds (launched day 96, thin paint reaches the top band, 0.8, by day 270 in about half of them; fresh paint stays under 0.45).",
+    "UNVERIFIED (design note 008): the fouling growth rate, its dependence on water temperature and on the paint, the knots lost and the extra load on the impeller are not checked against real boats.",
+    "PLACEHOLDER (design note 008): mooring { the previous owner's lines start at chafe 0.4 (new lines at 0); a gale of force 7, 8 and 9 adds 0.05, 0.09 and 0.14 times a spread of 0.6 to 1.6; at 1.0 she breaks her mooring (a tow, 4000 NOK of repair and new lines); the arrival warning from 0.25. Calibrated over 20 seeds: new lines fitted on day 96 part in 1 of 20 by day 270 (never in the first 30 days, warned 55 days before), the old lines in 1 of 20 and in none by day 130 }, the chafe word bands, and the mooring lines at 600 NOK and 30 min (the yard chandlery only).",
+    "UNVERIFIED (design note 008): the chafe rates per gale and the claim that a chafed mooring parts in a second gale are not checked against real moorings.",
+    "PLACEHOLDER (design note 008): layup { winterise 90 min and 250 NOK of antifreeze; fill the tank 30 min at 22 NOK a litre (a tank at 90 % or more counts as full); battery ashore 30 min and 400 NOK for the yard's battery room, the yard charger 20 min and 600 NOK; the winter cover 120 min and 2500 NOK the first time, kept; a battery aboard on the hard without a charger loses 0.006 a day on top of its self-discharge; 3 frost hours per degree below zero, at most 14 a night; damp-air nights counted below 5 degrees at night; a battery freezes below 25 % charge; snow counted below 1 degree; spring is day 75 of the year }.",
+    "PLACEHOLDER (design note 008): the winter faults wake from the layup counts, each at its threshold times a seeded spread of 0.6 to 1.6 (rates.spread): raw-water-pump-cracked at 24 frost hours with water held, heat-exchanger-cracked at 48, water-in-fuel-condensation at 40 damp-night counts, battery-dead at 2 frozen nights, sprayhood-torn at 4 snow days; each can happen again the next winter. Their effects (pump flow x0.6 and 0.5 L/h leak afloat, heat exchanger flow x0.7, battery internal resistance x25 at no charge) and prices (pump 1400/2100 NOK, heat exchanger 3200/4600, battery 1900/2600, sprayhood 3500/4800, tank as the existing water-in-fuel) are placeholders; so is the sprayhood component (3500 NOK, 240 min).",
+    "UNVERIFIED (design note 008): the winter claims are not checked against real boats: that raw water left in the pump and the heat exchanger cracks them on frost nights, that a part-empty tank grows water over a cold winter, that a flat battery aboard freezes and splits after a few frosty nights, that snow on an uncovered sprayhood tears it, and the hour and price of each winter task (oil has no consequence yet).",
+    "PLACEHOLDER (design note 008): sale { base value 180000 NOK (the insured value); less the yard price of every finding of the buyer's surveyor (else the parts, else the cost later; heavy growth on the hull, 0.2 or more, at the yard's wash); 3000 NOK for each of 4 undocumented years at purchase and for each season of her ownership without an engine service entry (the current one until it has one); plus 600 NOK for each maintenance entry this season, at most 12; plus 4 percent for a sale in March to June, minus 4 percent from September to February; never below 30 percent of the base }.",
+    "PLACEHOLDER (design note 008): buyers { a viewing on 0.2 of the days she is listed on the hard, times 1 plus 3 times how far the broker's value is over the ask (between 0.1 and 2), times 1.3 in spring, 1.0 in summer, 0.6 in autumn and winter; the buyer's surveyor finds each detectable fault with chance 0.85; the offer is 0.88 to 1.02 of the value found, rounded to 100 NOK and never over the ask; it holds 7 days; listing takes 30 min; the broker is Holm & Datter }.",
+    "UNVERIFIED (design note 008): the valuation practice (that a buyer takes the yard price of every defect off, that undocumented engine years and a kept logbook move the price, that a spring sale beats an autumn one by about 8 percent) and the viewing rates are not checked against real brokers or buyers."
   ]
 }

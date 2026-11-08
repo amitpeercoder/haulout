@@ -13,6 +13,12 @@ public readonly record struct GameClock(int Day)
     public int DayOfYear => Day % DaysPerYear;
     public int Month => DayOfYear / DaysPerMonth; // 0 = January
 
+    private static readonly string[] MonthNames =
+        ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    /// <summary>"January" to "December" (months are 30 days).</summary>
+    public string MonthName => MonthNames[Month];
+
     public Season Season => Month switch
     {
         >= 11 or <= 1 => Season.Winter,

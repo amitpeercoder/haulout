@@ -160,14 +160,17 @@ public sealed partial class Game
         var days = new[] { depart, depart + 1 }.Select(d => ForecastFor(d, route)).ToList();
         var ci = CultureInfo.InvariantCulture;
 
-        double motorHours = Math.Round(route.DistanceNm / sea.MotorKnots, 1);
+        // What the player has seen of the growth on her hull is all the plan may know of it.
+        double motorKnots = Slowed(sea.MotorKnots, _foulingSeen);
+        double motorHours = Math.Round(route.DistanceNm / motorKnots, 1);
         double? sailHours = null;
-        string estimate = $"About {motorHours.ToString("0.0", ci)} hours under engine at {sea.MotorKnots.ToString("0.#", ci)} knots";
+        string estimate = $"About {motorHours.ToString("0.0", ci)} hours under engine at {motorKnots.ToString("0.#", ci)} knots";
+        if (_foulingSeen > 0) estimate += $" (the growth you saw on her hull costs her about {(sea.MotorKnots - motorKnots).ToString("0.#", ci)} knots)";
         var first = days[0];
         if (!first.Known) estimate += "; no forecast that far out, so no sailing estimate.";
         else if (first.WindServes)
         {
-            sailHours = Math.Round(route.DistanceNm / Sea.SailKnots(sea, first.WindForce), 1);
+            sailHours = Math.Round(route.DistanceNm / Slowed(Sea.SailKnots(sea, first.WindForce), _foulingSeen), 1);
             estimate += $"; about {sailHours.Value.ToString("0.0", ci)} under sail if the forecast wind holds.";
         }
         else estimate += "; the forecast wind doesn't serve for sailing.";

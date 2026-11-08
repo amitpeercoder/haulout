@@ -99,7 +99,7 @@ public sealed partial class Game
             .Where(f => f is { State: FaultState.Fixed, Escalated: false })
             .Select(f => f!.Name).Concat(SupersededFixed().Select(f => f.Name)).ToList();
 
-        int deadline = _boat.Economy.LaunchDeadlineDay;
-        return new ReadinessView(Day, deadline, deadline - Day, Balance, _launched, open, investigate, fixedNames, Afloat, _boat.Economy.EmergencyLiftNok);
+        int deadline = _launchDeadlineDay;
+        return new ReadinessView(Day, deadline, deadline - Day, Balance, _launched, open, investigate, fixedNames, Afloat, _boat.Economy.EmergencyLiftNok, ReadinessSeasonLead());
     }
 }

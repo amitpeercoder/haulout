@@ -6,7 +6,7 @@ namespace Haulout.Web.Services;
 public enum ViewLevel { Map, CloseUp }
 
 /// <summary>The tabs of the context panel: the part and place, the launch picture, the passage.</summary>
-public enum PanelTab { Here, Readiness, Trip }
+public enum PanelTab { Here, Readiness, Trip, Season }
 
 /// <summary>
 /// The web adapter's one door into the sim. Holds the Game, forwards commands and queries,
@@ -87,6 +87,9 @@ public sealed class GameSession
     /// <summary>The card of the passage that just ended (arrival, turned back, tow); kept until the next command.</summary>
     public TripResultView? TripResult { get; private set; }
 
+    /// <summary>The closing card when she has been sold, kept so it stays readable.</summary>
+    public ClosingView? Closing { get; private set; }
+
     // ------------------------------------------------------------- queries
 
     public T Ask<T>(Query query) where T : QueryResult => (T)_game.Ask(query);
@@ -104,6 +107,8 @@ public sealed class GameSession
     public TripPlanView PlanTrip() => Ask<TripPlanView>(new PlanTrip());
     public InventoryView Inventory => Ask<InventoryView>(new Inventory());
     public TripView Trip => Ask<TripView>(new Trip());
+    public SeasonView Season => Ask<SeasonView>(new Season());
+    public SaleView Sale => Ask<SaleView>(new Sale());
 
     public bool HasTool(string tool) => Status.Tools.Contains(tool);
 
@@ -138,6 +143,7 @@ public sealed class GameSession
         {
             if (command is Launch && result.Observation is LaunchView lv) LaunchNarrative = lv.Lines;
             if (result.Observation is LossView loss) Loss = loss;
+            if (result.Observation is ClosingView closing) Closing = closing;
             switch (command, result.Observation)
             {
                 case (Inspect c, InspectionView v): _lastInspect[c.Component] = v.Text; break;
@@ -265,4 +271,34 @@ public sealed class GameSession
     public CommandResult Anchor() => Execute(new Anchor());
     public CommandResult TurnBack() => Execute(new TurnBack());
     public CommandResult CallTow() => Execute(new CallTow());
+
+    // ------------------------------------------------------------ the season, the yard and the sale (docs/design/008)
+
+    public CommandResult BookHaulout(int day) => Execute(new BookHaulout(day));
+    public CommandResult HaulOut() => Execute(new HaulOut());
+    public CommandResult CleanHull() => Execute(new Clean("hull"));
+    public CommandResult WashHull() => Execute(new WashHull());
+    public CommandResult Scrub() => Execute(new Scrub());
+    public CommandResult WinteriseEngine() => Execute(new WinteriseEngine());
+    public CommandResult ChangeOil() => Execute(new Replace("engine oil"));
+    public CommandResult FillTank() => Execute(new FillTank());
+    public CommandResult BatteryAshore() => Execute(new BatteryAshore());
+    public CommandResult BatteryAboard() => Execute(new BatteryAboard());
+    public CommandResult WinterCharger() => Execute(new WinterCharger());
+    public CommandResult FitWinterCover() => Execute(new FitWinterCover());
+    public CommandResult WaitUntilSpring() => Execute(new WaitUntilSpring());
+    public CommandResult ListForSale(int askNok) => Execute(new ListForSale(askNok));
+    public CommandResult AcceptOffer(int offer) => Execute(new AcceptOffer(offer));
+    public CommandResult Keep() => Execute(new Keep());
+
+    /// <summary>Runs a winter task by the console words the sim names it with.</summary>
+    public CommandResult RunLayupTask(string command) => command switch
+    {
+        "winterise" => WinteriseEngine(),
+        "replace engine oil" => ChangeOil(),
+        "fill tank" => FillTank(),
+        "battery ashore" => BatteryAshore(),
+        "fit cover" => FitWinterCover(),
+        _ => throw new ArgumentException($"Unknown winter task '{command}'.", nameof(command)),
+    };
 }

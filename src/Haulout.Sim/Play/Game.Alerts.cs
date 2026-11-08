@@ -11,6 +11,8 @@ namespace Haulout.Sim.Play;
 /// </summary>
 public sealed partial class Game
 {
+    /// <summary>The counter alert when the open hatch let in most of the water: the player's fix is one slide of the hatch, nothing to investigate.</summary>
+    private const string PumpCounterHatchKind = "pump-counter-hatch";
     private const string FloorboardsId = "saloon-floorboards";
     private const double BatteryAlertBelow = 0.5;
     private const double BilgeDeepLitres = 30;
@@ -78,7 +80,7 @@ public sealed partial class Game
         // At sea the voltmeter is watched every step, not only at the morning check (kinds are still raised once a day).
         if (atSea)
         {
-            if (Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
+            if (!IsBatteryAshore && Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
             return;
         }
 
@@ -86,7 +88,7 @@ public sealed partial class Game
         if (_alerts.LastMorningCheckDay != day)
         {
             _alerts.LastMorningCheckDay = day;
-            if (Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
+            if (!IsBatteryAshore && Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
         }
     }
 
@@ -98,15 +100,36 @@ public sealed partial class Game
         return $"The panel voltmeter reads {volts.ToString("F1", CultureInfo.InvariantCulture)} V {(AtSea ? "and falling" : "this morning")}. The battery isn't holding its charge; worth a meter on it.";
     }
 
-    /// <summary>On coming back aboard after an away period of a day or more: what built up while she sat.</summary>
-    private void ArrivalAlerts()
+    /// <summary>
+    /// A long wait (the winter) reads the pump counter once, when it ends or when something needs the player's hands, not every day: the
+    /// counter then says what has built up since the player was last aboard, not since the midnight before.
+    /// </summary>
+    private bool _holdPumpCounter;
+
+    /// <summary>
+    /// The bilge pump counter, read on coming back and reset. If the open hatch let in most of the water, it says so: that is what the
+    /// player did, and the fix is a slide of the hatch, not a look under the floorboards.
+    /// </summary>
+    private void PumpCounterAlert()
     {
         int cycles = _water.CyclesSinceAboard;
         if (cycles > 0)
-            Raise("pump-counter",
-                $"The bilge pump counter has gone up by {Number(cycles)} since you were last aboard. Worth lifting the saloon floorboards to see where the water comes from.");
+        {
+            if (_water.HatchDominant)
+                Raise(PumpCounterHatchKind,
+                    $"The bilge pump counter has gone up by {Number(cycles)} since you were last aboard. You left the companionway hatch open; rain has been finding its way below.");
+            else
+                Raise("pump-counter",
+                    $"The bilge pump counter has gone up by {Number(cycles)} since you were last aboard. Worth lifting the saloon floorboards to see where the water comes from.");
+        }
         // The counter is read; the next stretch away counts from here.
-        _water.CyclesSinceAboard = 0;
+        _water.ResetSinceAboard();
+    }
+
+    /// <summary>On coming back aboard after an away period of a day or more: what built up while she sat.</summary>
+    private void ArrivalAlerts()
+    {
+        if (!_holdPumpCounter) PumpCounterAlert();
 
         bool over = OverSole;
         if (!over && _water.Level >= BilgeDeepLitres && !_removed.Contains(FloorboardsId))
@@ -114,8 +137,9 @@ public sealed partial class Game
         if (over) Raise("sole", SoleAlert);
         _alerts.WasOverSole = over;
 
-        if (Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
+        if (!IsBatteryAshore && Electrical.StateOfCharge(_boat) < BatteryAlertBelow) Raise("battery", BatteryAlert());
         _alerts.LastMorningCheckDay = Day;
+        MooringArrivalAlert();
         RaiseArrivalSigns();
     }
 

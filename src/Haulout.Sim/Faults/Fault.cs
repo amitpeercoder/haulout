@@ -13,8 +13,13 @@ public enum PropertyOp { Set, Add, Multiply, Min }
 public sealed record FaultEffect(
     FaultEffectKind Kind, double Value, string? Property = null, PropertyOp? Op = null, string? Component = null);
 
-/// <summary>A dormant fault wakes, once, when the named system value reaches AtLeast (for example "water.awashHours").</summary>
-public sealed record SpawnRule(string When, double AtLeast);
+/// <summary>
+/// A dormant fault wakes, once, when the named system value reaches AtLeast (for example "water.awashHours").
+/// Spread (design note 008): the threshold is AtLeast times a seeded factor of this fault, so no two faults wake at the same count.
+/// Repeats: once the woken fault is Fixed the component gets a dormant copy of it, armed from the values of that moment, so next winter
+/// can do it again. Cause: the sentence told when the player finds it ("{n}" is the count the value had passed, "{s}" a plural s).
+/// </summary>
+public sealed record SpawnRule(string When, double AtLeast, bool Spread = false, bool Repeats = false, string? Cause = null);
 
 public enum PlayerAction { Look, Inspect, Measure, Start, Clean, Replace, Charge, CheckFilterBowl, CheckRawWaterFlow }
 
@@ -135,6 +140,23 @@ public sealed class Fault
     public bool Spawned { get; private set; }
     /// <summary>The day the fault became active: the game's start day, or the day a successor or a poor job woke. Null while dormant.</summary>
     public int? ActiveSinceDay { get; private set; }
+
+    /// <summary>The value of each spawn rule's system value when this fault was armed (a re-armed copy); subtracted before the threshold. Empty: 0.</summary>
+    public IReadOnlyDictionary<string, double> SpawnBaseline { get; private set; } = new Dictionary<string, double>();
+    /// <summary>A repeating fault that was fixed has already put its dormant copy on the component.</summary>
+    internal bool Rearmed { get; set; }
+    /// <summary>One of its spawn rules asks for a fresh copy once it is fixed.</summary>
+    internal bool Repeats => Spawn.Any(r => r.Repeats);
+
+    /// <summary>
+    /// A dormant copy for next time: same name, reveals, routes and effects under a new id, armed from <paramref name="baseline"/>.
+    /// </summary>
+    internal Fault CloneDormant(string id, IReadOnlyDictionary<string, double> baseline) => new(
+        id, Name, ComponentId, new FaultEffect(FaultEffectKind.None, 0), Reveals, FixedBy, present: true, OnHardOnly, Harmless, dormant: true,
+        Consequence, CostLaterNok, LaterNote, Diy, Yard, Escalation, Properties, Progression, Effects, Spawn, ArrivalSign, AtSea)
+    {
+        SpawnBaseline = baseline,
+    };
 
     /// <summary>It turned into its successor; it no longer counts as present, nor as fixed.</summary>
     internal bool Escalated { get; private set; }

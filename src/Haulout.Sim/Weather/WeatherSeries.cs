@@ -8,7 +8,8 @@ namespace Haulout.Sim.Weather;
 /// </summary>
 public sealed class WeatherSeries
 {
-    public const int LastDay = 720;
+    /// <summary>Three years of days. Generation is sequential, so days 0 to 720 are the same for a seed whatever this is.</summary>
+    public const int LastDay = 1080;
 
     internal static readonly string[] Directions =
         ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"];

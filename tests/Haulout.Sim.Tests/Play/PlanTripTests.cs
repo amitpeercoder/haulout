@@ -151,7 +151,7 @@ public class PlanTripTests
         Assert.False(Sea.Serves(rules, 6, "southwest", 40));   // too strong
         Assert.Equal(225, Sea.Degrees("southwest"));
         Assert.Equal(5, Sea.WindOnBoat(45, 40));
-        var back = BoatLoader.LoadSloop28().Trips!.RoutesFrom("hestholmen").Single();
+        var back = BoatLoader.LoadSloop28().Trips!.RoutesFrom("hestholmen").Single(r => r.To == "skjaervik");
         Assert.Equal(220, back.CourseDeg);
         Assert.Equal(7, back.Shelter.Single().AtNm);
     }

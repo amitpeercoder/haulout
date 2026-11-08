@@ -43,7 +43,7 @@ internal static class EngineInputsBuilder
             SwitchOn: boat.Get("battery-switch").Properties.GetValueOrDefault("on") == 1,
             PanelLive: !boat.Get("ignition-panel").ActiveFaults.Any(f => f.Effect.Kind == FaultEffectKind.OpenCircuit),
             BatteryOpenCircuitVolts: ElectricalChain.OpenCircuitVolts(soc),
-            BatteryInternalOhms: battery.Properties.GetValueOrDefault("internalOhms"),
+            BatteryInternalOhms: Properties.Effective(boat, "start-battery", "internalOhms", battery.Properties.GetValueOrDefault("internalOhms")),
             Loop: loop,
             StarterId: StarterId);
 

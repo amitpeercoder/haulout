@@ -3,7 +3,8 @@ using System.Text.Json.Serialization;
 namespace Haulout.Sim.Play;
 
 /// <summary>Id is for in-process use only (tests, history); it is never serialised, so no adapter can leak it.</summary>
-public sealed record KnownFault([property: JsonIgnore] string Id, string Name, string ComponentName);
+/// <summary>A problem the player has found. Fixed: it has since been put right (it stays on the list as history, marked).</summary>
+public sealed record KnownFault([property: JsonIgnore] string Id, string Name, string ComponentName, bool Fixed = false);
 
 /// <summary>A cover as the player sees it at a place. Removed: it is off.</summary>
 public sealed record CoverState(string Name, bool Removed);
@@ -39,6 +40,9 @@ public sealed record NoticesView(IReadOnlyList<Alert> Alerts) : QueryResult;
 [JsonDerivedType(typeof(LossView), "loss-view")]
 [JsonDerivedType(typeof(LegView), "leg-view")]
 [JsonDerivedType(typeof(TripResultView), "trip-result-view")]
+[JsonDerivedType(typeof(HauloutView), "haulout-view")]
+[JsonDerivedType(typeof(ListingView), "listing-view")]
+[JsonDerivedType(typeof(ClosingView), "closing-view")]
 public abstract record Observation;
 
 /// <summary>
@@ -92,6 +96,8 @@ public sealed record LossView(
 [JsonDerivedType(typeof(InventoryView), "inventory-view")]
 [JsonDerivedType(typeof(TripPlanView), "trip-plan-view")]
 [JsonDerivedType(typeof(TripView), "trip-view")]
+[JsonDerivedType(typeof(SeasonView), "season-view")]
+[JsonDerivedType(typeof(SaleView), "sale-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -115,7 +121,10 @@ public sealed record StatusView(
     bool Sunk = false,
     IReadOnlyList<Alert>? Notices = null,
     string? Port = null,
-    bool AtSea = false) : QueryResult;
+    bool AtSea = false,
+    string? Season = null,
+    bool Sold = false,
+    string? SeasonLead = null) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 /// <summary>Document: set when the entry is a document the player can read again (e.g. "survey report").</summary>
@@ -192,11 +201,12 @@ public sealed record InvestigateItem(string Component, string Note);
 
 /// <summary>
 /// The launch picture. Only discovered problems, ever. Fixed: names of discovered problems that are now fixed or ruled out (history).
-/// DaysToDeadline: negative once past it.
+/// DaysToDeadline: negative once past it. SeasonLead: once she has been launched, the season's business in a sentence (the booked slot, the
+/// winter list); it replaces the launch deadline in the views. Null before the first launch and after a Keep, when the deadline is what is next.
 /// </summary>
 public sealed record ReadinessView(
     int Day, int LaunchDeadlineDay, int DaysToDeadline, int BalanceNok, bool Launched,
-    IReadOnlyList<ReadinessItem> Open, IReadOnlyList<InvestigateItem> ToInvestigate, IReadOnlyList<string> Fixed, bool Afloat = false, int EmergencyLiftNok = 0) : QueryResult;
+    IReadOnlyList<ReadinessItem> Open, IReadOnlyList<InvestigateItem> ToInvestigate, IReadOnlyList<string> Fixed, bool Afloat = false, int EmergencyLiftNok = 0, string? SeasonLead = null) : QueryResult;
 
 /// <summary>One thing aboard. Tool: kept for good (the remote start button); otherwise a spare, Count of them.</summary>
 public sealed record InventoryLine(string Name, int Count, bool Tool);
@@ -228,10 +238,11 @@ public sealed record TripPlanView(
 /// net distance made good from From (drift already taken off), RemainingNm what is left to To, Mode in the game's words ("under engine",
 /// "under sail", "hove-to", "at anchor", "drifting", "under tow"), Hours the hour in progress since she cast off. CanAnchor: shelter is within
 /// reach; NearestShelter the nearest place to anchor, in words. WindServes: the wind would carry her under sail on this course now.
+/// Destinations: in port, one line per route out ("Hestholmen, 14 nm"); null at sea.
 /// </summary>
 public sealed record TripView(
     bool AtSea, string? Port, string? From, string? To, double PositionNm, double RemainingNm, string? Mode, int Hours,
-    bool CanAnchor, string? NearestShelter, bool WindServes, string Text) : QueryResult;
+    bool CanAnchor, string? NearestShelter, bool WindServes, string Text, IReadOnlyList<string>? Destinations = null) : QueryResult;
 
 /// <summary>The observation after an hour (or part of one) at sea: Continue, Motor, Sail. Text is the hour line, also in the narrative and the logbook.</summary>
 public sealed record LegView(
@@ -244,3 +255,53 @@ public sealed record LegView(
 public sealed record TripResultView(
     string Destination, bool Towed, bool TurnedBack, int Minutes, int MoneySpentNok,
     IReadOnlyList<string> Failures, IReadOnlyList<string> Fixes, IReadOnlyList<LogEntry> Log, IReadOnlyList<string> Lines) : Observation;
+
+/// <summary>
+/// The lift (design note 008): HaulOut, and the autumn emergency lift. HullText is what the hull looks like out of the water, with
+/// its cause in words. Lines: the card in the game's voice. No ids.
+/// </summary>
+public sealed record HauloutView(int Day, int LiftNok, int StorageNok, string HullText, IReadOnlyList<string> Lines) : Observation;
+
+/// <summary>One piece of winter layup work (filled by the layup round; empty until then). Command is the console words.</summary>
+public sealed record LayupTask(string Name, bool Done, int Minutes, int CostNok, string Command, string Risk);
+
+/// <summary>
+/// The season and the yard's calendar. Text is the season line (also in the status). Day numbers are absolute game days.
+/// BookedDay: the slot you hold. FirstFreeDay null: the yard is full for the autumn, or has finished lifting for the year.
+/// SlotsFromDay and SlotsToDay: this year's lifting window. HauledOut: she was launched and is out of the water again.
+/// </summary>
+public sealed record SeasonView(
+    int Day, int Year, int DayOfYear, string SeasonWord, string Text, bool Afloat, bool LaidUp, int LaunchDeadlineDay,
+    int? BookedDay, int? FirstFreeDay, int SlotsFromDay, int SlotsToDay, int LiftNok, int StorageNok, int ChangeFeeNok,
+    int EmergencyLiftNok, bool HauledOut, IReadOnlyList<LayupTask> Tasks, bool Listed, int? AskNok, int OpenOffers, bool Kept,
+    IReadOnlyList<SeasonAction>? Actions = null) : QueryResult;
+
+/// <summary>
+/// A season action and whether the facade would accept it right now (the same refusal the command gives, free and unlogged, when it is not).
+/// Verb is the command's wire name; Cost is what it would bill now.
+/// </summary>
+public sealed record SeasonAction(string Verb, string Label, bool Available, string? UnavailableReason, int Minutes, int CostNok);
+
+/// <summary>One line of the broker's letter: what it is, and what it does to the value (deductions are negative).</summary>
+public sealed record ValuationLine(string Text, int Nok);
+
+/// <summary>
+/// The broker's valuation letter. The lines add up to <see cref="ValueNok"/>. Only the problems the player knows are open are in it:
+/// the buyer's surveyor will find the rest for themselves.
+/// </summary>
+public sealed record ValuationLetter(
+    int Day, string Broker, IReadOnlyList<ValuationLine> Lines, int ValueNok, int? AskNok, IReadOnlyList<string> Text);
+
+/// <summary>A buyer's viewing: what their surveyor found (with the yard's price), what they value her at and what they offer.</summary>
+public sealed record ViewingReport(
+    int Number, int Day, IReadOnlyList<string> Findings, int ValueNok, int OfferNok, int HoldsUntilDay, bool Open);
+
+public sealed record SaleView(
+    bool Listed, int? AskNok, ValuationLetter? Letter, IReadOnlyList<ViewingReport> Viewings, bool Sold) : QueryResult;
+
+/// <summary>What ListForSale hands back: the letter.</summary>
+public sealed record ListingView(ValuationLetter Letter) : Observation;
+
+/// <summary>The end of the game: facts only. The lines are also the narrative of the accepting command.</summary>
+public sealed record ClosingView(
+    int Day, int PriceNok, int SpentNok, int BalanceNok, int Days, int HoursWorked, int Trips, int Tows, IReadOnlyList<string> Lines) : Observation;

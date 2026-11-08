@@ -2,8 +2,8 @@
 set -euo pipefail
 
 MODEL="${1:-sonnet}"
-# A run normally finishes in under a minute. Kill it after this many seconds.
-LIMIT="${PLAYTEST_TIMEOUT:-300}"
+# A first-trip run takes a few minutes; a whole season (up to 300 tool calls) can take most of half an hour. Kill it after this many seconds.
+LIMIT="${PLAYTEST_TIMEOUT:-1800}"
 case "$MODEL" in
   sonnet|opus|haiku) ;;
   *) echo "usage: $0 [sonnet|opus|haiku]" >&2; exit 2 ;;
@@ -40,7 +40,7 @@ CMD=(claude -p "$(cat "$HERE/prompt.md")"
   --mcp-config "$CFG" --strict-mcp-config
   --allowedTools "mcp__haulout__*"
   --disallowedTools "Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Task,Agent,NotebookEdit"
-  --model "$MODEL" --output-format json --max-turns 250)
+  --model "$MODEL" --output-format json --max-turns 400)  # the prompt gives up at 300 tool calls; the rest is room for thinking turns
 
 if [ -n "$DRY" ]; then
   echo "# config -> $CFG"; echo "$CFG_JSON"

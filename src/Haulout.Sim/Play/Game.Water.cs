@@ -35,27 +35,71 @@ public sealed partial class Game
     {
         // The step ends at the clock; a step that ends at midnight belongs to the day before.
         int day = _startDay + (StartMinuteOfDay + ClockMinutes - minutes) / 1440;
-        Electrical.Step(_boat, minutes);
-        _values.Set(SystemValues.Charging, Electrical.Run(_boat, minutes, _running));
+        ElectricalStep(minutes);
         _cooling.Step(minutes, _running, _running ? EngineInputsBuilder.Build(_boat).Cooling.RawWaterFlow : 1.0);
         _cooling.Publish(_values);
-        _water.Step(new WaterSystem.Inputs(minutes, Afloat, _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
+        _water.BatteryAboard = !IsBatteryAshore;
+        _water.Step(new WaterSystem.Inputs(minutes, Afloat, UnderWinterCover ? 0 : _weather[day].RainMm, _removed.Contains(HatchId), !_removed.Contains(PumpFuseId),
             AtSea ? Sea.SeaState(_boat.SeaRules, _weather[day].WindForce) : 0));
         _water.Publish(_values);
         if (Afloat && _water.Level >= _boat.Water.SinkLitres) Sink(day);
     }
 
-    /// <summary>A dormant fault whose spawn value has crossed wakes once, Latent and silent, with its spread drawn.</summary>
+    /// <summary>
+    /// A dormant fault whose spawn value has crossed wakes once, Latent and silent, with its spread drawn. Design note 008: a rule may scale
+    /// its threshold by a seeded spread of the fault, count from a baseline, and tell a cause when the fault is found; a fixed repeating
+    /// fault leaves a dormant copy of itself behind.
+    /// </summary>
     private void Spawn(bool present)
     {
-        foreach (var f in _boat.AllFaults)
+        foreach (var f in _boat.AllFaults.ToList())
         {
+            if (f is { Spawned: true, Rearmed: false, State: FaultState.Fixed, Repeats: true }) Rearm(f);
             if (!f.Dormant || f.Spawned || f.Spawn.Count == 0) continue;
-            if (!f.Spawn.Any(r => _values.Get(r.When) >= r.AtLeast)) continue;
+            var rule = f.Spawn.FirstOrDefault(r => SpawnCount(f, r) >= SpawnThreshold(f, r));
+            if (rule is null) continue;
+            int count = (int)Math.Round(SpawnCount(f, rule), MidpointRounding.AwayFromZero);
             f.SpawnOn(Day);
             DrawSpread(f);
+            if (rule.Cause is { Length: > 0 } cause)
+                _pendingCause[f.Id] = cause.Replace("{n}", Number(count)).Replace("{s}", count == 1 ? "" : "s");
             if (!present) _wokenAway.Add(f);
         }
+    }
+
+    /// <summary>What the rule's system value has gained since the fault was armed.</summary>
+    private double SpawnCount(Fault f, SpawnRule rule) => _values.Get(rule.When) - f.SpawnBaseline.GetValueOrDefault(rule.When);
+
+    private double SpawnThreshold(Fault f, SpawnRule rule)
+    {
+        if (!rule.Spread) return rule.AtLeast;
+        var rates = _boat.Rates;
+        double roll = new SeededRandom(SeasonSeed(_worldSeed, SaltSpawnSpread, StableHash(f.Id), 0)).NextDouble();
+        return rule.AtLeast * (rates.SpreadLo + roll * (rates.SpreadHi - rates.SpreadLo));
+    }
+
+    /// <summary>The same number on every machine and every run (string.GetHashCode is neither).</summary>
+    internal static int StableHash(string text)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (char c in text) hash = (hash ^ c) * 16777619;
+            return (int)hash;
+        }
+    }
+
+    /// <summary>A repeating fault was put right: its component gets a dormant copy, counting from the values of now.</summary>
+    private void Rearm(Fault f)
+    {
+        f.Rearmed = true;
+        var component = _boat.Get(f.ComponentId);
+        int hash = f.Id.IndexOf('#');
+        string root = hash < 0 ? f.Id : f.Id[..hash];
+        int n = 2;
+        while (component.Faults.Any(x => x.Id == $"{root}#{n}")) n++;
+        var baseline = f.Spawn.ToDictionary(r => r.When, r => _values.Get(r.When));
+        component.AddFault(f.CloneDormant($"{root}#{n}", baseline));
     }
 
     /// <summary>Said in the saloon (look, go) when the water is over the sole, even with the floorboards in.</summary>

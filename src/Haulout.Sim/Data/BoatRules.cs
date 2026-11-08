@@ -122,7 +122,12 @@ public sealed record Port
     /// <summary>What the shop here charges against the chandlery price (1.3 = 30 % markup). PLACEHOLDER.</summary>
     public double PriceFactor { get; init; } = 1.0;
 
-    public bool Sells(ChandleryItem item) => Stock is null || Stock.Contains(item.Id);
+    /// <summary>False: no shop at all (an anchorage). Nothing can be bought here and no spare can be had. PLACEHOLDER (design note 008).</summary>
+    public bool Shop { get; init; } = true;
+    /// <summary>Diesel is for sale here (design note 008, used by the winter tasks). PLACEHOLDER.</summary>
+    public bool Fuel { get; init; }
+
+    public bool Sells(ChandleryItem item) => Shop && (Stock is null || Stock.Contains(item.Id));
     public int PriceOf(ChandleryItem item) => (int)Math.Round(item.PriceNok * PriceFactor, MidpointRounding.AwayFromZero);
     public IReadOnlyList<string> ArrivalLines { get; init; } = [];
 }
@@ -207,4 +212,151 @@ public sealed record ForecastRules
     public IReadOnlyList<double> RainFlipChance { get; init; } = [0, 0.1, 0.2, 0.3];
 
     public static ForecastRules Default { get; } = new();
+}
+
+/// <summary>A word band: the first band whose Under exceeds the value wins; a null Under is anything above the rest.</summary>
+public sealed record Band(double? Under, string Text)
+{
+    /// <summary>The text of the band the value falls in; "" when there are no bands.</summary>
+    public static string Pick(IReadOnlyList<Band> bands, double value)
+    {
+        foreach (var b in bands)
+            if (b.Under is { } u && value < u) return b.Text;
+        return bands.Count == 0 ? "" : bands[^1].Text;
+    }
+}
+
+/// <summary>
+/// The yard's calendar and prices (design note 008). Days of year are 0-based within a 360-day year. All PLACEHOLDERS for Amit;
+/// the haulout season is UNVERIFIED.
+/// </summary>
+public sealed record YardRules
+{
+    public int WindowFromDayOfYear { get; init; } = 255;
+    public int WindowToDayOfYear { get; init; } = 300;
+    /// <summary>From this day of year every week of waiting pushes the first free slot later by a seeded 0 to DriftMaxDaysPerWeek days.</summary>
+    public int DriftFromDayOfYear { get; init; } = 240;
+    public int DriftMaxDaysPerWeek { get; init; } = 7;
+    public int MinLeadDays { get; init; } = 1;
+    public int LiftNok { get; init; } = 7000;
+    public int StorageNok { get; init; } = 9000;
+    public int ChangeFeeNok { get; init; } = 500;
+    public int WashNok { get; init; } = 1200;
+    public int WashMinutes { get; init; } = 120;
+    public int HauloutMinutes { get; init; } = 120;
+    /// <summary>A lift on or after this day of year is the autumn lift: storage is billed and she is laid up.</summary>
+    public int AutumnFromDayOfYear { get; init; } = 240;
+
+    public static YardRules Default { get; } = new();
+}
+
+/// <summary>
+/// Growth on the hull below the waterline (design note 008). The growth rate and the knots lost are PLACEHOLDERS, UNVERIFIED against real boats.
+/// </summary>
+public sealed record FoulingRules
+{
+    public double BaseGrowthPerDay { get; init; } = 0.008;
+    public int WaterLagDays { get; init; } = 20;
+    public double GrowthFromC { get; init; } = 6;
+    public double FullGrowthC { get; init; } = 15;
+    public double PaintProtection { get; init; } = 0.9;
+    public IReadOnlyList<double> Spread { get; init; } = [0.6, 1.6];
+    public double MaxKnotsLost { get; init; } = 1.2;
+    public double LoadPerGrowth { get; init; } = 0.5;
+    public int CleanMinutes { get; init; } = 240;
+    public int ScrubMinutes { get; init; } = 120;
+    public double ScrubFraction { get; init; } = 0.4;
+    public double PaintNeedsCleanBelow { get; init; } = 0.1;
+    public double ShowFrom { get; init; } = 0.05;
+    /// <summary>Antifouling in a condition under this reads as thin paint in the lift's cause line.</summary>
+    public double PaintThinBelow { get; init; } = 0.5;
+    /// <summary>A look at the waterline compares with the last look when the words are the same but the growth moved by more than this.</summary>
+    public double CompareStep { get; init; } = 0.04;
+    public IReadOnlyList<Band> WaterlineWords { get; init; } = [];
+    public IReadOnlyList<Band> HullWords { get; init; } = [];
+
+    public static FoulingRules Default { get; } = new();
+}
+
+/// <summary>Chafe on the mooring lines on a gale day afloat in port, and what happens when they part (design note 008). PLACEHOLDERS, UNVERIFIED.</summary>
+public sealed record MooringRules
+{
+    public double StartChafe { get; init; } = 0.2;
+    public int FromForce { get; init; } = 7;
+    /// <summary>Index 0 is force FromForce; stronger gales than the list use its last entry.</summary>
+    public IReadOnlyList<double> ChafeByForce { get; init; } = [0.25, 0.45, 0.7];
+    public IReadOnlyList<double> Spread { get; init; } = [0.6, 1.6];
+    public double PartAt { get; init; } = 1.0;
+    public double WarnFrom { get; init; } = 0.5;
+    public int PartedRepairNok { get; init; } = 4000;
+    public IReadOnlyList<Band> ChafeWords { get; init; } = [];
+
+    public static MooringRules Default { get; } = new();
+}
+
+/// <summary>
+/// The winter layup on the hard (design note 008, step 2): the tasks' minutes and prices, and the rates of the four winter accumulators.
+/// All PLACEHOLDERS for Amit; the domain claims are UNVERIFIED.
+/// </summary>
+public sealed record LayupRules
+{
+    /// <summary>From this day of the year to the yard's autumn day it is the season: waiting for spring is refused unless she is laid up.</summary>
+    public int SeasonFromDayOfYear { get; init; } = 60;
+    public int WinteriseMinutes { get; init; } = 90;
+    public int AntifreezeNok { get; init; } = 250;
+    public int FillMinutes { get; init; } = 30;
+    public int DieselNokPerLitre { get; init; } = 22;
+    /// <summary>A tank at or above this fraction of its capacity breathes no damp air worth the name.</summary>
+    public double FullAt { get; init; } = 0.9;
+    public int BatteryMinutes { get; init; } = 30;
+    public int BatteryRoomNok { get; init; } = 400;
+    public int ChargerMinutes { get; init; } = 20;
+    public int ChargerNok { get; init; } = 600;
+    public int CoverMinutes { get; init; } = 120;
+    public int CoverNok { get; init; } = 2500;
+    /// <summary>What a battery left aboard on the hard loses in a day on top of its self-discharge.</summary>
+    public double DrawPerDay { get; init; } = 0.006;
+    public double FrostHoursPerDegree { get; init; } = 3;
+    public double MaxFrostHoursPerNight { get; init; } = 14;
+    public double CondensationBelowNightC { get; init; } = 5;
+    public double FreezeBelowCharge { get; init; } = 0.25;
+    public double SnowBelowC { get; init; } = 1;
+    public int SpringDayOfYear { get; init; } = 75;
+
+    public static LayupRules Default { get; } = new();
+}
+
+/// <summary>
+/// The sale (design note 008, step 3): the valuation, the broker, the buyers. All numbers are PLACEHOLDERS for Amit; the valuation
+/// practice itself (what a buyer deducts, how a logbook and the season move a price) is UNVERIFIED against real brokers.
+/// </summary>
+public sealed record SaleRules
+{
+    public int BaseNok { get; init; } = 180000;
+    /// <summary>Years of engine hours nobody wrote down, before the player owned her.</summary>
+    public int UndocumentedYearsAtPurchase { get; init; } = 4;
+    public int PerUndocumentedYearNok { get; init; } = 3000;
+    public int PerEntryNok { get; init; } = 600;
+    public int EntriesCap { get; init; } = 12;
+    /// <summary>Added in March to June.</summary>
+    public double SpringBonus { get; init; } = 0.04;
+    /// <summary>Taken off from September to February.</summary>
+    public double AutumnDiscount { get; init; } = 0.04;
+    public double FloorFraction { get; init; } = 0.3;
+    /// <summary>Growth on the hull from which a buyer's surveyor counts the wash as a finding.</summary>
+    public double FoulingFindFrom { get; init; } = 0.2;
+    public double FindChance { get; init; } = 0.85;
+    public double ViewingChancePerDay { get; init; } = 0.2;
+    public double AskSensitivity { get; init; } = 3;
+    public IReadOnlyDictionary<string, double> SeasonViewingFactor { get; init; } =
+        new Dictionary<string, double> { ["spring"] = 1.3, ["summer"] = 1.0, ["autumn"] = 0.6, ["winter"] = 0.6 };
+    public IReadOnlyList<double> OfferSpread { get; init; } = [0.88, 1.02];
+    public int OfferHoldsDays { get; init; } = 7;
+    public int ListMinutes { get; init; } = 30;
+    public string Broker { get; init; } = "Holm & Datter, yacht brokers";
+    /// <summary>Replacing one of these (or winterising the engine) is an engine service entry in the logbook.</summary>
+    public IReadOnlyList<string> ServiceComponents { get; init; } =
+        ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"];
+
+    public static SaleRules Default { get; } = new();
 }

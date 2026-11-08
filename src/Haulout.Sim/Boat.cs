@@ -40,8 +40,15 @@ public sealed class Boat
         IEnumerable<Position> positions, IEnumerable<Component> components,
         Economy? economy = null, SurveyData? survey = null, DiyQuality? diyQuality = null, Rates? rates = null,
         WaterRules? water = null, ElectricalRules? electrical = null, InsuranceRules? insurance = null,
-        IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null)
+        IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null,
+        YardRules? yard = null, FoulingRules? fouling = null, MooringRules? mooring = null, LayupRules? layup = null,
+        SaleRules? sale = null)
     {
+        Sale = sale ?? SaleRules.Default;
+        Layup = layup ?? LayupRules.Default;
+        Yard = yard ?? YardRules.Default;
+        Fouling = fouling ?? FoulingRules.Default;
+        Mooring = mooring ?? MooringRules.Default;
         Chandlery = (chandlery ?? []).ToList();
         Trips = trips;
         SeaRules = seaRules ?? SeaRules.Default;
@@ -113,6 +120,11 @@ public sealed class Boat
     public TripRules? Trips { get; }
     public SeaRules SeaRules { get; }
     public ForecastRules ForecastRules { get; }
+    public YardRules Yard { get; }
+    public FoulingRules Fouling { get; }
+    public MooringRules Mooring { get; }
+    public LayupRules Layup { get; }
+    public SaleRules Sale { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }
     /// <summary>Null: no poor-job rule.</summary>

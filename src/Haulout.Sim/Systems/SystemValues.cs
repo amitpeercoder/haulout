@@ -14,6 +14,11 @@ public sealed class SystemValues
     public const string Charging = "electrical.charging";
     public const string DragStarts = "electrical.dragStarts";
     public const string OverheatMinutes = "cooling.overheatMinutes";
+    /// <summary>Design note 008, the winter layup: frost hours with raw water left in the engine, damp cold nights in a part-empty tank, frosty nights with a flat battery aboard, snow days with no cover.</summary>
+    public const string FrostHoursWithWater = "cooling.frostHoursWithWater";
+    public const string CondensationDays = "fuel.condensationDays";
+    public const string FrozenNights = "electrical.frozenNights";
+    public const string SnowDays = "deck.snowDays";
 
     private readonly Dictionary<string, double> _values = new();
 

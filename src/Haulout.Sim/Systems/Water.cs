@@ -38,6 +38,24 @@ internal sealed class WaterSystem
     public double AwashHours { get; private set; }
     /// <summary>Pump cycles since the player was last aboard: the arrival alerts (step 5) read it, the next aboard step resets it.</summary>
     public int CyclesSinceAboard { get; set; }
+    /// <summary>Litres that came in through the open companionway hatch (rain) since the player was last aboard.</summary>
+    public double HatchLitresSinceAboard { get; private set; }
+    /// <summary>Litres of rain that came in through components (deck, ports, hoses) since the player was last aboard.</summary>
+    public double RainLitresSinceAboard { get; private set; }
+    /// <summary>Litres of seawater through leaks (and spray) since the player was last aboard.</summary>
+    public double SeaLitresSinceAboard { get; private set; }
+
+    /// <summary>The player is aboard and has read the counter: the next stretch away counts from here.</summary>
+    public void ResetSinceAboard()
+    {
+        CyclesSinceAboard = 0;
+        HatchLitresSinceAboard = 0;
+        RainLitresSinceAboard = 0;
+        SeaLitresSinceAboard = 0;
+    }
+
+    /// <summary>The hatch let in more than every other source put together since the player was last aboard.</summary>
+    public bool HatchDominant => HatchLitresSinceAboard > RainLitresSinceAboard + SeaLitresSinceAboard;
 
     public int PumpCycles => _boat.TryGet(PumpId, out var p) ? (int)p.State.GetValueOrDefault(CyclesState) : 0;
     public double PumpRunMinutes => _boat.TryGet(PumpId, out var p) ? p.State.GetValueOrDefault(RunMinutesState) : 0;
@@ -45,9 +63,12 @@ internal sealed class WaterSystem
     /// <summary>What a step needs to know of the world. RainMm is the day's rain; the step takes its share of 24 hours.</summary>
     public readonly record struct Inputs(int Minutes, bool Afloat, double RainMm, bool HatchOpen, bool FuseIn, int SeaState = 0);
 
+    /// <summary>The start battery is in its box (design note 008: a battery in the yard's battery room powers nothing).</summary>
+    public bool BatteryAboard { get; set; } = true;
+
     /// <summary>The pump has current: its fuse is in and the battery is above the floor.</summary>
     public bool PumpPowered(bool fuseIn) =>
-        fuseIn && _boat.TryGet(PumpId, out _) && Electrical.StateOfCharge(_boat) > _boat.Electrical.PumpMinStateOfCharge;
+        BatteryAboard && fuseIn && _boat.TryGet(PumpId, out _) && Electrical.StateOfCharge(_boat) > _boat.Electrical.PumpMinStateOfCharge;
 
     public void Step(Inputs input)
     {
@@ -57,18 +78,22 @@ internal sealed class WaterSystem
         double hours = minutes / 60.0;
 
         // Ingress, litres per minute over the step.
-        double sea = 0, perMm = input.HatchOpen ? rules.RainThroughOpenHatchLitresPerMm : 0;
+        double sea = 0, hatchPerMm = input.HatchOpen ? rules.RainThroughOpenHatchLitresPerMm : 0, componentPerMm = 0;
         foreach (var id in _ingress)
         {
             if (input.Afloat) sea += Math.Max(0, Properties.Effective(_boat, id, LeakProperty, 0));
-            perMm += Math.Max(0, Properties.Effective(_boat, id, RainProperty, 0));
+            componentPerMm += Math.Max(0, Properties.Effective(_boat, id, RainProperty, 0));
         }
+        double perMm = hatchPerMm + componentPerMm;
         // Under way (design note 007): the sea slops at every leak, and spray finds the open hatch.
         var seaRules = _boat.SeaRules;
         sea *= 1 + seaRules.SlopPerSeaState * input.SeaState;
         if (input.Afloat && input.HatchOpen && input.SeaState >= seaRules.SprayFromSeaState)
             sea += seaRules.SprayLitresPerHourPerSeaState * input.SeaState;
         double rate = (sea * hours + perMm * input.RainMm * hours / 24.0) / minutes;
+        HatchLitresSinceAboard += hatchPerMm * input.RainMm * hours / 24.0;
+        RainLitresSinceAboard += componentPerMm * input.RainMm * hours / 24.0;
+        SeaLitresSinceAboard += sea * hours;
 
         // The pump, with its float switch: on at onLitres, off at offLitres.
         bool pumpFitted = _boat.TryGet(PumpId, out var pump);

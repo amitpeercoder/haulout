@@ -44,8 +44,8 @@ public sealed partial class Game
 
         switch (p.Mode)
         {
-            case SeaMode.Motoring: p.PositionNm += rules.MotorKnots * h; break;
-            case SeaMode.Sailing: p.PositionNm += Sea.SailKnots(rules, w.WindForce) * h; break;
+            case SeaMode.Motoring: p.PositionNm += Slowed(rules.MotorKnots, Fouling) * h; break;
+            case SeaMode.Sailing: p.PositionNm += Slowed(Sea.SailKnots(rules, w.WindForce), Fouling) * h; break;
             case SeaMode.HoveTo:
             case SeaMode.Drifting: p.DriftNm += rules.HeaveToDriftKnots * h; break;
             case SeaMode.UnderTow:
@@ -59,7 +59,7 @@ public sealed partial class Game
         {
             double vanes = impeller.State.GetValueOrDefault(EngineInputsBuilder.VaneFactorProperty, 1.0);
             impeller.State[EngineInputsBuilder.VaneFactorProperty] =
-                Math.Max(0, vanes - rules.ImpellerShedPerLoadHour * (1 - impeller.Condition) * h);
+                Math.Max(0, vanes - rules.ImpellerShedPerLoadHour * (1 - impeller.Condition) * (1 + _boat.Fouling.LoadPerGrowth * Fouling) * h);
         }
 
         // A running engine in a seaway stirs the tank: water in the fuel reaches the primary filter.
@@ -135,6 +135,7 @@ public sealed partial class Game
         t.Narrative.Add("You pick up a mooring and stop the engine.");
         t.Narrative.AddRange(port.ArrivalLines);
         _log.Add(new LogEntry(DayAt(p.EndClockMinutes), FormatTime(p.EndClockMinutes), $"Arrived at {port.Name}."));
+        CountArrival(p, port);
         return ResultOf(p, towed: false, port.ArrivalLines.ToList());
     }
 
@@ -198,8 +199,8 @@ public sealed partial class Game
         var w = Today;
         double speed = p.Mode switch
         {
-            SeaMode.Motoring => _running ? rules.MotorKnots : 0,
-            SeaMode.Sailing => Sea.Serves(rules, w.WindForce, w.WindFrom, p.Route.CourseDeg) ? Sea.SailKnots(rules, w.WindForce) : 0,
+            SeaMode.Motoring => _running ? Slowed(rules.MotorKnots, Fouling) : 0,
+            SeaMode.Sailing => Sea.Serves(rules, w.WindForce, w.WindFrom, p.Route.CourseDeg) ? Slowed(Sea.SailKnots(rules, w.WindForce), Fouling) : 0,
             _ => 0,
         };
         if (speed <= 0) return MaxStepMinutes;
@@ -360,6 +361,7 @@ public sealed partial class Game
         t.Narrative.Add("You call the towboat on the VHF and give your position. It comes alongside, takes your line, and the engine stays silent.");
         t.Narrative.Add($"{home} is the nearer port, {towNm.ToString("0.0", CultureInfo.InvariantCulture)} nm off; that's where they take her.");
         _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {tow.Nok} NOK to be towed {towed}.", tow.Nok));
+        CountTow($"Called the towboat: {tow.Nok} NOK to be towed {towed}.");
         int before = ClockMinutes;
 
         Tick(t, tow.Hours * 60, aboard: true);
@@ -400,8 +402,11 @@ public sealed partial class Game
             var route = _boat.Trips is { } trips && !_sunk ? trips.RoutesFrom(_portId).FirstOrDefault() : null;
             bool serves = route is not null && Sea.Serves(rules, w.WindForce, w.WindFrom, route.CourseDeg);
             string at = CurrentPort?.Name ?? "";
+            var out_ = _boat.Trips is { } all && !_sunk
+                ? all.RoutesFrom(_portId).Select(r => $"{PortName(r.To)}, {r.DistanceNm.ToString("0.#", ci)} nm").ToList()
+                : [];
             return new TripView(false, CurrentPort?.Name, null, null, 0, 0, null, 0, false, null, serves,
-                at.Length > 0 ? $"She lies at {at}." : "She lies at her mooring.");
+                at.Length > 0 ? $"She lies at {at}." : "She lies at her mooring.", out_);
         }
 
         var near = NearestAnchorage(p);

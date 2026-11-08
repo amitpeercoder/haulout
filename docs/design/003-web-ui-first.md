@@ -49,3 +49,5 @@ Chart view, seasons, economy, sound, mobile layout, the MCP adapter.
 Both are queries: no time passes. The MCP adapter can reuse them.
 
 **Clicking.** Clicking a closed compartment issues Open (2 min); clicking it again only selects it. Clicking a marker selects the component; the panel's buttons issue the commands.
+
+**Season tab (design note 008).** The context panel has a fourth tab, Season: the yard calendar and booking, the hull, the winter tasks, the broker's letter, viewings and offers, Keep, and a closing card when she is sold. A season line sits under the logbook header. No new drawing.

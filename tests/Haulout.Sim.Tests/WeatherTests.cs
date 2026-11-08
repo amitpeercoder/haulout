@@ -11,11 +11,11 @@ public class WeatherTests
     private static IEnumerable<WeatherSeries> Seeds() => Enumerable.Range(1, 20).Select(x => WeatherSeries.Generate(x));
 
     [Fact]
-    public void Same_seed_gives_identical_721_days()
+    public void Same_seed_gives_identical_days()
     {
         var a = WeatherSeries.Generate(4);
         var b = WeatherSeries.Generate(4);
-        Assert.Equal(721, a.Count);
+        Assert.Equal(WeatherSeries.LastDay + 1, a.Count);
         for (var d = 0; d <= 720; d++) Assert.Equal(a[d], b[d]);
     }
 
@@ -84,7 +84,7 @@ public class WeatherTests
     {
         var s = WeatherSeries.Generate(3);
         Assert.Equal(s[0], s.For(-5));
-        Assert.Equal(s[720], s.For(5000));
+        Assert.Equal(s[WeatherSeries.LastDay], s.For(5000));
     }
 
     [Fact]

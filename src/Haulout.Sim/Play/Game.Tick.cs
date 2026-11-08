@@ -54,7 +54,7 @@ public sealed partial class Game
             if (aboard) PresentAlerts(step, atSea);
             if (aboard)
             {
-                _water.CyclesSinceAboard = 0;
+                _water.ResetSinceAboard();
                 RaiseArrivalSigns(); // she is here to be seen now
             }
             left -= step;
@@ -82,6 +82,8 @@ public sealed partial class Game
             f.Progress += f.Progression!.BaseRatePerDay * (f.Spread ?? 1.0) * product;
             if (f.Escalation is not null && f.Progress >= _boat.Rates.Threshold) Escalate(t, f, present, withCause: true);
         }
+
+        SeasonDaily(t, day, present);
 
         _workMinutesToday = 0;
         _engineMinutesToday = 0;
@@ -113,6 +115,7 @@ public sealed partial class Game
     /// <summary>The rain weighting for the day from the day's weather.</summary>
     private double RainTerm(int day)
     {
+        if (UnderWinterCover) return 0; // the cover keeps the deck dry
         var e = _boat.Rates.Exposure;
         return e.RainWeight * Math.Min(_weather[day].RainMm, e.RainCapMm) / e.RainCapMm;
     }
@@ -123,10 +126,10 @@ public sealed partial class Game
     /// <summary>Rain counts for this fault only when its progression asks for no cover, or one of the named covers is off now.</summary>
     private bool RainCounts(ProgressionSpec spec) => spec.RainOnlyWhenOff is not { Count: > 0 } c || c.Any(_removed.Contains);
 
-    private bool RainDay(int day) => WeatherWords.IsRaining(_weather[day]);
+    private bool RainDay(int day) => !UnderWinterCover && WeatherWords.IsRaining(_weather[day]);
     private bool FrostNight(int day) => _weather[day].NightC < 0;
     /// <summary>The start battery below half charge.</summary>
-    private bool BatteryLow() => Electrical.StateOfCharge(_boat) < 0.5;
+    private bool BatteryLow() => !IsBatteryAshore && Electrical.StateOfCharge(_boat) < 0.5;
 
     /// <summary>The product of the fault's declared factors for a day, and the causes that applied.</summary>
     private (double Product, DailyCauses Causes) Factors(Fault f, DayStateValues s)

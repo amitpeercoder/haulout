@@ -70,6 +70,7 @@ public sealed class GameSession
                 port = status.Port,
                 atSea = status.AtSea,
                 sunk = status.Sunk,
+                sold = status.Sold,
             });
             using var w = new StreamWriter(_tracePath, append: true);
             w.WriteLine(line);

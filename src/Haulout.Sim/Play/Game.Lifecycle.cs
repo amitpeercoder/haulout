@@ -24,7 +24,7 @@ public sealed partial class Game
 
     // ------------------------------------------------------------------ money and haul state
 
-    private int Balance => _boat.Economy.StartingBalanceNok - _money;
+    private int Balance => _boat.Economy.StartingBalanceNok - _money + _incomeNok;
 
     private string? MoneyRefusal(int costNok) =>
         costNok <= Balance ? null
@@ -53,7 +53,7 @@ public sealed partial class Game
 
     private string LaunchIn()
     {
-        int deadline = _boat.Economy.LaunchDeadlineDay;
+        int deadline = _launchDeadlineDay;
         int n = deadline - Day;
         return n > 0 ? $"Launch is set for day {deadline}, {Days(n)} from now."
             : n == 0 ? $"Launch is set for day {deadline}, today."
@@ -95,6 +95,20 @@ public sealed partial class Game
     /// <summary>What the player knows is open: the discovered problems still present, and the ones that have since turned into something unfound.</summary>
     private IEnumerable<Fault> KnownOpenFaults() => OpenFaults().Concat(SupersededOpen());
 
+    /// <summary>
+    /// The status list: every problem the player has found, the ones put right marked as fixed (they stay as history, as in the readiness
+    /// list's "Done"). Empty once she is sold: the status says so instead.
+    /// </summary>
+    private List<KnownFault> KnownStatus()
+    {
+        if (_sold) return [];
+        var superseded = SupersededFixed().ToHashSet();
+        return _discovered
+            .Where(k => FaultById(k.Id) is not { Escalated: true } || Superseded(FaultById(k.Id)!))
+            .Select(k => FaultById(k.Id) is { } f ? k with { Fixed = f.State == FaultState.Fixed || superseded.Contains(f) } : k)
+            .ToList();
+    }
+
     private bool ResolveFault(string action, string name, out Fault fault, out CommandResult? rejected)
     {
         var open = KnownOpenFaults().ToList();
@@ -103,6 +117,11 @@ public sealed partial class Game
             r = NameResolver.Resolve(open, name, f => f.Id, f => f.Name,
                 f => _boat.Get(f.ComponentId) is var c ? c.Aliases.Append(c.Name).ToList() : []);
         fault = r.Match!;
+        if (r.Match is { ComponentId: Systems.Electrical.BatteryId } && IsBatteryAshore)
+        {
+            rejected = Reject(action, BatteryAshoreMessage);
+            return false;
+        }
         if (r.Match is not null) { rejected = null; return true; }
         rejected = r.Kind == ResolutionKind.Ambiguous
             ? RejectResolution(action, r, name, f => f.Name)
@@ -154,6 +173,7 @@ public sealed partial class Game
         if (AtSea) return Reject("wait", "You're at sea: continue, heave to or anchor.");
         if (days is < 1 or > MaxWaitDays) return Reject("wait", $"You can wait between 1 and {MaxWaitDays} days at a time.");
         ShutDownEngine(t);
+        days = StopAtSlot(t, days);
         t.Narrative.Add($"You leave her for {Days(days)}.");
         // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
         var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();
@@ -191,6 +211,7 @@ public sealed partial class Game
         Discover(t, next);
         if (!withCause) return;
         _log.Add(new LogEntry(Day, TimeOfDay, CauseLine(f, next)));
+        _firstCauseLine ??= $"Day {Day}: {CauseLine(f, next)}";
         LogFound(t, from, Day, TimeOfDay);
     }
 
@@ -199,7 +220,11 @@ public sealed partial class Game
         for (int i = from; i < t.Newly.Count; i++)
         {
             var k = t.Newly[i];
-            if (t.Causes.TryGetValue(k.Id, out var cause)) _log.Add(new LogEntry(day, stamp, cause));
+            if (t.Causes.TryGetValue(k.Id, out var cause))
+            {
+                _log.Add(new LogEntry(day, stamp, cause));
+                _firstCauseLine ??= $"Day {day}: {cause}";
+            }
             _log.Add(new LogEntry(day, stamp, t.RuledOut.Contains(k.Id) ? $"Ruled out: {k.Name}." : $"Found: {k.Name}."));
         }
     }
@@ -210,11 +235,14 @@ public sealed partial class Game
     {
         if (YardGate() is { } away) return Reject("launch", away);
         if (Afloat) return Reject("launch", "She's already in the water.");
+        if (IsBatteryAshore) return Reject("launch", "The battery is in the yard's battery room: fit it first (battery aboard).");
         if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
             return Reject("launch", $"The yard won't launch her in this: {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}). Try another day.");
 
         _onTheHard = false;
         _launched = true;
+        _laidUp = false;
+        _foulingSpread = Between(_boat.Fouling.Spread, SeasonRoll(SaltFouling, Day, 0));
         _placeId = StartPlaceId;
         _visited.Add(_placeId);
         MarkSeen(t);
@@ -222,10 +250,12 @@ public sealed partial class Game
 
         t.Narrative.Add("The travel hoist lifts her out of the cradle and lowers her into the water.");
         t.Narrative.Add("She's in the water.");
+        LaunchLayupLines(t);
+        LaunchSaleLines(t);
         foreach (var f in _boat.AllFaults.Where(f => f.Present && f.Escalation is { OnLaunch: true }).ToList()) Escalate(t, f, present: true);
         RecordLaunchCover();
 
-        int deadline = _boat.Economy.LaunchDeadlineDay;
+        int deadline = _launchDeadlineDay;
         int early = deadline - day;
         string when = early > 0 ? $"{Days(early)} before the deadline" : early == 0 ? "on the deadline" : $"{Days(-early)} after the deadline";
         var open = KnownOpenFaults().ToList();
@@ -251,8 +281,23 @@ public sealed partial class Game
         ShutDownEngine(t);
         _onTheHard = true;
         t.Narrative.Add($"The yard crane lifts her out and sets her back in the cradle. {Days(economy.EmergencyLiftDays)} later she's standing on the hard again.");
-        return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok, null,
-            "Emergency lift: back on the hard.", work: false);
+        // On or after the autumn day this is the lift for the winter: storage is billed, she is laid up, any booking lapses.
+        bool autumn = IsAutumnLift();
+        int storage = autumn ? _boat.Yard.StorageNok : 0;
+        HauloutView? card = null;
+        if (autumn)
+        {
+            _laidUp = true;
+            _laidUpSinceDay = Day;
+            if (_bookedDay is not null)
+            {
+                _bookedDay = null;
+                t.Narrative.Add("Your haulout booking lapses: she is out already.");
+            }
+            card = LiftCard(t, economy.EmergencyLiftNok, storage);
+        }
+        return Accept(t, "emergency-lift", economy.EmergencyLiftDays * 1440, economy.EmergencyLiftNok + storage, card,
+            autumn ? $"Emergency lift for the winter: back on the hard, storage {storage} NOK." : "Emergency lift: back on the hard.", work: false);
     }
 
     // ------------------------------------------------------------------ the player's own work

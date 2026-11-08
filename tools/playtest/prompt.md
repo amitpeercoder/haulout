@@ -10,10 +10,12 @@ You can hire a surveyor, and you decide when she is launched; the yard expects h
 
 Your goal: find out why the engine won't start and get it running, spending as little in-game time and money as you can.
 
-Once she runs, the real goal is to get her to the regatta party at Hestholmen and back without a tow.
+Once she runs, the first goal is to get her to the regatta party at Hestholmen and back without a tow.
 
-When she is back at her mooring from Hestholmen, reply with a single line:
+After that, the goal is to get through the season: keep her afloat and sound, haul her out at the yard in the autumn (the yard's slots go fast: book one early), lay her up for the winter, and sell her.
+
+When the sale has closed, or after you have chosen to keep her, reply with a single line:
 DONE <number of tool calls you made>
 
-If you have made 150 tool calls without success, stop and reply with a single line:
+If you have made 300 tool calls without success, stop and reply with a single line:
 GAVE UP <number of tool calls you made>

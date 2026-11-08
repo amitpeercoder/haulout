@@ -177,6 +177,86 @@ public sealed class HaulTools(GameSession session)
         "At sea, anywhere: call the towboat on the VHF. Costs the tow in NOK (plan_trip shows it; it is charged even if you cannot afford it) and the best part of a day. Ends the trip at the nearer port along the route (the one she left or the one she was bound for).")]
     public string CallTow() => session.Do("call_tow", new CallTow());
 
+    [McpServerTool(Name = "season", ReadOnly = true), Description(
+        "The season and the yard's calendar: the lifting window, the slot you hold, the first free slot (it moves later every week you wait past the end of summer, and the yard fills up), and what a lift, winter storage, changing a booking and the emergency lift cost. Costs no time.")]
+    public string Season() => session.Ask("season", new Season());
+
+    [McpServerTool(Name = "book_haulout"), Description(
+        "Ring the yard and book the crane for a day, to be lifted out of the water. Free and takes no time, from any port (refused at sea). Changing an existing booking costs 500 NOK. " +
+        "Refused if the day is before the first free slot (season tells you), past the lifting window, already yours, or the yard is full or has finished for the year. A slot you miss is given away.")]
+    public string BookHaulout([Description("The day of the slot, as a game day number, e.g. 270.")] int day) =>
+        session.Do("book_haulout", new BookHaulout(day), ("day", day.ToString()));
+
+    [McpServerTool(Name = "haul_out"), Description(
+        "Motor her round to the yard crane and be lifted out. Takes 2 hours and costs the lift (7000 NOK) and, in the autumn, winter storage on the hard (9000 NOK), billed even if that takes your balance below zero. " +
+        "Only at Skjærvik, afloat, on your booked day, from the cockpit with the engine running and not in a gale; refused otherwise, and a missed slot is given away. Shows what the hull looks like out of the water.")]
+    public string HaulOut() => session.Do("haul_out", new HaulOut());
+
+    [McpServerTool(Name = "scrub"), Description(
+        "Scrub the growth off the hull from the rail. Takes 2 hours, free. Only afloat in port or at anchor, from the cockpit or on deck; it takes part of the growth off, never all. " +
+        "Refused on the hard (clean the hull instead) and under way.")]
+    public string Scrub() => session.Do("scrub", new Scrub());
+
+    [McpServerTool(Name = "yard_wash"), Description(
+        "Pay the yard to pressure-wash the hull clean. Costs 1200 NOK and takes 2 hours of the yard's time (not your work). Only on the hard at Skjærvik; refused afloat or without the money.")]
+    public string YardWash() => session.Do("yard_wash", new WashHull());
+
+    [McpServerTool(Name = "winterise_engine"), Description(
+        "Winter layup, on the hard: drain the raw-water side of the engine (the pump and the heat exchanger) and run antifreeze through it, so frost cannot crack them. Takes 90 minutes and costs 250 NOK. " +
+        "Only on the hard, from the companionway with the steps off; refused afloat or when it is done already. Running the engine afterwards fills the raw-water side again. The season query lists the layup tasks.")]
+    public string WinteriseEngine() => session.Do("winterise_engine", new WinteriseEngine());
+
+    [McpServerTool(Name = "fill_tank"), Description(
+        "Top the fuel tank up to the brim with diesel, at a port that sells it (Skjærvik and Storholmen do). Takes 30 minutes and costs the diesel (22 NOK a litre, shown in the result). " +
+        "A full tank has no room for damp air to condense into water over a cold winter. Refused at sea, at a port with no fuel, or when the tank is full.")]
+    public string FillTank() => session.Do("fill_tank", new FillTank());
+
+    [McpServerTool(Name = "battery_ashore"), Description(
+        "Winter layup, on the hard at Skjærvik: carry the start battery to the yard's battery room, where it sits on a charger all winter. Takes 30 minutes and costs 400 NOK. " +
+        "From the quarter berth with the battery box lid off. While it is ashore nothing aboard can start or draw on it, and she cannot be launched: fit it again with battery_aboard.")]
+    public string BatteryAshore() => session.Do("battery_ashore", new BatteryAshore());
+
+    [McpServerTool(Name = "battery_aboard"), Description(
+        "On the hard at Skjærvik, from the quarter berth with the battery box lid off: fit the start battery again from the yard's battery room (30 minutes, free). It comes back full.")]
+    public string BatteryAboard() => session.Do("battery_aboard", new BatteryAboard());
+
+    [McpServerTool(Name = "winter_charger"), Description(
+        "Winter layup, on the hard at Skjærvik: clip the yard's charger on the battery aboard so it is held full all winter. Takes 20 minutes and costs 600 NOK. It is disconnected at launch. " +
+        "The other way to keep the battery from running down in the cold is battery_ashore.")]
+    public string WinterCharger() => session.Do("winter_charger", new WinterCharger());
+
+    [McpServerTool(Name = "fit_winter_cover"), Description(
+        "Winter layup, on the hard, from on deck: rig the winter cover over the deck so rain and snow stay off it. Takes 2 hours; the cover costs 2500 NOK the first time and is kept for later winters. It comes off at launch.")]
+    public string FitWinterCover() => session.Do("fit_winter_cover", new FitWinterCover());
+
+    [McpServerTool(Name = "wait_until_spring"), Description(
+        "Leave her for the winter, day by day, to the next day 75 of the year. Not at sea. You come back early if the boat has something to tell you (an alert) or, if you hold a haulout booking, on the morning of the slot. " +
+        "The result says how many days passed and why you stopped; read notices and the logbook for what the winter did.")]
+    public string WaitUntilSpring() => session.Do("wait_until_spring", new WaitUntilSpring());
+
+    [McpServerTool(Name = "list_for_sale"), Description(
+        "Put her on the market with the broker at your asking price, in NOK; calling it again changes the ask. Takes 30 minutes, free. Only on the hard at Skjærvik. You get the broker's valuation letter: " +
+        "a base value, less the yard's price of every problem you have found and not fixed, less the engine years nobody wrote down, plus a kept logbook, with spring dearer than autumn. " +
+        "While she is listed buyers come to look now and then (more often when you ask less than the letter says, and in spring); each viewing's surveyor goes over her and finds what you could find with your own tools, " +
+        "and the buyer offers about what they found her worth, never over your ask, open for 7 days. Their findings become known problems. Launching her takes the listing off.")]
+    public string ListForSale([Description("Your asking price in NOK.")] int ask_nok) =>
+        session.Do("list_for_sale", new ListForSale(ask_nok), ("ask_nok", ask_nok.ToString()));
+
+    [McpServerTool(Name = "accept_offer"), Description(
+        "Sell her to the best open offer, or to the numbered one (sale lists them). Costs no time. The game ends here: the closing card states what you got, what you spent, the days and hours, the trips and tows; every later command is refused, but the queries still answer. " +
+        "Refused if she is not listed, the offer has lapsed or there is none open.")]
+    public string AcceptOffer([Description("The number of the offer, as sale lists it. Optional; defaults to the best open one.")] int? offer = null) =>
+        session.Do("accept_offer", new AcceptOffer(offer), ("offer", offer?.ToString() ?? ""));
+
+    [McpServerTool(Name = "keep"), Description(
+        "Keep her for another season instead of selling: takes her off the market, moves the launch deadline to the next day 96 of the year, and starts the logbook's maintenance count and the engine-service count again for the next sale. Free, no time. " +
+        "Nothing else is reset: the clock, what the winter did to her and the money carry on. Refused once already since you last launched.")]
+    public string Keep() => session.Do("keep", new Keep());
+
+    [McpServerTool(Name = "sale", ReadOnly = true), Description(
+        "The broker's valuation letter as it stands now (only what you know of her), whether she is listed and at what ask, and every viewing so far with what the buyer's surveyor found, what they offer and whether the offer is still open. Costs no time.")]
+    public string Sale() => session.Ask("sale", new Sale());
+
     [McpServerTool(Name = "status", ReadOnly = true), Description(
         "Day, time of day, time and money spent so far, whether the engine is running, tools owned and problems you have found. Costs no time.")]
     public string Status() => session.Ask("status", new Status());
@@ -204,7 +284,7 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow. " +
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer. " +
         "There is no quit; also available: status, aboard (what you have found so far), readiness, weather (today's sky and wind), inventory, trip, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(

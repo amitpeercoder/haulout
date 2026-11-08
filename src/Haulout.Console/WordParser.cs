@@ -60,6 +60,25 @@ public static class WordParser
             "call" => new Problem("Usage: call tow"),
             "inventory" or "inv" or "spares" => new RunQuery(new Inventory()),
             "trip" => new RunQuery(new Trip()),
+            "season" => new RunQuery(new Season()),
+            "sale" => new RunQuery(new Sale()),
+            "list" or "sell" => ParseList(arg),
+            "accept" => ParseAccept(arg),
+            "keep" => new RunCommand(new Keep()),
+            "book" => ParseBook(arg),
+            "haul" when arg.Equals("out", StringComparison.OrdinalIgnoreCase) => new RunCommand(new HaulOut()),
+            "haul" => new Problem("Usage: haul out"),
+            "haulout" => new RunCommand(new HaulOut()),
+            "scrub" => new RunCommand(new Scrub()),
+            "winterise" or "winterize" => new RunCommand(new WinteriseEngine()),
+            "fill" when arg.Equals("tank", StringComparison.OrdinalIgnoreCase) || arg.Equals("the tank", StringComparison.OrdinalIgnoreCase) => new RunCommand(new FillTank()),
+            "fill" => new Problem("Usage: fill tank"),
+            "battery" when arg.Equals("ashore", StringComparison.OrdinalIgnoreCase) => new RunCommand(new BatteryAshore()),
+            "battery" when arg.Equals("aboard", StringComparison.OrdinalIgnoreCase) => new RunCommand(new BatteryAboard()),
+            "battery" => new Problem("Usage: battery ashore | battery aboard"),
+            "charger" => new RunCommand(new WinterCharger()),
+            "fit" when arg.Equals("cover", StringComparison.OrdinalIgnoreCase) || arg.Equals("winter cover", StringComparison.OrdinalIgnoreCase) || arg.Equals("the cover", StringComparison.OrdinalIgnoreCase) => new RunCommand(new FitWinterCover()),
+            "fit" => new Problem("Usage: fit cover"),
             "buy" => WithArg(arg, "buy <item>", a => new Buy(a)),
             "charge" => new RunCommand(new Charge(arg.Length == 0 ? "start battery" : arg)),
             "check" => ParseCheck(arg),
@@ -137,15 +156,51 @@ public static class WordParser
 
     private static Parsed ParseYard(string arg)
     {
+        if (arg.Equals("wash", StringComparison.OrdinalIgnoreCase)) return new RunCommand(new WashHull());
         if (arg.StartsWith("fix", StringComparison.OrdinalIgnoreCase) && (arg.Length == 3 || arg[3] == ' ' || arg[3] == '\t'))
             arg = arg[3..].Trim();
         return WithArg(arg, "yard fix <problem>", a => new FixByYard(a));
     }
 
-    /// <summary>"wait 3", "wait 3 days", "wait a day".</summary>
+    /// <summary>"list for sale 150000", "list 150000", "sell 150000", "sell for 150000", "sell her at 150000".</summary>
+    private static Parsed ParseList(string arg)
+    {
+        const string usage = "Usage: list for sale <nok> | sell <nok>";
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => !(w.Equals("for", StringComparison.OrdinalIgnoreCase) || w.Equals("sale", StringComparison.OrdinalIgnoreCase)
+                || w.Equals("at", StringComparison.OrdinalIgnoreCase) || w.Equals("her", StringComparison.OrdinalIgnoreCase)
+                || w.Equals("it", StringComparison.OrdinalIgnoreCase) || w.Equals("nok", StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        return words.Count == 1 && int.TryParse(words[0], out var n) && n > 0 ? new RunCommand(new ListForSale(n)) : new Problem(usage);
+    }
+
+    /// <summary>"accept", "accept offer", "accept 2", "accept offer 2".</summary>
+    private static Parsed ParseAccept(string arg)
+    {
+        const string usage = "Usage: accept [offer] [<n>]";
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0].Equals("offer", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        if (words.Count == 0) return new RunCommand(new AcceptOffer());
+        return words.Count == 1 && int.TryParse(words[0], out var n) && n >= 1 ? new RunCommand(new AcceptOffer(n)) : new Problem(usage);
+    }
+
+    /// <summary>"book haulout 270", "book haul out 270", "book 270", "book haulout day 270".</summary>
+    private static Parsed ParseBook(string arg)
+    {
+        const string usage = "Usage: book haulout <day>";
+        var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0].Equals("haulout", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        else if (words.Count > 1 && words[0].Equals("haul", StringComparison.OrdinalIgnoreCase) && words[1].Equals("out", StringComparison.OrdinalIgnoreCase)) words.RemoveRange(0, 2);
+        if (words.Count > 0 && words[0].Equals("day", StringComparison.OrdinalIgnoreCase)) words.RemoveAt(0);
+        return words.Count == 1 && int.TryParse(words[0], out var n) && n >= 0 ? new RunCommand(new BookHaulout(n)) : new Problem(usage);
+    }
+
+    /// <summary>"wait 3", "wait 3 days", "wait a day", "wait until spring", "wait spring".</summary>
     private static Parsed ParseWait(string arg)
     {
-        const string usage = "Usage: wait <days>";
+        const string usage = "Usage: wait <days> | wait until spring";
+        if (arg.Equals("spring", StringComparison.OrdinalIgnoreCase) || arg.Equals("until spring", StringComparison.OrdinalIgnoreCase))
+            return new RunCommand(new WaitUntilSpring());
         var words = arg.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
         if (words.Count == 0 || words.Count > 2) return new Problem(usage);
         if (words.Count == 2 && !words[1].Equals("day", StringComparison.OrdinalIgnoreCase) && !words[1].Equals("days", StringComparison.OrdinalIgnoreCase))

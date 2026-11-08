@@ -13,6 +13,9 @@ public class McpServerTests
         "order_survey", "survey", "readiness", "defer", "undefer", "yard_fix", "wait", "launch", "emergency_lift", "pump_bilge",
         "status", "logbook", "aboard", "weather", "notices", "help", "briefing",
         "plan_trip", "inventory", "trip", "depart", "continue", "motor", "sail", "heave_to", "anchor", "turn_back", "call_tow",
+        "season", "book_haulout", "haul_out", "scrub", "yard_wash",
+        "winterise_engine", "fill_tank", "battery_ashore", "battery_aboard", "winter_charger", "fit_winter_cover", "wait_until_spring",
+        "list_for_sale", "accept_offer", "keep", "sale",
     ];
 
     private static string RepoRoot()
@@ -113,7 +116,7 @@ public class McpServerTests
     public async Task Emergency_lift_tool_description_quotes_the_data_numbers()
     {
         var eco = Haulout.Sim.Data.BoatLoader.LoadSloop28().Economy;
-        Assert.Equal(43, ExpectedTools.Length);
+        Assert.Equal(59, ExpectedTools.Length);
         await using var client = await Connect();
         var tool = (await client.ListToolsAsync()).Single(t => t.Name == "emergency_lift");
         Assert.Contains($"{eco.EmergencyLiftNok} NOK", tool.Description);
@@ -150,6 +153,17 @@ public class McpServerTests
             ("depart", []),
             ("continue", []),
             ("call_tow", []),
+            ("winterise_engine", []),
+            ("fill_tank", []),
+            ("battery_ashore", []),
+            ("battery_aboard", []),
+            ("winter_charger", []),
+            ("fit_winter_cover", []),
+            ("wait_until_spring", []),
+            ("sale", []),
+            ("list_for_sale", new() { ["ask_nok"] = 150000 }),
+            ("sale", []),
+            ("accept_offer", []),
         };
         foreach (var (tool, args) in calls)
         {
@@ -183,6 +197,98 @@ public class McpServerTests
 
         Assert.Contains("hard", TextOf(await Call(client, "depart", [])), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not at sea", TextOf(await Call(client, "continue", [])), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Season_tools_book_refuse_and_answer_in_plain_words()
+    {
+        await using var client = await Connect();
+        var season = TextOf(await Call(client, "season", []));
+        Assert.Contains("The yard lifts boats from day 255 to day 300.", season);
+        Assert.Contains("winter storage", season);
+
+        var booked = TextOf(await Call(client, "book_haulout", new() { ["day"] = 270 }));
+        Assert.Contains("book the crane for day 270", booked);
+        Assert.Contains("Haulout booked for day 270", TextOf(await Call(client, "season", [])));
+        Assert.Contains("500 NOK", TextOf(await Call(client, "book_haulout", new() { ["day"] = 271 })));
+
+        Assert.Contains("Your slot is day 271.", TextOf(await Call(client, "haul_out", [])));
+        Assert.Contains("Clean the hull properly from the ground.", TextOf(await Call(client, "scrub", [])));
+        Assert.Contains("Routes out: Hestholmen, 14 nm; Storholmen, 26 nm.", TextOf(await Call(client, "trip", [])));
+        Assert.Contains("1200 NOK", TextOf(await Call(client, "yard_wash", [])));
+    }
+
+    [Fact]
+    public async Task Layup_tools_refuse_in_plain_words_off_the_hard_and_their_descriptions_quote_the_data()
+    {
+        var rules = Haulout.Sim.Data.BoatLoader.LoadSloop28().Layup;
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains($"{rules.AntifreezeNok} NOK", tools["winterise_engine"]);
+        Assert.Contains($"{rules.DieselNokPerLitre} NOK", tools["fill_tank"]);
+        Assert.Contains($"{rules.BatteryRoomNok} NOK", tools["battery_ashore"]);
+        Assert.Contains($"{rules.ChargerNok} NOK", tools["winter_charger"]);
+        Assert.Contains($"{rules.CoverNok} NOK", tools["fit_winter_cover"]);
+        Assert.Contains($"day {rules.SpringDayOfYear}", tools["wait_until_spring"]);
+
+        Assert.Contains("steps off", TextOf(await Call(client, "winterise_engine", [])));
+        Assert.Contains("The battery is aboard already.", TextOf(await Call(client, "battery_aboard", [])));
+        Assert.Contains("from on deck", TextOf(await Call(client, "fit_winter_cover", [])));
+        Assert.Contains("battery", TextOf(await Call(client, "battery_ashore", [])), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("484 NOK", TextOf(await Call(client, "fill_tank", [])));
+        Assert.Contains("The tank is full.", TextOf(await Call(client, "fill_tank", [])));
+        var help = TextOf(await Call(client, "help", []));
+        Assert.Contains("wait until spring = wait_until_spring", help);
+        Assert.Contains("winterise = winterise_engine", help);
+    }
+
+    [Fact]
+    public async Task Sale_tools_list_refuse_and_answer_in_plain_words_and_their_descriptions_quote_the_data()
+    {
+        var rules = Haulout.Sim.Data.BoatLoader.LoadSloop28().Sale;
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains($"{rules.ListMinutes} minutes", tools["list_for_sale"]);
+        Assert.Contains($"{rules.OfferHoldsDays} days", tools["list_for_sale"]);
+        Assert.Contains("day 96", tools["keep"]);
+
+        Assert.Contains("Not listed for sale", TextOf(await Call(client, "sale", [])));
+        Assert.Contains("She isn't listed", TextOf(await Call(client, "accept_offer", [])));
+        Assert.Contains("Name a price above zero", TextOf(await Call(client, "list_for_sale", new() { ["ask_nok"] = 0 })));
+        var listed = TextOf(await Call(client, "list_for_sale", new() { ["ask_nok"] = 150000 }));
+        Assert.Contains("Holm & Datter, yacht brokers", listed);
+        Assert.Contains("Base value of a 28-footer of her kind: +180000 NOK", listed);
+        Assert.Contains("The broker values her at", listed);
+        Assert.Contains("You are asking 150000 NOK", listed);
+        Assert.Contains("A buyer's surveyor will go over her for themselves.", listed);
+        var sale = TextOf(await Call(client, "sale", []));
+        Assert.Contains("Listed for sale at 150000 NOK.", sale);
+        Assert.Contains("There's no offer open.", TextOf(await Call(client, "accept_offer", [])));
+        Assert.Contains("There's no offer number 4.", TextOf(await Call(client, "accept_offer", new() { ["offer"] = 4 })));
+
+        // Before the first launch there is no season to keep (the keep itself, and "kept her already", are tested in the Sim tests).
+        Assert.Contains("You haven't had a season with her yet.", TextOf(await Call(client, "keep", [])));
+        var help = TextOf(await Call(client, "help", []));
+        Assert.Contains("list for sale = list_for_sale", help);
+        Assert.Contains("accept = accept_offer", help);
+    }
+
+    [Fact]
+    public async Task A_sale_ends_the_game_over_the_wire_and_the_queries_still_answer()
+    {
+        await using var client = await Connect();
+        await Call(client, "list_for_sale", new() { ["ask_nok"] = 100000 });
+        for (int i = 0; i < 40 && !TextOf(await Call(client, "sale", [])).Contains("open until day", StringComparison.Ordinal); i++)
+            await Call(client, "wait", new() { ["days"] = 1 });
+        Assert.Contains("open until day", TextOf(await Call(client, "sale", [])));
+        var card = TextOf(await Call(client, "accept_offer", []));
+        Assert.Contains("Sold on day", card);
+        Assert.Contains("Trips made: 0. Tows: 0.", card);
+        Assert.Contains("The game is over", card);
+        Assert.Contains("She's sold. The logbook is all that's left of her for you.", TextOf(await Call(client, "look", [])));
+        Assert.Contains("She's sold.", TextOf(await Call(client, "status", [])));
+        Assert.Contains("Viewing 1", TextOf(await Call(client, "sale", [])));
+        Assert.Contains("(sale)", TextOf(await Call(client, "logbook", [])));
     }
 
     private static void AssertNoIdProperties(JsonElement el, string tool)

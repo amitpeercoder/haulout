@@ -41,3 +41,12 @@
 .tabs button.on { font-weight: bold; text-decoration: underline; }
 .flagged { color: #a05a00; font-style: italic; }
 .letter, .problem { border-top: 1px solid #0003; padding: 0.4rem 0; }
+
+.season { display: flex; flex-direction: column; gap: 0.7rem; }
+.season h3 { font-family: var(--face-type); font-weight: normal; font-size: 0.9rem; color: var(--water-pale); }
+.season .row { display: flex; gap: 0.5rem; align-items: center; }
+.season input { width: 6rem; font: inherit; padding: 0.25rem 0.4rem; }
+.task { border-top: 1px solid #0003; padding: 0.4rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.task .done { color: var(--water-pale); font-family: var(--face-type); }
+.viewing { border-top: 1px solid #0003; padding: 0.4rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.viewing.lapsed p { color: var(--ink-faint); }
