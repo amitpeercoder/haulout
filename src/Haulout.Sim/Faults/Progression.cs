@@ -6,8 +6,11 @@ public enum RateFactor { Exposure, Use, Neglect }
 /// <summary>
 /// How an active fault creeps toward its escalation. Per day: BaseRatePerDay * spread * product of the declared factors.
 /// ExposedBy: ids of covers whose being off exposes this fault.
+/// RainOnlyWhenOff: when not empty, rain counts toward the exposure factor (and the cause line) only on days one of these covers was off
+/// at the end of the day; frost is unaffected.
 /// </summary>
-public sealed record ProgressionSpec(double BaseRatePerDay, IReadOnlyList<RateFactor> Factors, IReadOnlyList<string> ExposedBy);
+public sealed record ProgressionSpec(
+    double BaseRatePerDay, IReadOnlyList<RateFactor> Factors, IReadOnlyList<string> ExposedBy, IReadOnlyList<string>? RainOnlyWhenOff = null);
 
 /// <summary>What applied on one day to one fault. Recorded so the logbook can name the causes.</summary>
 public sealed record DailyCauses(

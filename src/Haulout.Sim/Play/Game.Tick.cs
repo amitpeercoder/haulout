@@ -98,22 +98,27 @@ public sealed partial class Game
 
     /// <summary>What the day looked like, for the factors.</summary>
     private readonly record struct DayStateValues(
-        int Day, bool Aboard, double EngineHours, int DaysAway, int DaysAwayBeyondThree, bool BatteryLow, int KnownOpen, bool Rain, bool Frost, double WeatherTerm);
+        int Day, bool Aboard, double EngineHours, int DaysAway, int DaysAwayBeyondThree, bool BatteryLow, int KnownOpen, bool Rain, bool Frost, double RainTerm, double FrostTerm);
 
     private DayStateValues DayState(int day, bool aboard, double engineHours)
     {
         int away = aboard ? 0 : Math.Max(0, day - _lastAboardDay);
         return new DayStateValues(day, aboard, engineHours, away, Math.Max(0, away - 3), BatteryLow(), OpenFaults().Count(),
-            RainDay(day), FrostNight(day), ExposureWeatherTerm(day));
+            RainDay(day), FrostNight(day), RainTerm(day), FrostTerm(day));
     }
 
-    /// <summary>Rain plus frost weighting for the day from the day's weather.</summary>
-    private double ExposureWeatherTerm(int day)
+    /// <summary>The rain weighting for the day from the day's weather.</summary>
+    private double RainTerm(int day)
     {
-        var w = _weather[day];
         var e = _boat.Rates.Exposure;
-        return e.RainWeight * Math.Min(w.RainMm, e.RainCapMm) / e.RainCapMm + (w.NightC < 0 ? e.FrostWeight : 0);
+        return e.RainWeight * Math.Min(_weather[day].RainMm, e.RainCapMm) / e.RainCapMm;
     }
+
+    /// <summary>The frost weighting for the day.</summary>
+    private double FrostTerm(int day) => _weather[day].NightC < 0 ? _boat.Rates.Exposure.FrostWeight : 0;
+
+    /// <summary>Rain counts for this fault only when its progression asks for no cover, or one of the named covers is off now.</summary>
+    private bool RainCounts(ProgressionSpec spec) => spec.RainOnlyWhenOff is not { Count: > 0 } c || c.Any(_removed.Contains);
 
     private bool RainDay(int day) => WeatherWords.IsRaining(_weather[day]);
     private bool FrostNight(int day) => _weather[day].NightC < 0;
@@ -133,8 +138,9 @@ public sealed partial class Game
         if (spec.Factors.Contains(RateFactor.Exposure))
         {
             coversOff.AddRange(spec.ExposedBy.Where(_removed.Contains));
-            product *= (1 + s.WeatherTerm) * (1 + r.Exposure.PerOpenCover * coversOff.Count);
-            rain = s.Rain;
+            bool rainCounts = RainCounts(spec);
+            product *= (1 + (rainCounts ? s.RainTerm : 0) + s.FrostTerm) * (1 + r.Exposure.PerOpenCover * coversOff.Count);
+            rain = s.Rain && rainCounts;
             frost = s.Frost;
         }
         if (spec.Factors.Contains(RateFactor.Use))
@@ -182,7 +188,7 @@ public sealed partial class Game
         int lastAboard = _workMinutesToday > 0 ? Day : _lastAboardDay;
         double exposure = 1.0, neglectBase = 0;
         if (spec.Factors.Contains(RateFactor.Exposure))
-            exposure = (1 + r.Exposure.RainWeight + r.Exposure.FrostWeight)
+            exposure = (1 + (RainCounts(spec) ? r.Exposure.RainWeight : 0) + r.Exposure.FrostWeight)
                 * (1 + r.Exposure.PerOpenCover * spec.ExposedBy.Count(_removed.Contains));
         bool neglects = spec.Factors.Contains(RateFactor.Neglect);
         if (neglects)

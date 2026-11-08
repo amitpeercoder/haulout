@@ -508,25 +508,66 @@ public class WaterTests
         Assert.True(loss.Voided);
         Assert.Equal(0, loss.PayoutNok);
         Assert.Contains("raw-water seacock", loss.VoidReason);
+        Assert.EndsWith("and it was put off", loss.VoidReason);
         Assert.Contains(loss.Lines, l => l.Contains("pays nothing", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Insurance_still_pays_when_the_put_off_seacock_was_fixed_before_launch_or_never_put_off()
+    public void Insurance_pays_nothing_when_a_before_launch_item_was_left_open_and_never_put_off()
     {
-        var fixedLater = NewGame(Rain(Monsoon), out _);
-        Ok(fixedLater.Execute(new OrderSurvey()));
-        Ok(fixedLater.Execute(new Defer(Weeping)));
-        Ok(Walk.Do(fixedLater, "seacock", c => new Replace(c)));
-        Launch(fixedLater);
-        PullFuse(fixedLater);
-        Assert.Equal(108000, WaitUntilSunk(fixedLater).Loss.PayoutNok);
+        var g = NewGame(Rain(Monsoon), out _);
+        Ok(g.Execute(new OrderSurvey()));
+        Launch(g);
+        PullFuse(g);
+        var (_, loss) = WaitUntilSunk(g);
+        Assert.True(loss.Voided);
+        Assert.Equal(0, loss.PayoutNok);
+        Assert.Contains("the surveyor had marked the raw-water seacock for attention before launch", loss.VoidReason);
+        Assert.EndsWith("and it was never put right", loss.VoidReason);
+    }
 
-        var neverPutOff = NewGame(Rain(Monsoon), out _);
-        Ok(neverPutOff.Execute(new OrderSurvey()));
-        Launch(neverPutOff);
-        PullFuse(neverPutOff);
-        var loss = WaitUntilSunk(neverPutOff).Loss;
+    [Fact]
+    public void Insurance_names_the_deferral_when_one_item_was_put_off_and_another_left_open()
+    {
+        var g = NewGame(Rain(Monsoon), out var boat);
+        Ok(g.Execute(new OrderSurvey()));
+        // The seacock comes first in the report and is left open; the fuel is the one put off.
+        FaultOf(boat, "water-in-fuel").Defer(75);
+        Launch(g);
+        PullFuse(g);
+        var (_, loss) = WaitUntilSunk(g);
+        Assert.Contains("fuel tank", loss.VoidReason);
+        Assert.EndsWith("and it was put off", loss.VoidReason);
+    }
+
+    [Fact]
+    public void Insurance_voids_for_a_before_launch_investigate_item_whose_fault_was_never_found()
+    {
+        var g = NewGame(Rain(Monsoon), out var boat);
+        Ok(g.Execute(new OrderSurvey()));
+        Ok(Walk.Do(g, "seacock", c => new Replace(c)));
+        FaultOf(boat, "water-in-fuel").Clear();
+        Launch(g);
+        PullFuse(g);
+        var (_, loss) = WaitUntilSunk(g);
+        Assert.True(loss.Voided);
+        Assert.Contains("starter motor", loss.VoidReason);
+        Assert.EndsWith("and it was never put right", loss.VoidReason);
+    }
+
+    [Fact]
+    public void Insurance_still_pays_when_every_before_launch_item_was_fixed_before_launch()
+    {
+        var fixedBefore = NewGame(Rain(Monsoon), out var boat);
+        Ok(fixedBefore.Execute(new OrderSurvey()));
+        Ok(fixedBefore.Execute(new Defer(Weeping)));
+        Ok(Walk.Do(fixedBefore, "seacock", c => new Replace(c)));
+        Ok(Walk.Do(fixedBefore, "negative terminal", c => new Clean(c)));
+        FaultOf(boat, "neg-terminal-corrosion").Clear();
+        FaultOf(boat, "water-in-fuel").Clear();
+        Launch(fixedBefore);
+        PullFuse(fixedBefore);
+        var loss = WaitUntilSunk(fixedBefore).Loss;
         Assert.False(loss.Voided);
         Assert.Equal(108000, loss.PayoutNok);
     }

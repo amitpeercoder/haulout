@@ -57,7 +57,7 @@ public static class BoatLoader
                 f.Yard is { } y ? new YardRoute(y.How, y.Nok, y.LeadDays) : null,
                 f.Escalation is { } e ? new Escalation(e.To, e.OnLaunch, e.Text ?? "") : null,
                 f.Properties is null ? null : new Dictionary<string, double>(f.Properties),
-                f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? []) : null,
+                f.Progression is { } pr ? new ProgressionSpec(pr.BaseRatePerDay, pr.Factors ?? [], pr.ExposedBy ?? [], pr.RainOnlyWhenOff ?? []) : null,
                 f.Effects, ParseSpawn(f.Spawn), f.ArrivalSign?.Text));
             return new Component(c.Id, c.Name, c.Condition, wear, spec, faults);
         });
@@ -207,6 +207,7 @@ public static class BoatLoader
         public double BaseRatePerDay { get; set; }
         public List<RateFactor>? Factors { get; set; }
         public List<string>? ExposedBy { get; set; }
+        public List<string>? RainOnlyWhenOff { get; set; }
     }
 
     private sealed class EconomyDto
@@ -377,6 +378,8 @@ public static class BoatLoader
         public EscalationDto? Escalation { get; set; }
         public Dictionary<string, double>? Properties { get; set; }
         public ProgressionDto? Progression { get; set; }
+        /// <summary>Free text for the data's readers (for example "UNVERIFIED"); ignored by the loader.</summary>
+        public string? Note { get; set; }
         public ArrivalSignDto? ArrivalSign { get; set; }
     }
 

@@ -117,20 +117,34 @@ public sealed partial class Game
             : "The bilge pump never came on.";
     }
 
+    /// <summary>The words for the insurer's refusal, fixed at the last launch; null when the cover held at launch.</summary>
+    private string? _launchVoidReason;
+
     /// <summary>
-    /// A survey item marked Before launch whose fault, or a fault it escalated into, was put off at some point and
-    /// is still not fixed: the insurer will not pay. Null when the cover holds.
+    /// Called at launch: a survey item marked Before launch whose fault (or what it escalated into) is still present, whether the player
+    /// knew of it or not, voids the cover. It reads "put off" if the player ever deferred it, else "never put right". A deferral is named
+    /// before an item merely left open. Overwritten at every launch, so a boat lifted, put right and relaunched is covered.
     /// </summary>
-    private string? VoidReason()
+    private void RecordLaunchCover()
     {
+        string? deferred = null, open = null;
         foreach (var item in _surveyKept.Where(i => i.Severity == SurveySeverity.BeforeLaunch && i.Fault is not null))
         {
             var chain = EscalationChain(item.Fault!);
-            if (chain.Any(f => f.EverDeferred) && chain.Any(f => f.Present))
-                return $"the surveyor had marked the {_boat.Get(item.Component).Name.ToLowerInvariant()} for attention before launch, and it was put off and never put right";
+            if (!chain.Any(f => f.Present)) continue;
+            string name = _boat.Get(item.Component).Name.ToLowerInvariant();
+            if (chain.Any(f => f.EverDeferred)) deferred ??= name;
+            else open ??= name;
         }
-        return null;
+        _launchVoidReason = deferred is not null
+            ? $"the surveyor had marked the {deferred} for attention before launch, and it was put off"
+            : open is not null
+                ? $"the surveyor had marked the {open} for attention before launch, and it was never put right"
+                : null;
     }
+
+    /// <summary>What voids the cover, recorded at the last launch; null when it holds.</summary>
+    private string? VoidReason() => _launchVoidReason;
 
     /// <summary>The fault and every fault it escalated into, on its component.</summary>
     private List<Fault> EscalationChain(string faultId)

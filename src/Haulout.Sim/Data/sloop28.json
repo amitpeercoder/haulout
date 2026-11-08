@@ -1248,8 +1248,12 @@
             "exposedBy": [
               "saloon-floorboards",
               "companionway-hatch"
+            ],
+            "rainOnlyWhenOff": [
+              "saloon-floorboards"
             ]
           },
+          "note": "UNVERIFIED (decision 6): seizing is driven by frost; rain counts only with the saloon floorboards up. Weep rate 0.05 L/h is also unverified (decision 1).",
           "onHardOnly": true,
           "consequence": "It weeps now and will seize; a seized seacock can't be shut if a hose lets go.",
           "costLaterNok": 12800,
@@ -2159,6 +2163,7 @@
         {
           "id": "drain-clamps-rusted",
           "name": "Rusted cockpit drain hose clamps",
+          "note": "UNVERIFIED (decision 1): 1.5 L of rain in per mm through the rusted clamps.",
           "effect": {
             "kind": "none",
             "value": 0
@@ -2214,6 +2219,7 @@
         {
           "id": "drain-hose-failed",
           "name": "Cockpit drain hose off its tail",
+          "note": "UNVERIFIED (decision 1): 60 L/h afloat through the open through-hull.",
           "effect": {
             "kind": "none",
             "value": 0
@@ -2717,6 +2723,7 @@
     "PLACEHOLDER (design note 006): every progression.baseRatePerDay is a placeholder: seacock-weeping 0.0455 (median about 20 days at neutral factors and the median spread of 1.1), drain-clamps-rusted 0.02 (median about 45 days).",
     "PLACEHOLDER (design note 006): the economics of drain-hose-failed (diy 180 NOK and 60 min, yard 900 NOK and 1 day, 900 NOK later) are placeholders.",
     "PLACEHOLDER (design note 006): water { startLitres, soleLitres 120, sinkLitres 1500, rainThroughOpenHatchLitresPerMm 0.5, manual pump 10 L/min for 15 min, levelWords bands } are placeholders for Amit.",
+    "UNVERIFIED (Amit, 2026-11-08): the three weep and ingress rates (seacock 0.05 L/h, failed drain hose 60 L/h, 1.5 L of rain per mm through rusted clamps) and the claim that seacock seizing is driven by frost, with rain counting only while the saloon floorboards are up (progression.rainOnlyWhenOff on seacock-weeping), are not checked against real boats.",
     "PLACEHOLDER (design note 006): ingress rates: seacock-weeping and seacock-seized leak 0.05 L/h, drain-clamps-rusted lets 1.5 L of rain in per mm, drain-hose-failed 4 L per mm and 60 L/h afloat.",
     "PLACEHOLDER (design note 006): the bilge pump (20 L/min, on at 15 L, off at 5 L, 0.0005 charge per cycle, 0.0003 per run minute) and its burn-out spawn thresholds (150 cycles, 300 run minutes) are placeholders.",
     "PLACEHOLDER (design note 006): electrical { selfDischargePerDay 0.002, pumpMinStateOfCharge 0.15 }, and the soaked faults (spawn at 2 awash hours; starter +0.03 ohm, ground stud +0.04 ohm, battery +0.05 self-discharge per day) and their prices.",

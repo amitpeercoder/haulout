@@ -219,6 +219,7 @@ public sealed partial class Game
         t.Narrative.Add("The travel hoist lifts her out of the cradle and lowers her into the water.");
         t.Narrative.Add("She's in the water.");
         foreach (var f in _boat.AllFaults.Where(f => f.Present && f.Escalation is { OnLaunch: true }).ToList()) Escalate(t, f, present: true);
+        RecordLaunchCover();
 
         int deadline = _boat.Economy.LaunchDeadlineDay;
         int early = deadline - day;

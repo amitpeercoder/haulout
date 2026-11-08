@@ -255,4 +255,81 @@ public class WeatherGameTests
         Assert.DoesNotContain("rain", dry);
         Assert.DoesNotContain("frost", dry);
     }
+
+    // ------------------------------------------------------------------ rain on the seacock only with the floorboards up (decision 6)
+
+    private static readonly WeatherDay Drizzle = new(0, 3, "southwest", 7, 6, 3);
+
+    /// <summary>
+    /// Survey the boat (the seacock is found without lifting the floorboards), optionally lift them, then stay aboard a day at a time until
+    /// the weeping seacock has seized. Returns the game and the day.
+    /// </summary>
+    private static (Game Game, int Day) SeizeWithFloorboards(WeatherSeries weather, bool up)
+    {
+        var g = NewGame(weather);
+        Ok(g.Execute(new OrderSurvey()));
+        if (up)
+        {
+            Walk.ToPlace(g, "saloon");
+            Ok(g.Execute(new Remove("saloon floorboards")));
+        }
+        for (int i = 0; i < 120; i++)
+        {
+            Ok(g.Execute(new Look()));
+            Ok(g.Execute(new WaitDays(1)));
+            if (g.HasEscalated("seacock-weeping")) return (g, Status(g).Day);
+        }
+        throw new Xunit.Sdk.XunitException("The seacock never seized.");
+    }
+
+    private static string SeizeLine(Game g)
+    {
+        LookAtSeacock(g);
+        return Log(g).Entries.Single(e => e.Text.StartsWith("The raw-water seacock has seized.", StringComparison.Ordinal)).Text;
+    }
+
+    [Fact]
+    public void Constant_rain_without_frost_does_not_hasten_the_seacock_while_the_floorboards_are_in()
+    {
+        var dry = SeizeWithFloorboards(WeatherSeries.Fair(), up: false);
+        var wet = SeizeWithFloorboards(WeatherSeries.Constant(Drizzle), up: false);
+        Assert.Equal(dry.Day, wet.Day);
+        Assert.DoesNotContain("rain", SeizeLine(wet.Game));
+    }
+
+    [Fact]
+    public void Constant_rain_hastens_the_seacock_with_the_floorboards_up_and_the_cause_line_names_it()
+    {
+        var dry = SeizeWithFloorboards(WeatherSeries.Fair(), up: true);
+        var wet = SeizeWithFloorboards(WeatherSeries.Constant(Drizzle), up: true);
+        Assert.True(wet.Day < dry.Day, $"rain {wet.Day} vs dry {dry.Day}");
+        Assert.Contains("days of rain", SeizeLine(wet.Game));
+        Assert.DoesNotContain("rain", SeizeLine(dry.Game));
+    }
+
+    [Fact]
+    public void Frost_hastens_the_seacock_even_with_the_floorboards_in()
+    {
+        var dry = SeizeWithFloorboards(WeatherSeries.Fair(), up: false);
+        var frost = SeizeWithFloorboards(WeatherSeries.Constant(Frosty), up: false);
+        Assert.True(frost.Day < dry.Day, $"frost {frost.Day} vs dry {dry.Day}");
+        Assert.Contains("nights of frost", SeizeLine(frost.Game));
+    }
+
+    [Fact]
+    public void The_readiness_worst_case_counts_rain_only_when_the_floorboards_are_up()
+    {
+        int? MinDays(bool up)
+        {
+            var g = NewGame(WeatherSeries.Constant(Drizzle));
+            Ok(g.Execute(new OrderSurvey()));
+            if (up)
+            {
+                Walk.ToPlace(g, "saloon");
+                Ok(g.Execute(new Remove("saloon floorboards")));
+            }
+            return Ready(g).Open.Single(o => o.Problem == "Weeping raw-water seacock").LikelyMinDays;
+        }
+        Assert.True(MinDays(up: true) < MinDays(up: false));
+    }
 }
