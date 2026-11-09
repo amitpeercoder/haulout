@@ -152,7 +152,7 @@ public sealed partial class Game
     private string? YardRefusal(Fault f)
     {
         if (f.Yard is not { } yard) return "The yard can't take that on.";
-        return YardGate() ?? AfloatRefusal(f, _boat.Get(f.ComponentId)) ?? MoneyRefusal(yard.Nok);
+        return YardGate() ?? AfloatRefusal(f, _boat.Get(f.ComponentId)) ?? OfficeOpenRefusal() ?? MoneyRefusal(yard.Nok);
     }
 
     private CommandResult DoYardFix(Turn t, string name)
@@ -247,6 +247,7 @@ public sealed partial class Game
         if (YardGate() is { } away) return Reject("launch", away);
         if (Afloat) return Reject("launch", "She's already in the water.");
         if (IsBatteryAshore) return Reject("launch", "The battery is in the yard's battery room: fit it first (battery aboard).");
+        if (OfficeOpenRefusal() is { } shut) return Reject("launch", shut);
         if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
             return Reject("launch", $"The yard won't launch her in this: {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}). Try another day.");
 
@@ -316,13 +317,18 @@ public sealed partial class Game
     // ------------------------------------------------------------------ the player's own work
 
     /// <summary>Early jobs in a system can come out poor. Nothing is said: it surfaces later, on inspection.</summary>
-    private void MaybePoorJob(Component c)
+    private void MaybePoorJob(Turn t, Component c)
     {
         var quality = _boat.DiyQuality;
         if (quality is null) return;
         int skill = _skill[c.Subsystem];
+        // Tiredness is a named factor on the same roll (design note 012): nothing moves unless the skipper is tired.
+        double factor = BotchFactor;
+        if (factor > 1 && skill < quality.Threshold && quality.PoorJobs.ContainsKey(c.Subsystem)
+            && !c.ActiveFaults.Any(f => f.Id.StartsWith(PoorJobPrefix, StringComparison.Ordinal)))
+            t.Narrative.Add(TirednessNow == Tiredness.Exhausted ? ExhaustedJobLine : TiredJobLine);
         if (skill < quality.Threshold
-            && _random.NextDouble() < quality.PoorJobChance
+            && _random.NextDouble() < quality.PoorJobChance * factor
             && !c.ActiveFaults.Any(f => f.Id.StartsWith(PoorJobPrefix, StringComparison.Ordinal))
             && quality.PoorJobs.TryGetValue(c.Subsystem, out var template))
         {
@@ -335,6 +341,8 @@ public sealed partial class Game
             poor.ActivateOn(Day);
             DrawSpread(poor);
             c.AddFault(poor);
+            // A botch made tired is diagnosable: its cause line, told when the player finds it, says so.
+            if (factor > 1) _pendingCause[poor.Id] = $"It was tired work: you did that job {HoursAwake} hours into the day.";
         }
         _skill[c.Subsystem] = skill + 1;
     }

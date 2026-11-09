@@ -18,7 +18,7 @@ public enum StageView { Boat, Chart }
 /// </summary>
 public sealed class GameSession
 {
-    private readonly Game _game = Game.NewFirstFault();
+    private readonly Game _game = Game.NewFirstFault(withHours: true);
 
     /// <summary>How money is written (a display label from the game; the web never reads the data files).</summary>
     public Haulout.Sim.Data.Currency Currency => _game.Currency;

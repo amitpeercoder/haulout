@@ -158,6 +158,7 @@ public sealed partial class Game
             if (d < free) return $"The yard's first free slot is day {free}.";
             if (_bookedDay == d) return $"You're already booked for day {d}.";
         }
+        if (OfficeOpenRefusal() is { } shut) return shut;
         int fee = _bookedDay is null ? 0 : _boat.Yard.ChangeFeeNok;
         return fee > 0 ? MoneyRefusal(fee) : null;
     }
@@ -194,7 +195,7 @@ public sealed partial class Game
         if (!_running) return "Start the engine: you motor her round to the crane.";
         if (Today.WindForce >= _boat.Rates.WeatherGates.WindForce)
             return $"The yard won't lift in this: {WeatherWords.WindPhrase(Today)} (force {Today.WindForce}). If it blows all day, your slot moves a day.";
-        return null;
+        return OfficeOpenRefusal();
     }
 
     private CommandResult DoHaulOut(Turn t)
@@ -269,7 +270,7 @@ public sealed partial class Game
         if (AtSea) return "You're at sea.";
         if (Afloat) return "She's in the water: the yard washes her on the hard.";
         if (YardGate() is { } away) return away;
-        return MoneyRefusal(_boat.Yard.WashNok);
+        return OfficeOpenRefusal() ?? MoneyRefusal(_boat.Yard.WashNok);
     }
 
     private CommandResult DoWashHull(Turn t)

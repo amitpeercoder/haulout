@@ -7,6 +7,8 @@
     "PLACEHOLDER (design note 010, second pass B): money { pay 3500 NOK on the first of every month (day of year divisible by 30), the figure the single economic knob; overdraft limit 20000 NOK at 1.5 percent a month, charged on the first of the month before the pay, ceil(owed * 0.015); bills the player did not choose may pass the limit; the Calendar looks 42 days ahead }.",
     "PLACEHOLDER (design note 010, second pass B): standing bills { berth and mooring at Skjærvik 3000 NOK a quarter (12000 a year) on days of year 0, 90, 180 and 270, the first on day 90 (the spring quarter was paid with the boat); insurance 8000 NOK on day of year 90, the first renewal on day 450 (it runs to next spring); the yard's lift 7000 and storage 9000 stay as in design note 008 }.",
     "PLACEHOLDER (design note 010): orders { a part the yard chandlery does not keep on the shelf (starter motor, injection pump, injectors, heat exchanger, raw-water pump, alternator, fuel tank, exhaust elbow, sprayhood, engine block) is ordered by phone (5 minutes) and arrives in 3 to 10 days, drawn per order, at the yard in Skjærvik; the price is the part's replace price }.",
+    "PLACEHOLDER (design note 012, Amit's answers): hours { chandlery, port shops and the yard office are open Monday to Saturday 09:00 to 17:00 and shut on Sunday; orders by phone, booking the crane, launch, haul-out and the yard's jobs keep the office hours; the fuel pump on the quay is card-operated and has no hours; nothing stops at any hour of the night, but the harbourmaster does not ring between 22:00 and 08:00: her call comes at 08:00 }.",
+    "PLACEHOLDER (design note 012, Amit's answers): sleep { the skipper has hours awake: the first 16 are free; from 16 a job that can come out poor is 1.5 times as likely to, from 20 it is 3 times as likely and inspect and measure miss the subtle signs; any away stretch of 6 hours or more is sleep and resets the count; the sleep command sleeps until 08:00, or for 8 hours if 08:00 is less than 6 hours away; at sea under way the count does not run (watches) }. UNVERIFIED: the numbers; and whether a single-handed passage should tire the skipper (domain question for Amit).",
     "UNVERIFIED (design note 010): that these parts are not kept on a small yard's shelf, and the 3 to 10 day lead time; the berth and insurance prices and their billing dates; the share of a salary left over for the boat."
   ],
   "currency": { "code": "NOK", "symbol": "", "before": false },
@@ -27,5 +29,13 @@
   "mooring": { "partedRepairNok": 4000 },
   "fuel": { "dieselNokPerLitre": 22 },
   "survey": { "nokPerFoot": 200 },
-  "closeCalls": { "letterNok": 2000 }
+  "closeCalls": { "letterNok": 2000 },
+  "hours": {
+    "nightFrom": "22:00", "harbourmasterFirstCall": "08:00",
+    "shop": { "weekday": ["09:00", "17:00"], "saturday": ["09:00", "17:00"], "sunday": null }
+  },
+  "sleep": {
+    "tiredAtHours": 16, "exhaustedAtHours": 20, "botchFactorTired": 1.5, "botchFactorExhausted": 3,
+    "wakeHour": "08:00", "sleepHours": 8, "minSleepHours": 6
+  }
 }

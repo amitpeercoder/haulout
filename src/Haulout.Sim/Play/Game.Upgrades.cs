@@ -123,7 +123,7 @@ public sealed partial class Game
                 ? $"The yard needs the part first: order it (order {item.Name}), and they'll fit it when it's here."
                 : $"The yard needs the part first: buy it (buy {item.Name}), and they'll fit it.";
         }
-        return MoneyRefusal(YardInstallNok(rule));
+        return OfficeOpenRefusal() ?? MoneyRefusal(YardInstallNok(rule));
     }
 
     private CommandResult DoYardInstall(Turn t, string name)

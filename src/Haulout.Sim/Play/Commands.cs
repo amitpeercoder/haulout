@@ -49,6 +49,7 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(ListForSale), "list-for-sale")]
 [JsonDerivedType(typeof(AcceptOffer), "accept-offer")]
 [JsonDerivedType(typeof(Keep), "keep")]
+[JsonDerivedType(typeof(Sleep), "sleep")]
 [JsonDerivedType(typeof(NextWeekend), "next-weekend")]
 [JsonDerivedType(typeof(WaitWeek), "wait-week")]
 [JsonDerivedType(typeof(Order), "order")]
@@ -146,6 +147,8 @@ public sealed record WaitUntilSpring() : Command;
 public sealed record ListForSale(int AskNok) : Command;
 public sealed record AcceptOffer(int? Offer = null) : Command;
 public sealed record Keep() : Command;
+/// <summary>Not under way: turn in until the morning (or for a night's sleep if the morning is near). Resets the hours awake. Design note 012.</summary>
+public sealed record Sleep() : Command;
 
 /// <summary>Not at sea: go back to work and come back aboard at 08:00 on the next Saturday (from a Saturday or Sunday, the Saturday after). Design note 010.</summary>
 public sealed record NextWeekend() : Command;

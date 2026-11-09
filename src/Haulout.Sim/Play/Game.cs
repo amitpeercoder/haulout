@@ -93,7 +93,9 @@ public sealed partial class Game
     /// <summary>The seed of the shipped first game: it decides the poor-job rolls.</summary>
     public const int DefaultSeed = 4;
 
-    public static Game NewFirstFault(int seed = DefaultSeed) => new(BoatLoader.LoadSloop28(), 75, new SeededRandom(seed), seed);
+    /// <summary>The shipped first game. <paramref name="withHours"/>: the shops' hours and the skipper's tiredness (design note 012); the adapters turn it on, tests leave it off.</summary>
+    public static Game NewFirstFault(int seed = DefaultSeed, bool withHours = false) =>
+        new(BoatLoader.LoadSloop28(withHours: withHours), 75, new SeededRandom(seed), seed);
 
     // ---------------------------------------------------------------- queries
 
@@ -115,7 +117,7 @@ public sealed partial class Game
                 Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, KnownStatus(), ToolNames(), CurrentPlace.Name,
                 Balance, _launchDeadlineDay, _launched, Afloat, WeatherWords.Describe(Today, HourOfDay, withSky: true, minutesOut: MinutesOut), _sunk,
                 UnreadAlerts(), AtSea ? null : CurrentPort?.Name, AtSea, SeasonLine(), _sold, ReadinessSeasonLead(),
-                CalendarOn ? WeekLine() : null, CalendarOn && _boat.Calendar.ChargesDays ? _vacationLeft : 0, NextWords(), FuelStatusLine()),
+                CalendarOn ? WeekLine() : null, CalendarOn && _boat.Calendar.ChargesDays ? _vacationLeft : 0, NextWords(), FuelStatusLine(), TiredWords()),
             Logbook => new LogView(_log.ToList(), WeatherWords.Describe(Today), Day),
             Weather => TodayView(),
             Notices => new NoticesView(TakeUnread()),
@@ -177,6 +179,7 @@ public sealed partial class Game
         new("wait until spring", null, "Leave her for the winter, day by day, coming back early if she has something to tell you or your slot comes"),
         new("list for sale", "nok", "On the hard at the yard: list her with the broker at your asking price and get the broker's valuation letter (half an hour)"),
         new("accept offer", "offer", "Sell her to the best open offer, or to the numbered one: the game ends with the closing card"),
+        new("sleep", null, "Not under way: turn in until the morning, or for a night's sleep (resets how long you have been up)"),
         new("keep", null, "Keep her for another season: the launch deadline moves to next spring and the logbook starts again"),
         new("sale", null, "The broker's letter, your listing, the viewings and the offers"),
         new("charge", "component", "Charge a battery on shore power (8 h)"),
@@ -280,7 +283,7 @@ public sealed partial class Game
             bool spare = SpareFor(c.Id) is not null;
             var (partNok, notStocked) = spare ? (0, null) : ReplacePartHere(c);
             Add("replace", "Replace",
-                ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? notStocked ?? (spare ? null : MoneyRefusal(partNok)),
+                ReplaceGate(c) ?? touch ?? WetRefusal(c) ?? notStocked ?? (spare ? null : (partNok > 0 ? ShopOpenRefusal() : null) ?? MoneyRefusal(partNok)),
                 c.ReplaceMinutes, partNok);
         }
         if (c.HasVerb(Verb.Charge)) Add("charge", "Charge", YardGate() ?? touch, 480, 0);
@@ -358,6 +361,7 @@ public sealed partial class Game
             ListForSale c => DoListForSale(turn, c.AskNok),
             AcceptOffer c => DoAcceptOffer(turn, c.Offer),
             Keep => DoKeep(turn),
+            Sleep => DoSleep(turn),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -503,12 +507,20 @@ public sealed partial class Game
         // uncovered inspect reveal stands in for the part's uncoveredText, so the corroded look replaces the healthy one and is not an extra line.
         var standIn = off ? c.ActiveFaults.Select(f => f.RevealFor(PlayerAction.Inspect, uncovered: true))
             .FirstOrDefault(r => r is { Discovers: false, NeedsUncovered: true }) : null;
+        if (standIn is { Subtle: true } && TirednessNow == Tiredness.Exhausted)
+        {
+            if (!t.Narrative.Contains(EyesLine)) t.Narrative.Add(EyesLine);
+            standIn = null;
+        }
         if (standIn is not null) t.Narrative.Add(standIn.Text);
         else if (off && c.RemovablePart is { UncoveredText.Length: > 0 } part) t.Narrative.Add(part.UncoveredText);
         // The eye suggests (design note 010, second pass I): a worn impeller's vanes lie curled even when nothing is cracked yet.
         if (off && c.Id == EngineInputsBuilder.ImpellerId && Wear(c) >= _boat.SeaRules.ImpellerSetFromWear
             && !c.ActiveFaults.Any(f => f.RevealFor(PlayerAction.Inspect, uncovered: true) is { Discovers: true }))
-            t.Narrative.Add(ImpellerSetText);
+        {
+            if (TirednessNow == Tiredness.Exhausted) { if (!t.Narrative.Contains(EyesLine)) t.Narrative.Add(EyesLine); }
+            else t.Narrative.Add(ImpellerSetText);
+        }
         foreach (var f in c.ActiveFaults.ToList())
         {
             if (f.RevealFor(PlayerAction.Inspect, uncovered: off) is { Discovers: false, NeedsUncovered: true }) continue;
@@ -704,7 +716,7 @@ public sealed partial class Game
             t.Narrative.Add(refit);
             text += " " + refit;
         }
-        MaybePoorJob(c);
+        MaybePoorJob(t, c);
         return Accept(t, "clean", 30, 0, new RepairView(c.Name, text), $"Cleaned the {c.Name.ToLowerInvariant()}.");
     }
 
@@ -717,6 +729,7 @@ public sealed partial class Game
         var spare = SpareFor(c.Id);
         var (cost, notStocked) = spare is null ? ReplacePartHere(c) : (0, null);
         if (notStocked is not null) return Reject("replace", notStocked);
+        if (spare is null && cost > 0 && ShopOpenRefusal() is { } shut) return Reject("replace", shut);
         if (spare is null && MoneyRefusal(cost) is { } broke) return Reject("replace", broke);
 
         ShutDownEngine(t);
@@ -736,7 +749,7 @@ public sealed partial class Game
         }
         if (c.Id == EngineOilId) _oilChangedDay = Day;
         if (_boat.Sale.ServiceComponents.Contains(c.Id)) _serviceSeasons.Add(_seasonIndex);
-        if (!c.Spec.NoPoorJob) MaybePoorJob(c); // the poor-job templates are about paint; new lines or a shackle are just new
+        if (!c.Spec.NoPoorJob) MaybePoorJob(t, c); // the poor-job templates are about paint; new lines or a shackle are just new
         return Accept(t, "replace", c.ReplaceMinutes, cost, new RepairView(c.Name, text),
             spare is null ? $"Replaced the {c.Name.ToLowerInvariant()}." : $"Replaced the {c.Name.ToLowerInvariant()} from the spares aboard.");
     }
@@ -833,6 +846,11 @@ public sealed partial class Game
     private void Reveal(Turn t, Fault f, PlayerAction action, bool forceDiscover = false, bool uncovered = false)
     {
         var reveal = f.RevealFor(action, uncovered);
+        if (reveal is { Subtle: true } && TirednessNow == Tiredness.Exhausted && action is PlayerAction.Inspect or PlayerAction.Measure)
+        {
+            if (!t.Narrative.Contains(EyesLine)) t.Narrative.Add(EyesLine);
+            return; // a sign that needs sharp eyes is not seen; a rested look finds it
+        }
         if (reveal is not null) t.Narrative.Add(reveal.Text);
         if (reveal is { Discovers: false }) f.MarkSymptomatic();
         if ((reveal?.Discovers ?? false) || forceDiscover) Discover(t, f);

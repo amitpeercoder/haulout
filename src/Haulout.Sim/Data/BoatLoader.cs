@@ -36,7 +36,12 @@ public static class BoatLoader
     /// false: the boat as it was before design note 010. No pay, no bills, no vacation days, no overdraft limit, and every part on the
     /// yard's shelf (no orders). For tests whose subject is not the week or the money.
     /// </param>
-    public static Boat LoadSloop28(bool withCalendar = true) => Load(ReadResource(Sloop28Resource), withCalendar);
+    /// <param name="withHours">
+    /// true: the shops' hours and the skipper's tiredness of economy.json (design note 012). Off by default, as the calendar's knobs
+    /// were: a boat written in a test plays with shops always open and no tiredness; the shipped game (<c>Game.NewFirstFault</c>) turns it on.
+    /// </param>
+    public static Boat LoadSloop28(bool withCalendar = true, bool withHours = false) =>
+        Load(ReadResource(Sloop28Resource), withCalendar, null, withHours);
 
     private static string ReadResource(string name)
     {
@@ -56,7 +61,7 @@ public static class BoatLoader
     /// The economy file's text. Null: the embedded economy.json, so a boat written inline in a test is played in the world's economy
     /// (the same numbers the knobs held in the boat file before design note 010, second pass A).
     /// </param>
-    public static Boat Load(string json, bool withCalendar = true, string? economyJson = null)
+    public static Boat Load(string json, bool withCalendar = true, string? economyJson = null, bool withHours = false)
     {
         RefuseEconomyKnobs(json);
         var eco = economyJson is null ? LoadEconomy() : ParseEconomy(economyJson);
@@ -257,7 +262,7 @@ public static class BoatLoader
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
             chandlery, trips, dto.Sea, dto.Forecast, yard, dto.Fouling, mooring, layup, dto.Sale, calendar, orders, dto.Fuel, night, upgrades, withCalendar ? dto.Reputation : null,
-            eco.Currency, closeCalls, dto.Instruments);
+            eco.Currency, closeCalls, dto.Instruments, withCalendar && withHours ? eco.Hours.ToRules() : null, withCalendar && withHours ? eco.Sleep.ToRules() : null);
     }
 
     /// <summary>A boat file holding a knob that economy.json owns is a mistake the two files could disagree about, so it is refused.</summary>

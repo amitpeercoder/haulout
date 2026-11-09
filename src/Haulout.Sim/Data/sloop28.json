@@ -688,7 +688,8 @@
               "action": "inspect",
               "text": "Dull grey lead, white bloom along the edge of the clamp, the bolt snug.",
               "discovers": false,
-              "needsUncovered": true
+              "needsUncovered": true,
+              "subtle": true
             },
             {
               "action": "measure",

@@ -19,6 +19,7 @@ public sealed partial class Game
         if (data is null) return Reject("order-survey", "There's no surveyor to be had.");
         if (_report is not null) return Reject("order-survey", "You've already had her surveyed.");
         if (Afloat) return Reject("order-survey", "The surveyor wants her ashore.");
+        if (OfficeOpenRefusal() is { } shut) return Reject("order-survey", shut);
         if (MoneyRefusal(data.FeeNok) is { } broke) return Reject("order-survey", broke);
 
         foreach (var item in data.Items)
@@ -73,7 +74,7 @@ public sealed partial class Game
             var routes = new List<FixRoute>();
             if (f.Diy is { } diy)
             {
-                var diyReason = AfloatRefusal(f, comp) ?? WetRefusal(comp) ?? MoneyRefusal(diy.PartsNok);
+                var diyReason = AfloatRefusal(f, comp) ?? WetRefusal(comp) ?? (diy.PartsNok > 0 ? ReplaceBuyHoursRefusal(comp) : null) ?? MoneyRefusal(diy.PartsNok);
                 routes.Add(new FixRoute("DIY", diy.How, diy.PartsNok, diy.Minutes, 0, diyReason is null, diyReason, PartNote(comp)));
             }
             if (f.Yard is { } yard)

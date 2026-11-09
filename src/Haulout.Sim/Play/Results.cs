@@ -151,7 +151,8 @@ public sealed record StatusView(
     string? Week = null,
     int VacationDaysLeft = 0,
     string? Next = null,
-    string? Fuel = null) : QueryResult;
+    string? Fuel = null,
+    string? Tired = null) : QueryResult;
 
 /// <summary>CostNok is what the entry cost the player (a receipt), 0 when it cost nothing.</summary>
 /// <summary>Document: set when the entry is a document the player can read again (e.g. "survey report").</summary>

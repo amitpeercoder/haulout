@@ -9,7 +9,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
 
 builder.Services.AddSingleton(_ => new GameSession(
-    Haulout.Sim.Play.Game.NewFirstFault(),
+    Haulout.Sim.Play.Game.NewFirstFault(withHours: true),
     Environment.GetEnvironmentVariable("HAULOUT_TRACE")));
 
 builder.Services

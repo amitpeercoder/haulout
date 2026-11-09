@@ -24,7 +24,8 @@ public sealed record SpawnRule(string When, double AtLeast, bool Spread = false,
 public enum PlayerAction { Look, Inspect, Measure, Start, Clean, Replace, Charge, CheckFilterBowl, CheckRawWaterFlow }
 
 /// <summary>What the player learns from an action. Discovers=false is a hint only.</summary>
-public sealed record FaultReveal(PlayerAction Action, string Text, bool Discovers, bool NeedsUncovered = false);
+/// <summary>Subtle: a degree-only sign (a bloom, a set) that a skipper who is exhausted does not see (design note 012).</summary>
+public sealed record FaultReveal(PlayerAction Action, string Text, bool Discovers, bool NeedsUncovered = false, bool Subtle = false);
 
 /// <summary>Where a fault stands. Discovered stays true on the fault itself after it is fixed (history).</summary>
 public enum FaultState { Latent, Symptomatic, Discovered, Deferred, Fixed }

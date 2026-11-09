@@ -65,6 +65,7 @@ public sealed partial class Game
             left -= step;
             if ((StartMinuteOfDay + ClockMinutes) % 1440 == 0) Daily(t, Day - 1, aboard);
         }
+        CountAwake(minutes, aboard);
         if (!aboard && minutes >= 1440) ArrivalAlerts(); // "on coming back aboard"
     }
 

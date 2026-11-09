@@ -9,6 +9,9 @@ go saloon
 remove saloon floorboards
 look
 inspect raw-water seacock
+look
+look
+look
 replace raw-water seacock
 go companionway
 go cockpit
@@ -17,6 +20,7 @@ inspect cockpit drain hoses
 buy hose clamps
 replace cockpit drain hoses
 buy alternator belt
+buy impeller
 buy impeller
 buy primary filter element
 buy secondary filter element
@@ -33,12 +37,42 @@ replace raw-water impeller
 inspect raw-water impeller
 go quarter berth
 charge start battery
+sleep
 go companionway
 go cockpit
 start
 stop
+wait 1
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
 season
-book haulout 264
+book haulout 262
 start
 launch
 calendar plan regatta
@@ -62,6 +96,13 @@ go forepeak
 look
 inspect heads
 inspect joker valve
+look
+look
+look
+look
+look
+look
+look
 buy joker valve
 replace joker valve
 go saloon
@@ -81,12 +122,17 @@ wait week
 wait week
 wait week
 wait week
+go cockpit
+check filter
 calendar
 wait week
 go cockpit
 start
 fill tank
+check filter
 wait week
+check filter
+replace primary filter
 start
 plan trip hestholmen
 depart hestholmen
@@ -199,10 +245,21 @@ wait week
 wait week
 season
 wait week
+go companionway
+replace engine oil
+go cockpit
+fill tank
 start
 haul out
 season
+go companionway
+go quarter berth
+battery ashore
+go companionway
+winterise
+go cockpit
 go on deck
+fit cover
 look
 go beside the hull
 look
@@ -211,15 +268,6 @@ clean hull
 look
 inspect antifouling
 inventory
-go on deck
-fit cover
-go cockpit
-fill tank
-go companionway
-winterise
-replace engine oil
-go quarter berth
-battery ashore
 season page
 calendar
 keep

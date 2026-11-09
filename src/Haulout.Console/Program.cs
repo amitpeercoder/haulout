@@ -4,7 +4,7 @@ using Haulout.Sim.Play;
 int seed = Game.DefaultSeed;
 for (int i = 0; i < args.Length - 1; i++)
     if (args[i] == "--seed" && int.TryParse(args[i + 1], out var s)) seed = s;
-var game = Game.NewFirstFault(seed);
+var game = Game.NewFirstFault(seed, withHours: true);
 var prose = new Haulout.Prose.Prose(game.Currency);
 
 if (game.Ask(new Briefing()) is BriefingView briefing) Console.Write(prose.Briefing(briefing));

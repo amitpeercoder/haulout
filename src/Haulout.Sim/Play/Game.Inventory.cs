@@ -111,6 +111,7 @@ public sealed partial class Game
     {
         if (AtSea) return Reject("buy", ChandleryAshoreMessage);
         if (CurrentPort is { Shop: false } noShop) return Reject("buy", $"There's no shop at {noShop.Name}.");
+        if (ShopOpenRefusal() is { } shut) return Reject("buy", shut);
         var r = FindItem(item);
         if (r.Match is not { } shopItem)
             return r.Kind == ResolutionKind.Ambiguous

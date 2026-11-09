@@ -122,6 +122,7 @@ public sealed class Prose
                 else if (s.Afloat) sb.AppendLine("She's in the water.");
                 sb.AppendLine(s.EngineRunning ? "The engine is running." : "The engine is not running.");
                 if (s.Fuel is not null) sb.AppendLine(s.Fuel);
+                if (s.Tired is not null) sb.AppendLine(s.Tired);
                 if (s.Tools.Count > 0) sb.AppendLine("Tools: " + string.Join(", ", s.Tools) + ".");
                 foreach (var f in s.DiscoveredFaults) sb.AppendLine($"  Known: {f.Name} ({f.ComponentName}){(f.Fixed ? " - fixed" : "")}");
                 break;

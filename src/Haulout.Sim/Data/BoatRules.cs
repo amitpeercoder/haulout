@@ -472,6 +472,55 @@ public sealed record CalendarRules
     public static CalendarRules Default { get; } = new();
 }
 
+/// <summary>When a shop or the yard office is open on one kind of day, in minutes of the day. Open equal to close: shut all day.</summary>
+public readonly record struct OpeningHours(int OpenMinute, int CloseMinute)
+{
+    public static OpeningHours Shut { get; } = new(0, 0);
+    public bool IsShut => CloseMinute <= OpenMinute;
+}
+
+/// <summary>
+/// The shops' hours and the harbourmaster's night (design note 012). The default has no hours: shops are always open and the harbourmaster
+/// rings whenever. All numbers in the shipped data are PLACEHOLDERS for Amit.
+/// </summary>
+public sealed record HoursRules
+{
+    /// <summary>The harbourmaster does not ring from this minute of the day to her first call. Zero: no hours at all.</summary>
+    public int NightFromMinute { get; init; }
+    public int HarbourmasterFirstCallMinute { get; init; }
+    public OpeningHours Weekday { get; init; }
+    public OpeningHours Saturday { get; init; }
+    public OpeningHours Sunday { get; init; }
+
+    public bool Enabled => NightFromMinute > 0;
+
+    /// <summary>The shop and office hours on a weekday number (0 Monday to 6 Sunday).</summary>
+    public OpeningHours ShopOn(int weekday) => weekday switch { 5 => Saturday, 6 => Sunday, _ => Weekday };
+
+    public static HoursRules Default { get; } = new();
+}
+
+/// <summary>
+/// Sleep (design note 012, Amit's answers): hours awake are a rate, not a clock rule. Tired from <see cref="TiredAtMinutes"/>, exhausted from
+/// <see cref="ExhaustedAtMinutes"/>; the chance of a poor job is multiplied; from exhausted the subtle signs are missed. The default has no tiredness.
+/// </summary>
+public sealed record SleepRules
+{
+    public int TiredAtMinutes { get; init; }
+    public int ExhaustedAtMinutes { get; init; }
+    public double BotchFactorTired { get; init; } = 1;
+    public double BotchFactorExhausted { get; init; } = 1;
+    public int WakeMinute { get; init; }
+    /// <summary>The sleep the sleep command takes when the next wake hour is nearer than <see cref="MinSleepMinutes"/>.</summary>
+    public int SleepMinutes { get; init; }
+    /// <summary>An away stretch this long is sleep: it resets the hours awake.</summary>
+    public int MinSleepMinutes { get; init; }
+
+    public bool Enabled => TiredAtMinutes > 0;
+
+    public static SleepRules Default { get; } = new();
+}
+
 /// <summary>Parts that are not on the chandlery's shelf are ordered (design note 010). Lead time in whole days, inclusive. Default: 0 to 0, nothing is ever out of stock.</summary>
 public sealed record OrderRules
 {

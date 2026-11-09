@@ -9,6 +9,9 @@ go saloon
 remove saloon floorboards
 look
 inspect raw-water seacock
+look
+look
+look
 replace raw-water seacock
 go companionway
 go cockpit
@@ -29,14 +32,45 @@ inspect raw-water impeller
 replace raw-water impeller
 go quarter berth
 charge start battery
+sleep
 go companionway
 go cockpit
 start
 stop
+wait 1
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
 season
 book haulout 262
 start
 launch
+buy mooring lines
 start
 season
 plan trip hestholmen
@@ -61,7 +95,6 @@ replace primary filter
 start
 motor
 motor
-buy primary filter element
 check filter
 wait 1
 check filter
@@ -69,12 +102,11 @@ wait 1
 check filter
 replace primary filter
 readiness
-wait 7
+wait week
 wait 7
 wait 7
 go on deck
 inspect mooring lines
-buy mooring lines
 replace mooring lines
 go cockpit
 go companionway

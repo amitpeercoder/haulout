@@ -48,8 +48,11 @@ public sealed class Boat
         IEnumerable<ChandleryItem>? chandlery = null, TripRules? trips = null, SeaRules? seaRules = null, ForecastRules? forecastRules = null,
         YardRules? yard = null, FoulingRules? fouling = null, MooringRules? mooring = null, LayupRules? layup = null,
         SaleRules? sale = null, CalendarRules? calendar = null, OrderRules? orders = null, FuelRules? fuel = null, NightRules? night = null,
-        IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null, Currency? currency = null, CloseCallRules? closeCalls = null, InstrumentRules? instruments = null)
+        IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null, Currency? currency = null, CloseCallRules? closeCalls = null, InstrumentRules? instruments = null,
+        HoursRules? hours = null, SleepRules? sleep = null)
     {
+        Hours = hours ?? HoursRules.Default;
+        Sleep = sleep ?? SleepRules.Default;
         Currency = currency ?? Currency.Default;
         Reputation = reputation ?? ReputationRules.Default;
         Fuel = fuel ?? FuelRules.Default;
@@ -170,6 +173,10 @@ public sealed class Boat
     public LayupRules Layup { get; }
     public SaleRules Sale { get; }
     public CalendarRules Calendar { get; }
+    /// <summary>The shops' hours and the harbourmaster's night (design note 012, decision 1).</summary>
+    public HoursRules Hours { get; }
+    /// <summary>Hours awake and the tiredness they bring (design note 012).</summary>
+    public SleepRules Sleep { get; }
     public OrderRules Orders { get; }
     public FuelRules Fuel { get; }
     public NightRules Night { get; }

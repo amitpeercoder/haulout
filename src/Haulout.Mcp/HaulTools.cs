@@ -269,6 +269,11 @@ public sealed class HaulTools(GameSession session)
         "Nothing else is reset: the clock, what the winter did to her and the money carry on. Refused once already since you last launched.")]
     public string Keep() => session.Do("keep", new Keep());
 
+    [McpServerTool(Name = "sleep"), Description(
+        "Turn in: sleep until 08:00, or for a night's sleep if 08:00 is less than six hours away. Not while under way (heave to or anchor first). Nothing in the boat waits for you: she is left as she is, an away stretch like any other, and what she has to tell you is told when you wake. " +
+        "It resets how long you have been up: when you are tired, jobs you do yourself are likelier to come out poor, and when you are exhausted you will not see the subtle signs. Status says how long you have been up once it matters.")]
+    public string Sleep() => session.Do("sleep", new Sleep());
+
     [McpServerTool(Name = "sale", ReadOnly = true), Description(
         "The broker's valuation letter as it stands now (only what you know of her), whether she is listed and at what ask, and every viewing so far with what the buyer's surveyor found, what they offer and whether the offer is still open. Costs no time.")]
     public string Sale() => session.Ask("sale", new Sale());
@@ -353,7 +358,7 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, next weekend = next_weekend, wait week = wait_week, invite friend = invite_friend, calendar plan = plan_event (going true) and calendar unplan = plan_event (going false), yard install = yard_install, season page = season_page, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer. " +
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, next weekend = next_weekend, wait week = wait_week, invite friend = invite_friend, calendar plan = plan_event (going true) and calendar unplan = plan_event (going false), yard install = yard_install, season page = season_page, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer, turn in = sleep. " +
         "There is no quit; also available: status, aboard (what you have found so far), calendar (the week and the money), readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(

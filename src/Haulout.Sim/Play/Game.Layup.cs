@@ -142,7 +142,7 @@ public sealed partial class Game
         if (!_boat.TryGet(RawWaterPumpId, out var pump) || !pump.State.ContainsKey(WaterHeldProperty)) return "There's nothing to drain on this engine.";
         if (!_reach.Reachable(pump, _placeId)) return "The engine is reached from the companionway, with the steps off.";
         if (WaterHeld <= 0) return "The raw-water side is drained and full of antifreeze already.";
-        return MoneyRefusal(_boat.Layup.AntifreezeNok);
+        return ShopOpenRefusal() ?? MoneyRefusal(_boat.Layup.AntifreezeNok);
     }
 
     private CommandResult DoWinteriseEngine(Turn t)
@@ -202,7 +202,7 @@ public sealed partial class Game
         if (!_boat.TryGet(Electrical.BatteryId, out var battery)) return "There's no battery to take off.";
         if (!_reach.ReachableWhenFitted(battery, _placeId))
             return "The battery is under the quarter berth: get at it from there with the battery box lid off.";
-        return MoneyRefusal(_boat.Layup.BatteryRoomNok);
+        return OfficeOpenRefusal() ?? MoneyRefusal(_boat.Layup.BatteryRoomNok);
     }
 
     private CommandResult DoBatteryAshore(Turn t)
@@ -250,7 +250,7 @@ public sealed partial class Game
         if (Afloat) return "She's in the water: shore power is for the hard.";
         if (IsBatteryAshore) return "The battery is in the yard's battery room, on their charger already.";
         if (_chargerOn) return "The charger is on the battery already.";
-        return MoneyRefusal(_boat.Layup.ChargerNok);
+        return OfficeOpenRefusal() ?? MoneyRefusal(_boat.Layup.ChargerNok);
     }
 
     private CommandResult DoWinterCharger(Turn t)
@@ -275,7 +275,7 @@ public sealed partial class Game
         if (_placeId != OnDeckId) return "The cover goes over the deck from on deck: go up there.";
         if (_coverOn) return "The winter cover is on already.";
         int nok = _coverOwned ? 0 : _boat.Layup.CoverNok;
-        return nok > 0 ? MoneyRefusal(nok) : null;
+        return nok > 0 ? ShopOpenRefusal() ?? MoneyRefusal(nok) : null;
     }
 
     private CommandResult DoFitWinterCover(Turn t)

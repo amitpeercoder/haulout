@@ -27,6 +27,8 @@ public sealed record EconomyData
     public FuelData Fuel { get; init; } = new();
     public SurveyFeeData Survey { get; init; } = new();
     public CloseCallsData CloseCalls { get; init; } = new();
+    public HoursData Hours { get; init; } = new();
+    public SleepData Sleep { get; init; } = new();
 
     public sealed record StartData
     {
@@ -80,4 +82,65 @@ public sealed record EconomyData
     public sealed record SurveyFeeData { public int NokPerFoot { get; init; } }
 
     public sealed record CloseCallsData { public int LetterNok { get; init; } }
+
+    /// <summary>
+    /// The shops' hours and the harbourmaster's night (design note 012). Times are "HH:MM" in the file and minutes of the day in
+    /// <see cref="HoursRules"/>. A file with no <c>hours</c> block has no hours: shops are always open.
+    /// </summary>
+    public sealed record HoursData
+    {
+        public string? NightFrom { get; init; }
+        public string HarbourmasterFirstCall { get; init; } = "08:00";
+        public ShopHoursData Shop { get; init; } = new();
+
+        public HoursRules ToRules() => NightFrom is null
+            ? HoursRules.Default
+            : new HoursRules
+            {
+                NightFromMinute = Minute(NightFrom),
+                HarbourmasterFirstCallMinute = Minute(HarbourmasterFirstCall),
+                Weekday = Open(Shop.Weekday),
+                Saturday = Open(Shop.Saturday),
+                Sunday = Open(Shop.Sunday),
+            };
+
+        private static OpeningHours Open(IReadOnlyList<string>? span) =>
+            span is { Count: 2 } ? new OpeningHours(Minute(span[0]), Minute(span[1])) : OpeningHours.Shut;
+
+        internal static int Minute(string hhmm)
+        {
+            var parts = hhmm.Split(':');
+            if (parts.Length != 2 || !int.TryParse(parts[0], out var h) || !int.TryParse(parts[1], out var m) || h is < 0 or > 24 || m is < 0 or > 59)
+                throw new InvalidOperationException($"economy.json: '{hhmm}' is not a time of day (HH:MM).");
+            return h * 60 + m;
+        }
+    }
+
+    public sealed record ShopHoursData
+    {
+        public IReadOnlyList<string>? Weekday { get; init; }
+        public IReadOnlyList<string>? Saturday { get; init; }
+        public IReadOnlyList<string>? Sunday { get; init; }
+    }
+
+    /// <summary>Sleep is a need, not a curfew (design note 012, Amit's answers). No block: no tiredness.</summary>
+    public sealed record SleepData
+    {
+        public int TiredAtHours { get; init; }
+        public int ExhaustedAtHours { get; init; }
+        public double BotchFactorTired { get; init; } = 1;
+        public double BotchFactorExhausted { get; init; } = 1;
+        public string WakeHour { get; init; } = "08:00";
+        public int SleepHours { get; init; }
+        public int MinSleepHours { get; init; }
+
+        public SleepRules ToRules() => TiredAtHours <= 0
+            ? SleepRules.Default
+            : new SleepRules
+            {
+                TiredAtMinutes = TiredAtHours * 60, ExhaustedAtMinutes = ExhaustedAtHours * 60,
+                BotchFactorTired = BotchFactorTired, BotchFactorExhausted = BotchFactorExhausted,
+                WakeMinute = HoursData.Minute(WakeHour), SleepMinutes = SleepHours * 60, MinSleepMinutes = MinSleepHours * 60,
+            };
+    }
 }

@@ -15,7 +15,7 @@ public class McpServerTests
         "plan_trip", "inventory", "trip", "chart", "depart", "continue", "motor", "sail", "heave_to", "anchor", "turn_back", "call_tow",
         "season", "book_haulout", "haul_out", "scrub", "yard_wash",
         "winterise_engine", "fill_tank", "battery_ashore", "battery_aboard", "winter_charger", "fit_winter_cover", "wait_until_spring",
-        "list_for_sale", "accept_offer", "keep", "sale",
+        "list_for_sale", "accept_offer", "keep", "sale", "sleep",
         "calendar", "next_weekend", "wait_week", "order", "invite_friend", "plan_event",
         "install", "yard_install", "upgrades", "season_page",
     ];
@@ -119,7 +119,7 @@ public class McpServerTests
     [Fact]
     public async Task No_tool_or_parameter_description_carries_an_economy_figure_or_the_currency_code()
     {
-        Assert.Equal(70, ExpectedTools.Length);
+        Assert.Equal(71, ExpectedTools.Length);
         await using var client = await Connect();
         var tools = await client.ListToolsAsync();
         // Rule 5: the price is a query result, never a literal in the interface. A description may say "costs the tow"; it may not say how much.
@@ -202,6 +202,12 @@ public class McpServerTests
         }
     }
 
+    /// <summary>The game starts at eight on a Saturday: thirty looks of two minutes each bring it to nine, when the chandlery and the yard office open.</summary>
+    private static async Task UntilNine(McpClient client)
+    {
+        for (int i = 0; i < 30; i++) await Call(client, "look", []);
+    }
+
     [Fact]
     public async Task Trip_tools_plan_buy_and_refuse_in_plain_words()
     {
@@ -216,6 +222,9 @@ public class McpServerTests
         Assert.Contains("impeller", inv);
         Assert.Contains("NOK", inv);
 
+        // The chandlery opens at nine on a Saturday (design note 012): at eight it says so, and the refusal costs nothing.
+        Assert.Contains("opens at nine", TextOf(await Call(client, "buy", new() { ["item"] = "impeller" })));
+        await UntilNine(client);
         var buy = TextOf(await Call(client, "buy", new() { ["item"] = "impeller" }));
         Assert.Contains("impeller", buy, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("impeller x1", TextOf(await Call(client, "inventory", [])));
@@ -287,6 +296,7 @@ public class McpServerTests
         Assert.Contains("The yard lifts boats from day 255 to day 300.", season);
         Assert.Contains("winter storage", season);
 
+        await UntilNine(client); // the yard office opens at nine on a Saturday (design note 012)
         var booked = TextOf(await Call(client, "book_haulout", new() { ["day"] = 270 }));
         Assert.Contains("book the crane for day 270", booked);
         Assert.Contains("Haulout booked for day 270", TextOf(await Call(client, "season", [])));

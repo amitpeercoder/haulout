@@ -126,11 +126,12 @@ public sealed partial class Game
         if (AtSea) return "You're at sea: ring the yard from port.";
         if (!_boat.Orders.Enabled) return "The yard chandlery has everything on the shelf: buy it.";
         if (item.Stocked) return $"The yard chandlery keeps the {item.Name} on the shelf: buy it.";
-        return OrderRefusal(item.Name, item.PriceNok, null, item.Id);
+        return OfficeOpenRefusal() ?? OrderRefusal(item.Name, item.PriceNok, null, item.Id);
     }
 
     private CommandResult PlaceOrder(Turn t, string action, string name, int price, string? componentId, string? itemId)
     {
+        if (OfficeOpenRefusal() is { } shut) return Reject(action, shut);
         if (OrderRefusal(name, price, componentId, itemId) is { } refusal) return Reject(action, refusal);
 
         var rules = _boat.Orders;

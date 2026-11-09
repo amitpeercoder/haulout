@@ -53,6 +53,14 @@ public sealed partial class Game
                 Tick(t, chunk, aboard: false);
                 left -= chunk;
                 if (_sunk) break;
+                // The harbourmaster does not ring in the night: a call that would land there comes at her first call of the morning.
+                if (InNight(MinuteOfDay) && !AtSea)
+                {
+                    int toCall = (MinuteOfDay > DayHours.NightFromMinute ? 1440 : 0) + DayHours.HarbourmasterFirstCallMinute - MinuteOfDay;
+                    Tick(t, toCall, aboard: false);
+                    left = Math.Max(0, left - toCall);
+                    if (_sunk) break;
+                }
                 waited++;
                 if (_bilgePassedToday) Raise(HarbourmasterKind, _boat.Water.HarbourmasterText);
                 if (FreshAlert(raisedBefore, MooringStops))
