@@ -98,6 +98,9 @@ public sealed partial class Game
     /// </summary>
     private void Spawn(bool present)
     {
+        // The impeller's shed vanes are a property, not a fault; the fault that lists them wakes on this value, read fresh so a replaced part reads 0 again.
+        _values.Set(SystemValues.VanesShed, _boat.TryGet(EngineInputsBuilder.ImpellerId, out var impeller)
+            ? 1 - impeller.State.GetValueOrDefault(EngineInputsBuilder.VaneFactorProperty, 1.0) : 0);
         foreach (var f in _boat.AllFaults.ToList())
         {
             if (f is { Spawned: true, Rearmed: false, State: FaultState.Fixed, Repeats: true }) Rearm(f);

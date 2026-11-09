@@ -1667,6 +1667,29 @@
             "nok": 1400,
             "leadDays": 2
           }
+        },
+        {
+          "id": "impeller-shed",
+          "atSea": { "text": "Under load the engine will run hot: the impeller has lost vanes.", "spare": "impeller" },
+          "name": "Impeller with vanes shed",
+          "effect": { "kind": "none", "value": 0 },
+          "dormant": true,
+          "spawn": [ { "when": "cooling.vanesShed", "atLeast": 0.3, "repeats": true } ],
+          "reveals": [
+            {
+              "action": "inspect",
+              "text": "The pump turns, but there are too few vanes left to push the water.",
+              "discovers": true,
+              "needsUncovered": true
+            }
+          ],
+          "fixedBy": [ "replace" ],
+          "onHardOnly": false,
+          "consequence": "The engine will overheat under load at sea: the cooling water is going the way of the vanes.",
+          "costLaterNok": 4500,
+          "laterNote": "a tow home if the engine overheats at sea",
+          "diy": { "how": "Fit a new impeller", "minutes": 60 },
+          "yard": { "how": "The yard mechanic fits a new impeller", "nok": 1400, "leadDays": 2 }
         }
       ],
       "removablePart": {
@@ -3394,7 +3417,10 @@
     "heaveToDriftKnots": 0.5, "anchorWithinNm": 1, "towKnots": 3,
     "slopPerSeaState": 0.5, "sprayFromSeaState": 2, "sprayLitresPerHourPerSeaState": 2,
     "stirFromSeaState": 3, "stirHoursToBite": 2,
-    "impellerShedPerLoadHour": 0.3, "impellerSetFromWear": 0.6, "impellerWeakFlowFromWear": 0.75, "overheatStopMinutes": 90,
+    "impellerShedPerLoadHour": 1.1, "impellerShedWearPower": 4, "impellerShedVisibleBelow": 0.7,
+    "impellerShedText": "Two vanes are gone at the root; the stubs are torn.",
+    "impellerShedCoverOnText": "It is inside the pump behind a six-screw cover; you can't tell without taking the cover off.",
+    "impellerSetFromWear": 0.6, "impellerWeakFlowFromWear": 0.75, "overheatStopMinutes": 90,
     "underWayDrawPerHour": 0.05,
     "departMinutes": 10, "heaveToMinutes": 5, "anchorMinutes": 15, "turnBackMinutes": 2
   },
@@ -3888,7 +3914,7 @@
     "PLACEHOLDER (design note 007): chandlery prices and walking minutes (remote start button 400 NOK and 30 min; impeller 350; alternator belt 220; primary filter element 180; secondary filter element 160; engine oil 300; hose clamps 120; fuses 60; hose 250; 15 min each).",
     "PLACEHOLDER (design note 007): trips { Skjaervik to Hestholmen 14 nm on 040 degrees, shelter at Lyngskjaer 7 nm out, tow 6000 NOK for 6 hours aboard and 18 hours lost }, and the arrival lines.",
     "PLACEHOLDER (design note 007): sea { motoring 5 kn; sailing in force 3 to 5 at 4.0, 5.0 and 5.5 kn, not closer than 45 degrees to the wind; heave-to drift 0.5 kn; anchoring within 1 nm of shelter; tow 3 kn; sea state by wind force }.",
-    "PLACEHOLDER (design note 007): sea { waves add 50 % per sea state to seawater leaks; spray 2 L/h per sea state with the hatch open from sea state 2; the tank is stirred from sea state 3 and bites after 2 hours; impeller sheds 0.3 x (1 - condition) of its vanes per load hour; the engine stops itself after 90 overheat minutes; 0.05 of a charge an hour drawn under way }.",
+    "PLACEHOLDER (design note 007, revised by 012 finding 8): sea { waves add 50 % per sea state to seawater leaks; spray 2 L/h per sea state with the hatch open from sea state 2; the tank is stirred from sea state 3 and bites after 2 hours; impeller sheds 1.1 x (1 - condition)^4 of its vanes per load hour (times 1 + 0.5 x hull growth), which is about 0.196 an hour for the tired part as sold (condition 0.35: flow under the 0.25 overheat line in the second load hour with its tired-impeller fault, about 3.8 hours without; the old linear 0.3 x (1 - condition) gave 0.195 an hour) and 0.0018 an hour at condition 0.8 (about 426 load hours on a clean hull to the same line; 84 hours at condition 0.7), and next to nothing for a new one; the vanes can be seen gone below a vane factor of 0.7 (impellerShedVisibleBelow) and the impeller-shed fault wakes on cooling.vanesShed (1 minus the vane factor) at 0.3, the same line; the engine stops itself after 90 overheat minutes; 0.05 of a charge an hour drawn under way }.",
     "PLACEHOLDER (design note 007): sea { depart 10 min, heave-to 5, anchor 15, turn back 2 }; forecast { 3 days of lead, force error chance 0 / 0.3 / 0.5 / 0.7 by lead day, rain flip chance 0 / 0.1 / 0.2 / 0.3 }.",
     "PLACEHOLDER (design note 007): the atSea sentence on each fault names the consequence under way, and the vaneFactor (impeller) and waterMinutes (primary filter) properties start at 1 and 0.",
     "PLACEHOLDER (design note 008): trips { Skjaervik to Storholmen 26 nm on 300 degrees with shelter at Maakeskjaer 12 nm out; Kvitnes 9 nm from Hestholmen on 120 degrees, the way back on 300 }, the arrival lines of both, fuel at Skjaervik and Storholmen, no shop at Kvitnes, and the Storholmen kiosk (stock as Hestholmen's, 1.3 times the chandlery price).",
@@ -3928,6 +3954,8 @@
     "PLACEHOLDER (design note 010, second pass G): instruments { the plotter's plug counts wetness from the day the plotter is fitted: 1.0 a day of full rain (times the exposure rain term, so a winter cover keeps it off) and 0.05 an hour at sea in force 4 or more; the corroded-plug fault wakes at 7 times the house's seeded spread (0.6 to 1.6) and blanks the screen on a day of rain only; cleaning the pins (30 min, free) is the fix, the yard 400 NOK and a day. The radar's scanner cable counts chafe from the day the radar is fitted, afloat, in force 5 or more: 0.05, 0.1, 0.2, 0.35 an hour for force 5 to 8 and over, times 3 at sea; the chafed-cable fault wakes at 35 times the seeded spread and the radar paints nothing; a new cable run is 700 NOK and 120 min, the yard 1800 NOK and a day }. The cable is a part that comes aboard with the radar (upgrades.also), not an upgrade and not on the shelf (bought at 700 NOK when it is replaced): no price or value moves.",
     "UNVERIFIED (design note 010, second pass G): how fast an unsealed plotter plug corrodes in cockpit rain and spray, that it blanks the screen only when wet, how fast a scanner cable chafes at a spreader, how much faster under way, and the price of a cable run (domain, Amit).",
     "PLACEHOLDER (design note 010): reputation { one point for every 2 standing bills paid within the bank's limit, +1 for a haulout on the booked day, -1 for a tow, -2 for a parted mooring, -1 for a forfeited slot, -1 for a bill that left the balance past the limit, -1 for a ferry's report after a close call in fog or at night; clamped to -5..5; each point takes 5 % off the tow (a negative point adds 5 %) and one day off the yard's first free slot (a negative point adds one) }. It is never shown as a number: five sentences by band.",
-    "PLACEHOLDER (design note 010, second pass H): the friend's week as three beats { the arrival at Skjaervik at 17:00 of the first day (a heads, a stove and dry bunks; failing one ends the week), a day trip to Hestholmen made on a passage the player makes with the friend aboard (a tow does not count), the last night judged at 22:00 of the last day, afloat at any port, with a diesel heater if the night's low is under 10 degrees; a good week is both of the trip and the night, a week one of them, a thin week the arrival only; the week charges no fixed block: the weekday rule charges what the player does, and a wait leaves the friend ashore } and the club cruise { the first Friday on or after day 214, Friday to Sunday; made if she is at Kvitnes by 20:00 on the Saturday, and with the Friday line if by 20:00 on the Friday }"
+    "PLACEHOLDER (design note 010, second pass H): the friend's week as three beats { the arrival at Skjaervik at 17:00 of the first day (a heads, a stove and dry bunks; failing one ends the week), a day trip to Hestholmen made on a passage the player makes with the friend aboard (a tow does not count), the last night judged at 22:00 of the last day, afloat at any port, with a diesel heater if the night's low is under 10 degrees; a good week is both of the trip and the night, a week one of them, a thin week the arrival only; the week charges no fixed block: the weekday rule charges what the player does, and a wait leaves the friend ashore } and the club cruise { the first Friday on or after day 214, Friday to Sunday; made if she is at Kvitnes by 20:00 on the Saturday, and with the Friday line if by 20:00 on the Friday }",
+    "PLACEHOLDER (design note 012, finding 8): the impeller's shed rate is 1.1 x (1 - condition)^4 per load hour (impellerShedPerLoadHour, impellerShedWearPower), so a part kept at 0.8 or better lasts about 426 load hours on a clean hull (84 at 0.7) and the as-sold part (0.35) still fails in the second load hour, as before; the fourth power is what lets the two ends sit this far apart. Vanes read as gone below a vane factor of 0.7 (impellerShedVisibleBelow): with the cover off inspect says so in place of the condition phrase, with it on inspect says only that you cannot tell, and the impeller-shed fault (dormant, wakes at 0.3 shed on cooling.vanesShed, effect none because the vane factor already cuts the flow, fixed by replace) puts it on the readiness list.",
+    "UNVERIFIED (design note 012, finding 8): impeller life. Practice is to inspect or replace yearly or about every 250 hours: a Yanmar 6BY2 schedule quoted second-hand on tugnuts.com (every 250 hours or one year), West Marine's Impeller Replacement 101 and John Jamieson in Sail-World (yearly), owners reporting two years when it looks good. Forum and retailer sources, no manufacturer sheet; the fourth power and the constant are placeholders (domain, Amit)."
   ]
 }

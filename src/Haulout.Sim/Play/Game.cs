@@ -523,7 +523,10 @@ public sealed partial class Game
         if (!ResolveComponent("inspect", name, needTouch: false, out var c, out var rejected)) return rejected!;
 
         bool off = _uncovered.Contains(c.Id);
-        t.Narrative.Add(c.Description + " " + WearPhrase(c.Condition));
+        bool vanesShed = c.Id == EngineInputsBuilder.ImpellerId && ImpellerVanesShed(c);
+        string shedWords = vanesShed ? (off ? _boat.SeaRules.ImpellerShedText : _boat.SeaRules.ImpellerShedCoverOnText) : "";
+        // A torn impeller is never "in good shape": what the eye can tell stands in for the condition phrase. A missing vane is not subtle: tiredness does not hide it.
+        t.Narrative.Add(c.Description + " " + (shedWords.Length > 0 ? shedWords : WearPhrase(c.Condition)));
         if (c.Id == BilgeId) t.Narrative.Add($"In the bilge: {_boat.Water.Words(_water.Level)}.");
         if (c.Id == FuelTankId && GaugeWords() is { } level) t.Narrative.Add($"In the tank: {level}.");
         if (c.Id == HullId && Band.Pick(_boat.Fouling.HullWords, Fouling) is { Length: > 0 } below)
@@ -844,6 +847,10 @@ public sealed partial class Game
         int m = (StartMinuteOfDay + minutesSpent) % 1440;
         return $"{m / 60:00}:{m % 60:00}";
     }
+
+    /// <summary>The impeller has shed enough of its vanes to be seen (data: <c>impellerShedVisibleBelow</c>).</summary>
+    private bool ImpellerVanesShed(Component impeller) =>
+        impeller.State.GetValueOrDefault(EngineInputsBuilder.VaneFactorProperty, 1.0) < _boat.SeaRules.ImpellerShedVisibleBelow;
 
     private const string ImpellerSetText = "The vanes have taken a set: they lie curled the way the pump turns and spring back slowly.";
 

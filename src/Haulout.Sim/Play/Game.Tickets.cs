@@ -7,7 +7,7 @@ namespace Haulout.Sim.Play;
 /// <summary>
 /// Tickets, the club's courses and the notice board (design note 012, decisions 3 and 6, step 2). A ticket asks things of the skipper's log
 /// (<see cref="SkipperLog"/>); a course is a dated card at the club; <see cref="Enrol"/> pays at enrolment and marks the days. A course day is played:
-/// the first command of the day (or a wait passing it) is the day at the club, from the club's start to its end, with that day's line from data; the
+/// the first command of the day (a wait or a sleep included) is the day at the club, from the club's start to its end, with that day's line from data; the
 /// player is not aboard, and the evening is their own. A weekday course day costs a vacation day by the weekday rule, once. A day not spent at the
 /// club (at sea, or at another port) forfeits the course and the fee. On the last day the log decides (<see cref="DecideLastDay"/>, the one method where
 /// the exam of step 2b is slotted in): if it meets every ask the ticket is held, else the course is done and the ticket is held automatically on the
@@ -264,10 +264,12 @@ public sealed partial class Game
     /// <summary>The player is at the club's port, not at sea.</summary>
     private bool AtTheClub => !AtSea && !_sunk && _portId == Club.Port;
 
-    /// <summary>Commands that are only a phone call, a mark on the calendar or a decision: they do not take the player from the club (and need no boat).</summary>
+    /// <summary>
+    /// Commands that are only a phone call, a mark on the calendar or a decision: they do not take the player from the club (and need no boat). A wait or a
+    /// sleep is not one: issued at the club before the session ends it is the day at the club (design note 012, finding 7), so the exam is sat, not slept through.
+    /// </summary>
     private static bool KeepsCourseDay(Command c) =>
-        c is Enrol or Order or BookHaulout or InviteFriend or PlanEvent or UnplanEvent or Defer or Undefer or ListForSale or AcceptOffer or Keep
-            or WaitDays or NextWeekend or WaitWeek or WaitUntilSpring;
+        c is Enrol or Order or BookHaulout or InviteFriend or PlanEvent or UnplanEvent or Defer or Undefer or ListForSale or AcceptOffer or Keep;
 
     /// <summary>
     /// The first command of a course day, issued at the club's port before the session ends, is the day at the club: that day's line, the weekday

@@ -425,19 +425,102 @@ public class ExamTests
         Assert.False(Exam(g).Open);
     }
 
-    [Fact]
-    public void A_wait_that_passes_the_exam_day_without_the_player_at_the_table_hands_in_a_blank_paper()
+    /// <summary>The radio course enrolled and its morning reached (the wait stopped there), with the club's phone calls taking <paramref name="phoneMinutes"/> each.</summary>
+    private static Game RadioMorning(int phoneMinutes = 5)
     {
-        var g = ClubGame.Afloat(100);
+        var g = phoneMinutes == 5 ? ClubGame.Afloat(100) : AfloatWithPhone(phoneMinutes);
         Ok(g.Execute(new Enrol("radio")));
         ClubGame.ToMorning(g, 138);
-        var wait = Ok(g.Execute(new WaitDays(1)));          // the Saturday goes by at the club, with no command
+        return g;
+    }
+
+    private static Game AfloatWithPhone(int phoneMinutes)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(ClubGame.Sloop28Json())!;
+        node["orders"]!["phoneMinutes"] = phoneMinutes;
+        var boat = BoatLoader.Load(node.ToJsonString(), true, ClubGame.OpenShops(), withHours: true);
+        boat.Get("anchor-gear").Replace();
+        boat.Get("anchor-shackle").Replace();
+        var g = new Game(boat, 100, new ClubGame.FixedRandom(0.99), Game.DefaultSeed, ClubGame.Calm());
+        Ok(Walk.Do(g, "negative terminal", c => new Clean(c)));
+        Ok(Walk.Do(g, "seacock", c => new Replace(c)));
+        Ok(Walk.Do(g, "impeller", c => new Replace(c)));
+        Ok(Walk.Do(g, "cockpit drains", c => new Replace(c)));
+        Ok(Walk.Do(g, "navigation lights", c => new Replace(c)));
+        Ok(Walk.Start(g));
+        Ok(g.Execute(new Launch()));
+        if (!Status(g).EngineRunning) Ok(Walk.Start(g));
+        Walk.ToPlace(g, "cockpit");
+        return g;
+    }
+
+    [Fact]
+    public void A_wait_on_the_exam_morning_is_the_day_at_the_club_and_the_paper_is_put_not_handed_in_blank()
+    {
+        var g = RadioMorning();
+        var wait = Ok(g.Execute(new NextWeekend()));          // finding 7: the second wait after the stop used to lose the exam without a question
+        Assert.Equal("course", wait.Action);
+        Assert.Equal(138, Status(g).Day);
+        Assert.Equal("16:00", Status(g).TimeOfDay);
+        Assert.Contains(wait.Narrative, l => l.StartsWith("Saturday, day 138: day 1 of 1", StringComparison.Ordinal));
+        Assert.DoesNotContain("The paper was not handed in: no questions answered.", wait.Narrative);
+        Assert.True(Exam(g).Open);
+        Assert.Contains(wait.Narrative, l => l.StartsWith("Question 1 of 5:", StringComparison.Ordinal));
+        var answers = Sit(g, true, true, true, true, true);
+        Assert.Contains("You got 5 of 5.", answers[^1].Narrative);
+        Assert.False(Exam(g).Open);
+    }
+
+    [Fact]
+    public void A_sleep_on_the_exam_morning_is_the_day_at_the_club_and_the_exam_opens()
+    {
+        var g = RadioMorning();
+        var sleep = Ok(g.Execute(new Sleep()));
+        Assert.Equal("course", sleep.Action);
+        Assert.Equal("16:00", Status(g).TimeOfDay);
+        Assert.True(Exam(g).Open);
+        Assert.Contains(sleep.Narrative, l => l.StartsWith("Question 1 of 5:", StringComparison.Ordinal));
+        Sit(g, true, true, true, true, true);
+        Assert.False(Exam(g).Open);
+    }
+
+    [Theory]
+    [InlineData("wait")]
+    [InlineData("week")]
+    [InlineData("spring")]
+    public void Every_wait_on_the_exam_morning_is_gated_the_same_way(string which)
+    {
+        var g = RadioMorning();
+        Command wait = which switch { "wait" => new WaitDays(3), "week" => new WaitWeek(), _ => new WaitUntilSpring() };
+        Assert.Equal("course", Ok(g.Execute(wait)).Action);
+        Assert.True(Exam(g).Open);
+        Assert.Equal(138, Status(g).Day);
+    }
+
+    [Fact]
+    public void A_wait_after_the_session_on_the_exam_day_goes_in_blank_and_says_the_paper_was_not_handed_in()
+    {
+        // Phone calls of nine hours: the player is still at the club's port, but it is past four when the wait is issued.
+        var g = RadioMorning(phoneMinutes: 540);
+        Ok(g.Execute(new Order("vhf radio")));
+        Assert.Equal("17:00", Status(g).TimeOfDay);
+        var wait = Ok(g.Execute(new WaitDays(1)));
         Assert.Contains("The paper was not handed in: no questions answered.", wait.Narrative);
         Assert.Contains("You got 0 of 5.", wait.Narrative);
         Assert.Equal(5, wait.Narrative.Count(l => l.StartsWith("Not right:", StringComparison.Ordinal)));
         Assert.DoesNotContain(wait.Narrative, l => l.Contains("You got up before", StringComparison.Ordinal));
         Assert.False(Exam(g).Open);
         Assert.False(Ticket(g, "Radio ticket").Held);
+    }
+
+    [Fact]
+    public void A_phone_call_on_the_exam_morning_keeps_the_day_for_the_gate()
+    {
+        var g = RadioMorning();
+        Ok(g.Execute(new Order("vhf radio")));                 // a phone call: not the day at the club
+        Assert.False(Exam(g).Open);
+        Assert.Equal("course", Ok(g.Execute(new Look())).Action);
+        Assert.True(Exam(g).Open);
     }
 
     [Fact]

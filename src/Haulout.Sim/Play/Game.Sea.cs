@@ -88,7 +88,7 @@ public sealed partial class Game
         {
             double vanes = impeller.State.GetValueOrDefault(EngineInputsBuilder.VaneFactorProperty, 1.0);
             impeller.State[EngineInputsBuilder.VaneFactorProperty] =
-                Math.Max(0, vanes - rules.ImpellerShedPerLoadHour * (1 - impeller.Condition) * (1 + _boat.Fouling.LoadPerGrowth * Fouling) * h);
+                Math.Max(0, vanes - rules.ImpellerShedPerLoadHour * Math.Pow(1 - impeller.Condition, rules.ImpellerShedWearPower) * (1 + _boat.Fouling.LoadPerGrowth * Fouling) * h);
         }
 
         // A running engine in a seaway stirs the tank: water in the fuel reaches the primary filter.

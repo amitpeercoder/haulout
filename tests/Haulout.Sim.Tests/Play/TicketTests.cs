@@ -415,18 +415,20 @@ public class TicketTests
     }
 
     [Fact]
-    public void A_wait_passing_a_course_day_is_the_day_at_the_club_and_its_line_comes_in_the_wait()
+    public void A_wait_issued_at_the_club_on_a_course_day_is_the_day_at_the_club_and_a_later_wait_passes_the_next_in_its_line()
     {
         var g = ClubGame.Afloat(100);
         g.GrantTicketForTests("radio");
         Ok(g.Execute(new Enrol("coastal")));
         ClubGame.ToMorning(g, 245);
         int vacation = ClubGame.Cal(g).VacationDaysUsed;
-        var wait = Ok(g.Execute(new WaitDays(2)));       // Monday and Tuesday go by at the club
-        Assert.Contains(wait.Narrative, l => l.StartsWith("Monday, day 245: day 1 of 5", StringComparison.Ordinal));
+        var first = Ok(g.Execute(new WaitDays(2)));      // the first command of the Monday: the day at the club, the wait is not carried out
+        Assert.Equal("course", first.Action);
+        Assert.Contains(first.Narrative, l => l.StartsWith("Monday, day 245: day 1 of 5", StringComparison.Ordinal));
+        Assert.Equal(245, Status(g).Day);
+        Assert.Equal(vacation + 1, ClubGame.Cal(g).VacationDaysUsed);
+        var wait = Ok(g.Execute(new WaitDays(2)));       // the Monday is held: this wait takes the evening and the Tuesday, which goes by at the club
         Assert.Contains(wait.Narrative, l => l.StartsWith("Tuesday, day 246: day 2 of 5", StringComparison.Ordinal));
-        Assert.DoesNotContain(wait.Narrative, l => l.StartsWith("Wednesday, day 247", StringComparison.Ordinal));   // the wait ends on the Wednesday morning
-        Assert.Equal(247, Status(g).Day);
         Assert.Equal(vacation + 2, ClubGame.Cal(g).VacationDaysUsed);                 // Monday and Tuesday, each once, by the weekday rule
     }
 

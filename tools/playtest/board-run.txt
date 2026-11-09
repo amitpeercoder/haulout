@@ -302,7 +302,8 @@ wait week
 wait week
 wait week
 wait week
-look
+wait week
+wait week
 answer b
 answer c
 answer d

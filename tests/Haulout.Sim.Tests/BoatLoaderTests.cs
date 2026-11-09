@@ -80,7 +80,7 @@ public class BoatLoaderTests
     public void Every_fault_can_be_discovered()
     {
         var boat = BoatLoader.LoadSloop28();
-        Assert.Equal(28, boat.AllFaults.Count()); // plus the seized anchor chain, the weeping joker valve and the frozen shackle (design note 010)
+        Assert.Equal(29, boat.AllFaults.Count()); // plus the seized anchor chain, the weeping joker valve and the frozen shackle (design note 010) and the impeller with vanes shed (012 finding 8)
         Assert.All(boat.AllFaults, f => Assert.Contains(f.Reveals, r => r.Discovers));
     }
 

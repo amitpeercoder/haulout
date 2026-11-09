@@ -253,6 +253,14 @@ public sealed record SeaRules
     public int StirFromSeaState { get; init; } = 3;
     public int StirHoursToBite { get; init; } = 2;
     public double ImpellerShedPerLoadHour { get; init; } = 0.3;
+    /// <summary>The wear (1 minus condition) is raised to this power in the shed rate: 1 is linear; 3 keeps a sound part shedding next to nothing while a tired one sheds fast.</summary>
+    public double ImpellerShedWearPower { get; init; } = 1;
+    /// <summary>The vane factor below which the missing vanes can be seen (pump cover off) and the shed is a fault on the list; 0 means they never show.</summary>
+    public double ImpellerShedVisibleBelow { get; init; }
+    /// <summary>With the pump cover off and the vanes shed: the line that replaces the condition phrase.</summary>
+    public string ImpellerShedText { get; init; } = "";
+    /// <summary>With the cover on and the vanes shed: what the eye can tell, in place of the condition phrase.</summary>
+    public string ImpellerShedCoverOnText { get; init; } = "";
     /// <summary>
     /// Wear (1 minus condition) at which the impeller's vanes show a set to the eye with the pump cover off, and at which the flow at the exhaust
     /// reads weaker; both before it sheds (design note 010, second pass I). A boat that names no threshold shows no wear symptom.

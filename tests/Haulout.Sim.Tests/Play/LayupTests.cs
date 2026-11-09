@@ -174,7 +174,9 @@ public class LayupTests(ITestOutputHelper output)
         {
             bool winter = WinterFaults.Contains(f.Id);
             Assert.Equal(winter, f.Spawn.All(r => r.Spread && r.Repeats && r.Cause is { Length: > 0 }));
-            if (!winter) Assert.All(f.Spawn, r => Assert.False(r.Spread || r.Repeats || r.Cause is not null));
+            // The impeller's shed vanes (012 finding 8) repeat, with no spread and no cause: a new impeller can shed again.
+            if (f.Id == "impeller-shed") Assert.All(f.Spawn, r => Assert.True(r.Repeats && !r.Spread && r.Cause is null));
+            else if (!winter) Assert.All(f.Spawn, r => Assert.False(r.Spread || r.Repeats || r.Cause is not null));
             Assert.True(f.Dormant || !winter);
         }
         Assert.Equal(5, WinterFaults.Count(id => FaultOf(boat, id).Spawn.Count == 1));
