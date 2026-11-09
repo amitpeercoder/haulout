@@ -62,6 +62,10 @@ public sealed class GameSession
             var calendar = (CalendarView)_game.Ask(new Calendar());
             var season = (SeasonView)_game.Ask(new Season());
             var upgrades = (UpgradesView)_game.Ask(new Upgrades());
+            // The club (design note 012): what the player can read on the board, in their tickets and in their own logbook.
+            var tickets = (TicketsView)_game.Ask(new Tickets());
+            var board = (NoticeboardView)_game.Ask(new Noticeboard());
+            var log = (LogView)_game.Ask(new Logbook());
             if (calendar.VacationDaysUsed < _vacationLast) _vacationBefore += _vacationLast;
             _vacationLast = calendar.VacationDaysUsed;
             var line = JsonSerializer.Serialize(new
@@ -89,6 +93,11 @@ public sealed class GameSession
                 eventsMissed = calendar.EventsMissed,
                 upgradesFitted = upgrades.Items.Count(i => i.Status.StartsWith("fitted", StringComparison.Ordinal)),
                 kept = season.Kept,
+                ticketsHeld = tickets.Tickets.Where(t => t.Held).Select(t => t.Name).ToArray(),
+                vhfFitted = upgrades.Items.Any(i => i.Name.Contains("VHF", StringComparison.Ordinal) && i.Status.StartsWith("fitted", StringComparison.Ordinal)),
+                crewingDays = board.Cards.OfType<CrewingCard>().Where(c => c.Status == "done").Sum(c => c.Days),
+                courseDays = board.Cards.OfType<CourseCard>().Where(c => c.Status == "done").Sum(c => c.Days),
+                examsPassed = log.Entries.Count(e => e.Text.StartsWith("Sat the exam of", StringComparison.Ordinal) && e.Text.EndsWith(", passed.", StringComparison.Ordinal)),
             });
             using var w = new StreamWriter(_tracePath, append: true);
             w.WriteLine(line);

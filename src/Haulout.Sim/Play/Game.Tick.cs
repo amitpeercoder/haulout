@@ -35,6 +35,7 @@ public sealed partial class Game
     private void Tick(Turn t, int minutes, bool aboard)
     {
         int left = minutes;
+        int underWayMinutes = 0; // the minutes of this tick spent under way at sea (they tire the skipper at half rate)
         while (left > 0)
         {
             int stepDay = Day;
@@ -47,6 +48,7 @@ public sealed partial class Game
                 if (_running) _engineMinutesToday += step;
             }
             bool atSea = AtSea;
+            if (atSea && !NotUnderWay) underWayMinutes += step;
             // A weekday at sea is always the player's day; aboard in port, more than an evening's work makes it one.
             if (atSea) ChargeDay(t, stepDay, atSea: true);
             else if (aboard && _workMinutesToday > _boat.Calendar.EveningMinutes) ChargeDay(t, stepDay, atSea: false);
@@ -65,7 +67,7 @@ public sealed partial class Game
             left -= step;
             if ((StartMinuteOfDay + ClockMinutes) % 1440 == 0) Daily(t, Day - 1, aboard);
         }
-        CountAwake(minutes, aboard);
+        CountAwake(minutes, aboard, underWayMinutes);
         if (!aboard && minutes >= 1440) ArrivalAlerts(); // "on coming back aboard"
     }
 
@@ -75,6 +77,7 @@ public sealed partial class Game
     {
         bool aboard = _workMinutesToday > 0;
         if (aboard) _lastAboardDay = day;
+        SkipperDay(aboard);
         double engineHours = _engineMinutesToday / 60.0;
 
         foreach (var c in _boat.Components) c.Age(1, engineHours);
@@ -93,6 +96,9 @@ public sealed partial class Game
         DeliverLetters(t, day + 1);
         SeasonDaily(t, day, present);
         EventsDaily(t, day);
+        CoursesDaily(t, day);
+        CrewDaily(day);
+        TicketsCheck(t);
 
         _workMinutesToday = 0;
         _engineMinutesToday = 0;

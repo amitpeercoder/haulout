@@ -10,6 +10,10 @@ public static class BoatLoader
 {
     private const string Sloop28Resource = "Haulout.Sim.Data.sloop28.json";
     private const string EconomyResource = "Haulout.Sim.Data.economy.json";
+    private const string TicketsResource = "Haulout.Sim.Data.tickets.json";
+    private const string BoardResource = "Haulout.Sim.Data.board.json";
+    private const string LadderResource = "Haulout.Sim.Data.ladder.json";
+    private const string QuestionsResource = "Haulout.Sim.Data.questions.json";
 
     /// <summary>
     /// The knobs economy.json owns (design note 010, second pass A): a boat file that still holds one is refused, so the two never disagree.
@@ -19,7 +23,7 @@ public static class BoatLoader
     [
         ["economy"], ["survey", "nokPerFoot"],
         ["yard", "liftNok"], ["yard", "storageNok"], ["yard", "changeFeeNok"], ["yard", "washNok"],
-        ["trips", "tow", "nok"], ["mooring", "partedRepairNok"], ["layup", "dieselNokPerLitre"], ["closeCalls", "letterNok"],
+        ["trips", "tow", "nok"], ["mooring", "partedRepairNok"], ["layup", "dieselNokPerLitre"], ["closeCalls", "letterNok"], ["radio", "unlicensedLetterNok"],
         ["orders", "leadDays"],
         ["calendar", "eveningMinutes"], ["calendar", "vacationDaysPerYear"], ["calendar", "unpaidLeaveNok"], ["calendar", "payNok"],
         ["calendar", "overdraftLimitNok"], ["calendar", "interestPerMonth"], ["calendar", "bills"],
@@ -61,7 +65,7 @@ public static class BoatLoader
     /// The economy file's text. Null: the embedded economy.json, so a boat written inline in a test is played in the world's economy
     /// (the same numbers the knobs held in the boat file before design note 010, second pass A).
     /// </param>
-    public static Boat Load(string json, bool withCalendar = true, string? economyJson = null, bool withHours = false)
+    public static Boat Load(string json, bool withCalendar = true, string? economyJson = null, bool withHours = false, string? boardJson = null)
     {
         RefuseEconomyKnobs(json);
         var eco = economyJson is null ? LoadEconomy() : ParseEconomy(economyJson);
@@ -93,7 +97,7 @@ public static class BoatLoader
                 c.SeriesOhms, kind, replaceCostNok, c.ReplaceMinutes,
                 new Dictionary<string, double>(c.Properties ?? new()),
                 c.RemovablePart is { } rp ? new RemovablePart(rp.Name, rp.Aliases ?? [], rp.UncoveredText ?? "", rp.UncoverText, rp.RefitText) : null,
-                c.BelowWaterline, c.ReplaceText, c.NeedsDry, c.Stocked, c.NoPoorJob);
+                c.BelowWaterline, c.ReplaceText, c.NeedsDry, c.Stocked, c.NoPoorJob, c.Aloft);
             var wear = WearRate.CalendarYears(c.WearYears > 0 ? c.WearYears : 10, c.WearPerUseHour);
             var faults = (c.Faults ?? []).Select(f => new Fault(
                 f.Id, f.Name, c.Id, f.Effect ?? new FaultEffect(FaultEffectKind.None, 0),
@@ -259,10 +263,25 @@ public static class BoatLoader
         var layup = (dto.Layup ?? LayupRules.Default) with { DieselNokPerLitre = eco.Fuel.DieselNokPerLitre };
         var night = dto.Night ?? NightRules.Default;
         var closeCalls = (dto.CloseCalls ?? CloseCallRules.Default) with { LetterNok = eco.CloseCalls.LetterNok };
+        // The skipper's tickets and the notice boards ride the same switch as the hours (design note 012, step 2): off for a boat written in a test.
+        var tickets = withCalendar && withHours ? TicketLoader.LoadTickets(ReadResource(TicketsResource), eco, ReadResource(QuestionsResource)) : null;
+        var board = withCalendar && withHours ? TicketLoader.LoadBoard(boardJson ?? ReadResource(BoardResource), ReadResource(LadderResource)) : null;
+        if (tickets is { Enabled: true } && trips?.FindPort(tickets.Club.Port) is null)
+            throw new InvalidOperationException($"tickets.json: the club is at '{tickets.Club.Port}', which is not in the trips.");
+        if (board is not null)
+            foreach (var (portId, port) in board.Ports)
+            {
+                if (trips?.FindPort(portId) is null) throw new InvalidOperationException($"board.json: a board at '{portId}', which is not in the trips.");
+                foreach (var id in port.Events)
+                    if (calendar?.Events.All(e => e.Id != id) ?? true) throw new InvalidOperationException($"board.json: '{portId}' posts the event '{id}', which is not in the calendar.");
+            }
+        if (board is not null) TicketLoader.CheckLadder(board.Ladder, trips, tickets);
+        if (board is { Crewing.Enabled: true } crewing) TicketLoader.CheckCrewing(crewing.Crewing, trips, tickets);
         return new Boat(
             dto.Name, places, covers, positions, components, economy, survey, quality, rates, water, electrical, insurance,
             chandlery, trips, dto.Sea, dto.Forecast, yard, dto.Fouling, mooring, layup, dto.Sale, calendar, orders, dto.Fuel, night, upgrades, withCalendar ? dto.Reputation : null,
-            eco.Currency, closeCalls, dto.Instruments, withCalendar && withHours ? eco.Hours.ToRules() : null, withCalendar && withHours ? eco.Sleep.ToRules() : null);
+            eco.Currency, closeCalls, dto.Instruments, withCalendar && withHours ? eco.Hours.ToRules() : null, withCalendar && withHours ? eco.Sleep.ToRules() : null,
+            tickets, board, (dto.Radio ?? RadioRules.Default) with { UnlicensedLetterNok = eco.Radio.UnlicensedLetterNok });
     }
 
     /// <summary>A boat file holding a knob that economy.json owns is a mistake the two files could disagree about, so it is refused.</summary>
@@ -418,6 +437,7 @@ public static class BoatLoader
         public NightRules? Night { get; set; }
         public CloseCallRules? CloseCalls { get; set; }
         public InstrumentRules? Instruments { get; set; }
+        public RadioRules? Radio { get; set; }
         public ReputationRules? Reputation { get; set; }
         public List<UpgradeDto>? Upgrades { get; set; }
     }
@@ -682,6 +702,8 @@ public static class BoatLoader
         public bool Stocked { get; set; } = true;
         /// <summary>Fitting a new one cannot come out as a poor job: the templates are about paint and wiring, and new lines or a shackle are just new.</summary>
         public bool NoPoorJob { get; set; }
+        /// <summary>The job is done up the mast: refused in more wind than instruments.aloftMaxForce (design note 012, step 3).</summary>
+        public bool Aloft { get; set; }
     }
 
     private sealed class KindDto

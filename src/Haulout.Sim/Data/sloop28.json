@@ -290,7 +290,8 @@
     { "id": "galley", "label": "Galley, by the companionway" },
     { "id": "heads-forward", "label": "Heads, forward" },
     { "id": "saloon-berths", "label": "Saloon berths" },
-    { "id": "mast", "label": "On the mast" }
+    { "id": "mast", "label": "On the mast" },
+    { "id": "chart-table", "label": "At the chart table" }
   ],
   "kinds": [
     { "id": "battery", "verbs": ["inspect", "measure", "charge", "replace"] },
@@ -3326,12 +3327,16 @@
     { "id": "galley-stove", "name": "gas stove", "aliases": ["stove", "galley stove", "cooker", "gas stove", "oven"], "priceNok": 4500, "minutes": 15, "stocked": false, "upgrade": "galley-stove" },
     { "id": "chartplotter", "name": "chart plotter", "aliases": ["chartplotter", "plotter", "gps plotter"], "priceNok": 9000, "minutes": 15, "stocked": false, "upgrade": "chartplotter" },
     { "id": "radar", "name": "marine radar", "aliases": ["radar", "radar set"], "priceNok": 24000, "minutes": 15, "stocked": false, "upgrade": "radar" },
+    { "id": "vhf-radio", "name": "VHF radio", "aliases": ["vhf", "radio", "marine radio", "vhf set", "radio set"], "priceNok": 3500, "minutes": 15, "stocked": false, "upgrade": "vhf-radio" },
+    { "id": "vhf-antenna-connector", "name": "VHF antenna connector", "aliases": ["antenna connector", "vhf connector", "aerial connector", "antenna plug", "connector"], "priceNok": 300, "minutes": 15, "forComponent": "vhf-antenna-connector" },
     { "id": "bunk-cushions", "name": "bunk cushions", "aliases": ["cushions", "berth cushions", "saloon cushions"], "priceNok": 5500, "minutes": 15, "stocked": false, "upgrade": "bunk-cushions" },
     { "id": "cockpit-varnish", "name": "varnish and brushes", "aliases": ["varnish", "brushes", "teak varnish"], "priceNok": 900, "minutes": 15, "stocked": false, "upgrade": "cockpit-varnish" }
   ],
   "instruments": {
     "plotterPlug": { "rainPerDay": 1.0, "sprayPerHourAtSea": 0.05, "sprayFromForce": 4 },
-    "scannerCable": { "fromForce": 5, "perHourByForce": [0.05, 0.1, 0.2, 0.35], "underWayFactor": 3.0 }
+    "scannerCable": { "fromForce": 5, "perHourByForce": [0.05, 0.1, 0.2, 0.35], "underWayFactor": 3.0 },
+    "vhfConnector": { "rainPerDay": 1.0, "sprayPerHourAtSea": 0.05, "sprayFromForce": 4 },
+    "aloftMaxForce": 3
   },
   "trips": {
     "home": "skjaervik",
@@ -3442,7 +3447,7 @@
     "baseNok": 180000, "undocumentedYearsAtPurchase": 4, "perUndocumentedYearNok": 3000, "perEntryNok": 600, "entriesCap": 12,
     "springBonus": 0.04, "autumnDiscount": 0.04, "floorFraction": 0.3, "foulingFindFrom": 0.2, "findChance": 0.85,
     "viewingChancePerDay": 0.2, "askSensitivity": 3, "seasonViewingFactor": { "spring": 1.3, "summer": 1.0, "autumn": 0.6, "winter": 0.6 },
-    "offerSpread": [0.88, 1.02], "offerHoldsDays": 7, "listMinutes": 30, "broker": "Holm & Datter, yacht brokers",
+    "offerSpread": [0.88, 1.02], "offerHoldsDays": 7, "listMinutes": 30, "afloatWeekendOnly": true, "afloatViewingFactor": 1.5, "broker": "Holm & Datter, yacht brokers",
     "serviceComponents": ["engine-oil", "oil-filter", "impeller", "primary-filter", "secondary-filter", "alternator-belt"]
   },
   "calendar": {
@@ -3615,9 +3620,55 @@
       }
     }
   },
+  "radio": {
+    "callMinutes": 5,
+    "boatName": "Marit",
+    "callSign": "Lima Golf Mike Romeo",
+    "channel": 16, "forecastChannel": 24, "forecastHour": "08:00", "harbourChannel": 12,
+    "noRadio": "You have no radio aboard.",
+    "identity": "this is sailing yacht {boat}, {boat}, {boat}",
+    "withSign": ", call sign {callSign}",
+    "noSign": "You give the boat's name; there is no call sign to give.",
+    "unheard": "You call three times. The set hisses with other boats' traffic: you can hear them; nobody hears you.",
+    "reportedNote": "The coast radio logs every call, and one made with no call sign will be reported: the harbour will hear of it.",
+    "harbour": {
+      "call": "You call on channel {channel}: '{station}, {station}, {station}, {identity}. Over.'",
+      "answer": "{station} answers: '{boat}, {station}. Go to channel {working}.' On {working}: '{boat}, {line} Out.'",
+      "lines": [
+        "there's room on the guest pontoon.",
+        "the guest pontoon is full, but the end of the fuel quay is free for an hour.",
+        "the pontoon is yours for the night; the water is on, the showers are shut.",
+        "ask for the harbourmaster's mooring, the second buoy from the breakwater."
+      ],
+      "noOffice": "You call three times. Nobody answers: {port} is an anchorage, with no harbour office to listen."
+    },
+    "coast": {
+      "call": "You call on channel {channel}: 'Coast radio, coast radio, coast radio, {identity}. Over.'",
+      "answer": "Coast radio answers: '{boat}, coast radio. Go to channel {working}.' On {working}, you ask for a radio check. 'Loud and clear. I read you strength five. Over.' You say: 'Thank you, {boat}. Out.'",
+      "forecast": "Then the coast radio reads the forecast. {forecast}"
+    },
+    "ferry": {
+      "call": "Channel 16: 'Sailing yacht {where}, this is the ferry {ferry}, {ferry}, {ferry}. Do you read? Over.' The set on the chart table is calling you.",
+      "answer": "You lift the handset and answer: '{ferry}, {ferry}, {ferry}, {identity}. I read you. Over.' 'Sailing yacht {boat}, {ferry}. I have you. I will pass astern of you. Out.' She passes astern, close, her wash rolling you for a minute, and no horn.",
+      "nobody": "Nobody is calling you; the ferries are working their own channels.",
+      "waiting": "The ferry {ferry} is calling you on channel 16.",
+      "log": "Spoke to the ferry {ferry} on channel 16; she passed astern."
+    },
+    "letter": {
+      "billText": "The harbourmaster's letter: a radio call made without a ticket.",
+      "alert": "A letter from the harbourmaster's office: the coast radio logged a call from your boat at about {time} on day {day}, made with no call sign. It bills {nok}, and the letter is in the logbook.",
+      "text": "Dear owner, the coast radio logged a call from a sailing boat of your name and number at about {time} on day {day}, made on channel {channel} with no call sign. A radio may be used only by the holder of an operator's certificate, and the station reports every call that is not. The harbour keeps every such report on file and bills the cost of answering it, {nok}. Please do not call again until you hold the radio ticket. Yours, the harbourmaster's office."
+    },
+    "plan": {
+      "withSet": "With the VHF a ferry will call you before she is close; answer on 16",
+      "noTicket": ", but you hold no radio ticket: a call would be reported.",
+      "noTicketNone": "."
+    },
+    "weather": "The coast radio reads the forecast on channel {channel} at {hour}: {forecast}"
+  },
   "orders": { "deliverTo": "skjaervik", "phoneMinutes": 5 },
   "reputation": {
-    "onTimeBillsPerPoint": 2, "slotKept": 1, "tow": -1, "mooringParted": -2, "slotMissed": -1, "billPastLimit": -1, "ferryReport": -1,
+    "onTimeBillsPerPoint": 2, "slotKept": 1, "tow": -1, "mooringParted": -2, "slotMissed": -1, "billPastLimit": -1, "ferryReport": -1, "unlicensedRadio": -1,
     "min": -5, "max": 5, "towFactorPerPoint": 0.05, "slotDaysPerPoint": 1,
     "words": [
       { "under": -2, "text": "The yard has started asking for payment before the work." },
@@ -3749,6 +3800,53 @@
       "installText": "You go up the mast on a halyard with the bracket and the radome, bolt it on above the spreaders and tape the cable down the mast. Below, the display sweeps round and shows the pontoon, the boats beside her and the shore."
     },
     {
+      "component": { "id": "vhf-radio", "kind": "instrument", "name": "VHF radio", "subsystem": "electrical", "position": "chart-table", "reach": [{"place":"saloon","cover":null,"visible":true,"reachable":true}],
+        "aliases": ["vhf", "radio", "marine radio", "vhf set", "radio set"],
+        "description": "A fixed VHF set on a bracket at the chart table, with its handset on a coiled lead and a coaxial cable run up the mast to an antenna at the masthead.",
+        "condition": 1, "wearYears": 10, "replaceMinutes": 120,
+        "replaceText": "You swap the set on its bracket and plug the handset and the coax into the new one." },
+      "also": [
+        {
+          "id": "vhf-antenna-connector", "kind": "fitting", "name": "VHF antenna connector", "subsystem": "electrical", "position": "mast",
+          "reach": [{"place":"on-deck","cover":null,"visible":true,"reachable":true},{"place":"cockpit","cover":null,"visible":true,"reachable":false}],
+          "aliases": ["antenna connector", "vhf connector", "aerial connector", "antenna plug", "connector"],
+          "description": "The coax connector where the VHF cable meets the antenna at the masthead, taped against the weather; from the deck you can look up and see the base of the whip.",
+          "condition": 1, "wearYears": 8, "replaceMinutes": 60, "aloft": true, "noPoorJob": true,
+          "replaceText": "You go up the mast in the bosun's chair with the new connector, cut off the old one, solder the new plug on, tape it and seal it with self-amalgamating tape, and come down again.",
+          "faults": [
+            {
+              "id": "vhf-connector-corroded",
+              "name": "Corroded VHF antenna connector",
+              "effect": { "kind": "none", "value": 0 },
+              "dormant": true,
+              "spawn": {
+                "when": "mast.connectorWetness",
+                "atLeast": 7,
+                "spread": true,
+                "repeats": true,
+                "cause": "The antenna connector at the masthead has corroded. Rain and spray at sea got in at the plug, and the green has eaten the contact: the set can receive but nothing gets out."
+              },
+              "reveals": [
+                { "action": "inspect", "text": "At the base of the antenna the connector is furred with green corrosion, and the tape round it has split.", "discovers": true }
+              ],
+              "fixedBy": ["replace"],
+              "onHardOnly": false,
+              "consequence": "The VHF receives but cannot be heard: no call you make is answered, and a ferry that calls you will not hear your answer.",
+              "costLaterNok": 0,
+              "laterNote": "nothing worse; the set stays deaf-mute until the connector is renewed",
+              "atSea": { "text": "The VHF receives but cannot be heard: no call you make is answered, and a ferry that calls you will not hear your answer.", "spare": "vhf-antenna-connector" },
+              "diy": { "how": "Go up the mast and fit a new antenna connector", "partsNok": 300, "minutes": 60 },
+              "yard": { "how": "The yard sends a man up the mast to fit a new antenna connector", "nok": 900, "leadDays": 1 },
+              "note": "UNVERIFIED (design note 012, step 3): how fast a masthead antenna connector corrodes in rain and spray, and the price of a connector and an hour aloft. Practice: water intrusion at the connector is a leading cause of marine VHF failure, and a corroded connector often lets the set receive while transmitting badly (Raymarine, West Marine and Simrad notes, sailing forums); the fix is a new connector, sealed."
+            }
+          ]
+        }
+      ],
+      "place": "saloon", "installMinutes": 120, "yardNok": 1500, "yardDays": 1, "valueNok": 1500,
+      "opens": "calls on channel 16; the coast radio's forecast; with the radio ticket, a ferry's call in fog or the dark",
+      "installText": "You bolt the set to the bracket at the chart table, run the power lead to the panel with its own fuse, plug the coax in and hang the handset on its hook. The set hisses, then a voice somewhere reads out a position. You are on the air, or would be if you were allowed to be."
+    },
+    {
       "component": { "id": "bunk-cushions", "kind": "fitting", "name": "Bunk cushions", "subsystem": "hull", "position": "saloon-berths", "reach": [{"place":"saloon","cover":null,"visible":true,"reachable":true}],
         "aliases": ["cushions", "berth cushions", "saloon cushions"],
         "description": "A set of foam cushions for the saloon berths, in washable covers.",
@@ -3818,6 +3916,8 @@
     "PLACEHOLDER (design note 010): the anchor-gear component (a plough on a galvanised chain, appended after the others so no fault index moves; its id is not 'anchor' because that is also the command), 1800 NOK and an hour to replace, 2400 NOK and a day at the yard; its seized-chain fault starts dormant (design note 010, second pass F) and governs anchoring at sea and arriving at Kvitnes, where the arrival lines change.",
     "PLACEHOLDER (design note 010): calendar.events { the regatta party at Hestholmen on the first Saturday on or after day 150; Midsummer at Storholmen on days 172 to 173, overnight; a friend's week aboard of seven days starting between day 180 and 203, at least 3 days after the invitation, needing a heads, a stove, dry bunks (no water over the sole in 30 days) and, below 12 degrees, a heater; the club cruise to Kvitnes on the first Saturday on or after day 215, two days, needing the anchor and the bilge pump } and the stories they tell.",
     "UNVERIFIED (design note 010): that these four events and their requirements are the right first list, and the 12 degree line for the heater (domain, Amit).",
+    "PLACEHOLDER (design note 012, step 3): the VHF { a fixed set 3500 NOK (real fixed-mount DSC sets run about 150 to 600 dollars, a little more with the antenna and the fitting), ordered (not on the shelf), 120 minutes at the chart table or the yard's 1500 NOK and a day, adds 1500 NOK to the broker's letter, wears in 10 years }. The antenna connector comes aboard with it (upgrades.also) and the chandlery sells a spare at 300 NOK; the vhf-connector-corroded fault wakes when mast.connectorWetness (the plotter plug's exposure: a full day of rain times the exposure term, so a winter cover keeps it off, and 0.05 an hour at sea in force 4 or more; instruments.vhfConnector) passes 7 times the house's seeded spread; a corroded connector lets the set receive but nothing gets out; a new connector is an hour aloft, refused in more than force 3 (instruments.aloftMaxForce), the yard 900 NOK and a day. radio { call minutes, the boat's name and call sign, the channels (16 to call, 12 the harbour's working channel, 24 for the coast radio's forecast, as real standards go) and the words of the calls } and reputation.unlicensedRadio -1 (economy.json radio.unlicensedLetterNok).",
+    "UNVERIFIED (design note 012, step 3): the price of a set, how fast a masthead connector corrodes in rain and spray, an hour aloft and its price, that a coast radio reports an unlicensed call and bills for it (domain, Amit). Sources: practical-sailor.com, thegpsstore.com and retailer listings for fixed-mount set prices; Raymarine, West Marine and Simrad notes and sailboatowners.com and ybw.com forums for connector corrosion (receives, does not transmit).",
     "PLACEHOLDER (design note 010): upgrades { diesel heater 14000 NOK, 600 minutes of your own work in the quarter berth, or the yard's 4000 NOK and 3 days, adds 8000 NOK to the broker's letter; marine heads 6500, 480 minutes in the forepeak, yard 3000 and 2 days, 3500; two-burner stove 4500, 240 minutes at the companionway, yard 1500 and 1 day, 2000; chart plotter 9000, 240 minutes in the cockpit, yard 1500 and 1 day, 5000; marine radar 24000, 480 minutes on deck, yard 5000 and 3 days, 12000; bunk cushions 5500, 30 minutes in the saloon, no yard route, 2000; varnish and brushes 900, 480 minutes in the cockpit on a dry day, no yard route, 4000 }. All are ordered (not kept on the yard's shelf), have no faults this round, and wear in 10 years (varnish 3). The names are generic and fictional.",
     "UNVERIFIED (design note 010): that a 28-footer of this age may have neither a heads nor a stove (a bucket in the forepeak, a camping burner) and so needs them fitted for a friend; the prices, install hours and yard days of the upgrades, and what each adds to a broker's letter (domain, Amit).",
     "PLACEHOLDER (design note 010, second pass I): impeller wear { with the pump cover off the vanes read as having taken a set from 60 percent wear (1 minus condition); the flow at the exhaust reads weaker from 75 percent wear; both before the vanes shed }.",

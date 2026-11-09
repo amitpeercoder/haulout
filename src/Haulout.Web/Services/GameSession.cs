@@ -5,8 +5,8 @@ namespace Haulout.Web.Services;
 /// <summary>The two UI levels of docs/design/004: the map, and the close-up of the current place.</summary>
 public enum ViewLevel { Map, CloseUp }
 
-/// <summary>The tabs of the context panel: the part and place, the launch picture, the passage.</summary>
-public enum PanelTab { Here, Readiness, Trip, Season, Calendar }
+/// <summary>The tabs of the context panel: the part and place, the launch picture, the passage, the season, the week, the club's board (docs/design/012).</summary>
+public enum PanelTab { Here, Readiness, Trip, Season, Calendar, Board }
 
 /// <summary>Above the stage: the boat (cutaway, with its Map and Close-up) or the chart (docs/design/009).</summary>
 public enum StageView { Boat, Chart }
@@ -114,6 +114,27 @@ public sealed class GameSession
         Changed?.Invoke();
     }
 
+    /// <summary>The document the player is reading (a course book, a letter, a season page, the far boat's card), as the facade gives it; null: none is open.</summary>
+    public DocumentView? Reading { get; private set; }
+
+    /// <summary>Opens a logbook entry's document. The survey report and the buyers' notes have their own places; everything else is read through the facade's ReadDocument.</summary>
+    public void ReadDocument(string document)
+    {
+        if (document.StartsWith("survey", StringComparison.Ordinal)) { ShowSurvey(); return; }
+        if (document.StartsWith("viewing", StringComparison.Ordinal)) { ShowTab(PanelTab.Season); return; }
+        Reading = Ask<DocumentView>(new ReadDocument(document));
+        Changed?.Invoke();
+    }
+
+    public void CloseReader()
+    {
+        Reading = null;
+        Changed?.Invoke();
+    }
+
+    /// <summary>The last result, except an exam answer: the exam card tells those (the question that follows, or the marking).</summary>
+    public CommandResult? ShownResult => LastResult is { Action: "answer" } ? null : LastResult;
+
     public bool Finished => Status.Finished;
 
     /// <summary>The narrative of the start attempt that finished the slice; kept so the closing stays readable.</summary>
@@ -153,6 +174,10 @@ public sealed class GameSession
     public CalendarView Calendar => Ask<CalendarView>(new Calendar());
     public SeasonPageView SeasonPage => Ask<SeasonPageView>(new SeasonPage(ShownPage));
     public SaleView Sale => Ask<SaleView>(new Sale());
+    public NoticeboardView Board => Ask<NoticeboardView>(new Noticeboard());
+    public TicketsView TicketList => Ask<TicketsView>(new Tickets());
+    public SkipperView SkipperLog => Ask<SkipperView>(new Skipper());
+    public ExamQuestionView Exam => Ask<ExamQuestionView>(new ExamQuestion());
 
     public bool HasTool(string tool) => Status.Tools.Contains(tool);
 
@@ -340,6 +365,11 @@ public sealed class GameSession
     // ------------------------------------------------------------ the week, the money and the wants (docs/design/010)
 
     public CommandResult NextWeekend() => Execute(new NextWeekend());
+    public CommandResult Sleep() => Execute(new Sleep());
+    public CommandResult Call(string to) => Execute(new Call(to));
+    public CommandResult Enrol(string course) => Execute(new Enrol(course));
+    public CommandResult TakeCrewingPlace(string place) => Execute(new TakeCrewingPlace(place));
+    public CommandResult Answer(string letter) => Execute(new Answer(letter));
     public CommandResult WaitWeek() => Execute(new WaitWeek());
     public CommandResult Order(string item) => Execute(new Order(item));
     public CommandResult InviteFriend(int day) => Execute(new InviteFriend(day));

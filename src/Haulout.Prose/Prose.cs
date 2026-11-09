@@ -128,6 +128,7 @@ public sealed class Prose
                 break;
             case WeatherView w:
                 sb.AppendLine(w.Text);
+                if (w.CoastRadio is { Length: > 0 }) sb.AppendLine(w.CoastRadio);
                 break;
             case AboardView a:
                 sb.Append(Aboard(a));
@@ -165,6 +166,21 @@ public sealed class Prose
             case SeasonPageView page:
                 sb.Append(SeasonPage(page));
                 break;
+            case SkipperView skipper:
+                sb.Append(Skipper(skipper));
+                break;
+            case TicketsView tickets:
+                sb.Append(Tickets(tickets));
+                break;
+            case NoticeboardView board:
+                sb.Append(Noticeboard(board));
+                break;
+            case DocumentView document:
+                sb.Append(Document(document));
+                break;
+            case ExamQuestionView exam:
+                sb.Append(ExamQuestion(exam));
+                break;
         }
         return sb.ToString();
     }
@@ -199,6 +215,8 @@ public sealed class Prose
         : document.StartsWith("viewing", StringComparison.Ordinal) ? " (sale)"
         : document.StartsWith("season", StringComparison.Ordinal) ? " (season page)"
         : document.StartsWith("letter", StringComparison.Ordinal) ? " (letter: the text is the entry)"
+        : document.StartsWith("book", StringComparison.Ordinal) ? " (course book: read it with 'read <the book>')"
+        : document.StartsWith("boat", StringComparison.Ordinal) ? " (the far boat's card: read it with 'read <her name>')"
         : " (read survey)";
 
     /// <summary>The broker's valuation letter, as a letter: who, the lines with their amounts, the value, the ask, the broker's words.</summary>
@@ -384,6 +402,96 @@ public sealed class Prose
     {
         var sb = new StringBuilder();
         foreach (var line in v.Lines) sb.AppendLine(line);
+        return sb.ToString();
+    }
+
+    /// <summary>The skipper's log: a line of words per fact, no score.</summary>
+    public string Skipper(SkipperView v)
+    {
+        var sb = new StringBuilder();
+        foreach (var line in v.Lines) sb.AppendLine(line);
+        return sb.ToString();
+    }
+
+    /// <summary>The tickets: each held or not, what it is for, the checklist against the log and the next course.</summary>
+    public string Tickets(TicketsView v)
+    {
+        var sb = new StringBuilder();
+        foreach (var t in v.Tickets)
+        {
+            sb.AppendLine($"{t.Name}: {t.Words}{(t.HeldSinceDay is { } since ? $" (since day {since})" : "")}");
+            sb.AppendLine($"  {t.Purpose}");
+            foreach (var a in t.Asks) sb.AppendLine($"  [{(a.Met ? "x" : " ")}] {a.Text}");
+            if (t.NextCourse.Length > 0) sb.AppendLine($"  {t.NextCourse}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>A document of the logbook: its title, then each page with its number and heading. Or why there is none.</summary>
+    public string Document(DocumentView v)
+    {
+        var sb = new StringBuilder();
+        if (v.Title.Length == 0)
+        {
+            sb.AppendLine(v.Note ?? "There is nothing to read there.");
+            return sb.ToString();
+        }
+        sb.AppendLine(v.Title);
+        foreach (var page in v.Pages)
+        {
+            sb.AppendLine();
+            sb.AppendLine(page.Title.Length > 0 ? $"Page {page.Number}. {page.Title}" : $"Page {page.Number}.");
+            sb.AppendLine(page.Text);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The exam question now open: "Question 2 of 5: ...", then the four options lettered.</summary>
+    public string ExamQuestion(ExamQuestionView v)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(v.Line);
+        foreach (var o in v.Options) sb.AppendLine($"  {o.Letter}) {o.Text}");
+        return sb.ToString();
+    }
+
+    /// <summary>A checklist line that follows a colon reads on in lower case ("the radio ticket: not yet."); a line that opens with a figure is left as it is.</summary>
+    public static string LowerFirst(string s) => s.Length > 1 && char.IsUpper(s[0]) && char.IsLower(s[1]) ? char.ToLowerInvariant(s[0]) + s[1..] : s;
+
+    /// <summary>The notice board: its header, then each card by day.</summary>
+    public string Noticeboard(NoticeboardView v)
+    {
+        var sb = new StringBuilder();
+        if (v.Header.Length > 0) sb.AppendLine(v.Header);
+        foreach (var card in v.Cards)
+        {
+            switch (card)
+            {
+                case EventCard e:
+                    sb.AppendLine($"  {e.Event.Name}{(e.Event.Name.Contains(e.Event.Place, StringComparison.Ordinal) ? "" : $" at {e.Event.Place}")}, {e.Event.When}: {e.Event.Status}.");
+                    foreach (var r in e.Event.Requirements)
+                        sb.AppendLine($"    {r.Text}: {(r.Met == true ? "met" : r.Met == false ? "not met" : "not known yet")} ({r.Note}).");
+                    break;
+                case CourseCard c:
+                    sb.AppendLine($"  {c.Line} [{c.Status}]");
+                    foreach (var s in c.Shortfall) sb.AppendLine($"    Your log: {LowerFirst(s)}");
+                    break;
+                case CrewingCard crew:
+                    sb.AppendLine($"  {crew.Line} [{crew.Status}]");
+                    foreach (var s in crew.Shortfall) sb.AppendLine($"    Your log: you have {s}.");
+                    break;
+            }
+        }
+        if (v.Empty is { Length: > 0 } empty) sb.AppendLine(empty);
+        if (v.Ladder is { Count: > 0 } ladder)
+        {
+            sb.AppendLine("The broker's window, by the club:");
+            foreach (var card in ladder)
+            {
+                sb.AppendLine($"  {card.Line}");
+                foreach (var s in card.Shortfall) sb.AppendLine($"    {s}");
+            }
+        }
         return sb.ToString();
     }
 

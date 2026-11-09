@@ -1,0 +1,191 @@
+{
+  "placeholders": [
+    "PLACEHOLDER (design note 012, step 2): four tickets, fictional names, modelled on a national boat licence, a short-range radio certificate and the coastal and offshore skipper grades. Every number below is a placeholder; every one is UNVERIFIED until Amit has read it. Course prices are in economy.json (courses), not here: the skipper's tickets are shared by every boat (design note 011), and the economy file owns the money.",
+    "SOURCES (researched 2026-11-08, design note 012, Amit's answers): radio ticket modelled on the RYA Short Range Certificate (marine radio SRC) page and club listings (rya.org.uk, carsingtonsailingclub.co.uk, yotspot.com): one day of about ten hours plus an exam, course fees about 50 to 120 pounds, exam fee 76 pounds; here one Saturday at the club, 1800 (about 13 units to the pound). Coastal skipper modelled on the RYA Coastal Skipper practical course page and training providers (rya.org.uk, firstclasssailing.com, uksa.org): five consecutive days at about 450 to 950 pounds, recommended minimum before it 15 days at sea, 300 miles, 8 night hours and 2 days as skipper; here 300 nm, 15 days aboard, 8 night hours under way, 2 passages over 20 nm as skipper, the radio ticket, and five days Monday to Friday at 9500. This is the course-level grade, NOT the Yachtmaster Coastal exam (800 miles, 30 days, 12 night hours), which the far boats in design note 011 will ask for later. Offshore skipper modelled on the RYA Yachtmaster Offshore page (rya.org.uk, firstclasssailing.com, uksa.org): 50 days at sea, 5 as skipper, 2500 miles, 5 passages over 60 miles, two of them overnight; here 2500 nm, 50 days aboard, 5 passages over 60 nm with 2 of them through a night, a season with no tow and a first-aid day (the first-aid day is a placeholder of ours), then five days at 15000: listed, not reachable this round (no course date).",
+    "UNVERIFIED: that a coastal skipper course asks nothing of a candidate beforehand (here it can be taken before the log is up to it, and the ticket then waits for the log); that a boat licence is held for life; the two radio dates; that the insurer of a boat over 10 m asks for the coastal ticket (design note 012 decision 3, from the ladder).",
+    "DATES (design note 012, step 2): a date is a day of the year plus a weekday rule, like an event: the first day on or after that day of the year with that weekday, for the course's days. Radio: the first Saturday on or after day 135 (May, before the regatta on day 150 and Midsummer on day 172, so the ticket can be in hand for the nights of the summer) and the first Saturday on or after day 225 (August, the second chance, clear of the club cruise on day 214). Coastal skipper: the first Monday on or after day 245 (early September, five days Monday to Friday, before the yard's lifting window opens on day 255), once a season. Offshore: none.",
+    "EXAM (design note 012, decision 8, step 2b): the last day of a course that has an 'exam' is an exam of that many questions from the ticket's bank in questions.json, passed at that many right; the answers take the player's own minutes; a fail costs the exam fee (economy.json examFees) for a re-sit at the next date of the course, attending the last day only. All numbers here are placeholders marked UNVERIFIED; the questions themselves are UNVERIFIED until Amit has read them.",
+    "COUNTS (design note 012, step 2): a passage is from casting off to arriving at a port; a turn back is not one (its miles still count); a towed arrival counts its miles but is not a passage over any length as skipper; a passage 'through a night' is one that crossed a midnight under way; night hours under way are the hours not at anchor between dusk and dawn by the daylight table; a day aboard is a day on which the player worked aboard or was at sea; a season without a tow is one completed (the autumn page) with some miles sailed and no tow; the first-aid day is never held this round."
+  ],
+  "club": {
+    "port": "skjaervik",
+    "name": "the club",
+    "office": "the club office",
+    "sessionFrom": "09:00",
+    "sessionTo": "16:00",
+    "enrolDaysBefore": 1,
+    "passageNm": [20, 60],
+    "placeLine": "at the club in {port}",
+    "enrolLine": "You ring the club secretary and put your name down for the {course}, {when}. {price} goes on the club's account.",
+    "enrolLog": "Enrolled on the {course}: {when}, {price}.",
+    "startsLine": "You come back on day {day}: the {course} starts today.",
+    "dayHead": "{weekday}, day {day}: day {n} of {total} of the {course}.",
+    "dayTail": "It's {until}: you walk back down to the boat, and the evening is yours.",
+    "dayLog": "At the club for the {course}, day {n} of {total}.",
+    "lateLine": "You walk in late, but the instructor nods you to a chair.",
+    "signedHeld": "The examiner signs your course card.",
+    "signedWaiting": "The examiner signs the course; the ticket comes when your log is up to it: {list}.",
+    "lateHeld": "Your log is up to it now: the examiner's signature stands. {held}",
+    "missedLine": "You were not at the club for day {n} of the {course}. The place and the fee are gone.",
+    "doneWaiting": "You have done the {course}; the ticket waits for your log.",
+    "futureDone": "Done: the ticket waits for your log.",
+    "boardCourse": "{Course}, {when}, {place}: {price}, {days} {dayWord}{vac}.",
+    "noBoard": "Nothing is pinned here.",
+    "exam": {
+      "sits": "The examiner sits you down with the paper: {total} questions, one at a time, and each answer is final.",
+      "question": "Question {n} of {total}: {text}",
+      "taken": "The examiner writes something down.",
+      "waiting": "The examiner is waiting for your answer: answer a, b, c or d.",
+      "invalid": "Answer a, b, c or d.",
+      "noExam": "There is no exam to sit.",
+      "score": "You got {right} of {total}.",
+      "missed": "Not right: \"{text}\" The {book} covers it on page {page}, {title}.",
+      "failed": "You need {need}. The course is done and the examiner will see you again for the exam alone.",
+      "failedNext": "Next date: {when}, {place}, {price}. Ring the club to put your name down (enrol {course}).",
+      "failedNoDate": "The club has no date posted yet for the exam: ask again.",
+      "failedLog": "Sat the exam of the {course}: {right} of {total}, not passed.",
+      "passedLog": "Sat the exam of the {course}: {right} of {total}, passed.",
+      "abandoned": "You got up before the paper was finished. The examiner marks the questions you did not answer as wrong.",
+      "unanswered": "The paper was not handed in: no questions answered.",
+      "resitNext": "Course done, exam to re-sit: next date {when}, {place}, {price}.",
+      "resitNoDate": "Course done, exam to re-sit: the club has no date posted yet.",
+      "resitEnrolLine": "You ring the club secretary and put your name down to re-sit the exam of the {course}, {when}. {price} goes on the club's account.",
+      "resitEnrolLog": "Enrolled to re-sit the exam of the {course}: {when}, {price}.",
+      "resitDayHead": "{weekday}, day {day}: the exam of the {course}.",
+      "resitDayLine": "The club room is empty but for the examiner and a table with the papers on it.",
+      "resitDayLog": "At the club for the exam of the {course}.",
+      "resitMissed": "You were not at the club for the exam of the {course}. The place and the fee are gone.",
+      "resitEnrolled": "You are enrolled to re-sit the exam of the {course}: {when}, {place}.",
+      "boardResit": "{Course}: exam to re-sit, {when}, {place}: {price}{vac}.",
+      "notAHeldBook": "You have no document called '{name}'.",
+      "today": "You come back on day {day}: the last day of the {course}, and the examiner is at the club today.",
+      "resitToday": "You come back on day {day}: the exam of the {course} is today."
+    }
+  },
+  "asks": {
+    "miles": { "line": "{need} miles: you have {have}.", "wait": "{need} miles under way" },
+    "daysAboard": { "line": "{need} days aboard: you have {have}.", "wait": "{need} days aboard" },
+    "nightHours": { "line": "{need} hours under way after dark: you have {have}.", "wait": "{need} hours under way after dark" },
+    "passagesOver": { "line": "{need} {passages} over {nm} miles as skipper: you have {have}.", "lineCrew": "{need} {passages} over {nm} miles: you have {have}.", "wait": "{need} {passages} over {nm} miles as skipper", "waitCrew": "{need} {passages} over {nm} miles" },
+    "passagesOverNight": { "line": "{need} of them through a night: you have {have}.", "wait": "{need} of the {nm}-mile passages through a night" },
+    "seasonsNoTow": { "line": "{need} {seasons} without a tow: you have {have}.", "wait": "{need} {seasons} without a tow" },
+    "ticket": { "line": "{name}: {state}.", "held": "held", "notYet": "not yet", "wait": "{name}" },
+    "firstAid": { "line": "A first-aid day: {state}.", "held": "held", "notYet": "not yet", "wait": "a first-aid day" }
+  },
+  "skipper": {
+    "miles": "{n} miles under way.",
+    "milesNone": "No miles under way yet.",
+    "nights": "{n} {nights} away from home.",
+    "nightsNone": "No nights away from home yet.",
+    "nightHours": "{n} {hours} under way after dark.",
+    "nightHoursNone": "No night passages yet.",
+    "passages": "{n} {passages} over {nm} miles{skipper}.",
+    "passagesNight": "{n} {passages} over {nm} miles{skipper}, {k} through a night.",
+    "passagesNone": "No passage over {nm} miles yet.",
+    "asSkipper": " as skipper",
+    "asCrew": " as crew",
+    "wind": "Strongest wind under way: force {n}.",
+    "windNone": "No wind logged under way yet.",
+    "days": "{n} {days} aboard.",
+    "daysNone": "No days aboard yet.",
+    "tows": "{n} {tows}.",
+    "towsNone": "No tows.",
+    "seasons": "{n} {seasons} without a tow.",
+    "seasonsNone": "No season without a tow yet.",
+    "firstAid": "You hold a first-aid day.",
+    "firstAidNone": "No first-aid day yet."
+  },
+  "tickets": [
+    {
+      "id": "boat-licence",
+      "name": "Boat licence",
+      "askName": "the boat licence",
+      "aliases": ["licence", "boat licence"],
+      "purpose": "The law asks for it of anyone who takes a boat out.",
+      "heldFromStart": true,
+      "heldFromStartLine": "You passed it in the winter, the night before you saw her.",
+      "heldLine": "You hold the boat licence.",
+      "noCourse": "Nothing to take: you hold it.",
+      "asks": [],
+      "course": null
+    },
+    {
+      "id": "radio",
+      "name": "Radio ticket",
+      "askName": "the radio ticket",
+      "aliases": ["radio", "radio course", "vhf ticket"],
+      "purpose": "Needed to use a VHF radio.",
+      "heldLine": "You hold the radio ticket.",
+      "noCourse": "No course this season.",
+      "asks": [],
+      "course": {
+        "name": "The radio course",
+        "days": 1,
+        "exam": { "questions": 5, "passAt": 4, "answerMinutes": 5 },
+        "offers": [
+          { "id": "may", "fromDayOfYear": 135, "weekday": "saturday" },
+          { "id": "august", "fromDayOfYear": 225, "weekday": "saturday" }
+        ],
+        "dayLines": [
+          "The club room smells of coffee and wet coats. Channel 16, the call, the Mayday and the Pan-Pan: the instructor has you say \"Skjærvik harbour, Skjærvik harbour, this is...\" until it stops sounding like a school play. By four you have made a radio check to the harbour office and been answered, and a paper on the table says what a DSC alert is."
+        ]
+      }
+    },
+    {
+      "id": "coastal",
+      "name": "Coastal skipper",
+      "askName": "the coastal skipper ticket",
+      "aliases": ["coastal", "coastal course", "coastal skipper course"],
+      "purpose": "The insurer of anything over 10 m asks for it.",
+      "heldLine": "You hold the coastal skipper ticket.",
+      "noCourse": "No course this season.",
+      "asks": [
+        { "kind": "miles", "need": 300 },
+        { "kind": "daysAboard", "need": 15 },
+        { "kind": "nightHours", "need": 8 },
+        { "kind": "passagesOver", "nm": 20, "need": 2, "asSkipper": true },
+        { "kind": "ticket", "ticket": "radio" }
+      ],
+      "course": {
+        "name": "The coastal skipper course",
+        "days": 5,
+        "weekdays": true,
+        "exam": { "questions": 5, "passAt": 4, "answerMinutes": 5 },
+        "offers": [
+          { "id": "september", "fromDayOfYear": 245, "weekday": "monday" }
+        ],
+        "dayLines": [
+          "Monday morning at the chart table in the club: lights and shapes, who gives way to whom, a pencil behind your ear. By four the room's chart of the archipelago has turned into a harbour approach in the dark.",
+          "Weather: a printed forecast, a barometer on the wall and a lecture on dew points and lee shores. The instructor asks what force 6 means to a 28-footer, and waits.",
+          "Passage planning: fuel, daylight, the tide where it matters. You plan a night passage to Storholmen on paper, and the instructor finds the hour you forgot to allow for.",
+          "Engines and the electrics: a voltage drop across a clamp, and why weak exhaust flow comes before the alarm. You know more of this than you thought, and less than you hoped.",
+          "The last day: the examiner comes at nine with the course cards. Fog signals, a man overboard drill off the club's pontoon, and a long, quiet look at your logbook."
+        ]
+      }
+    },
+    {
+      "id": "offshore",
+      "name": "Offshore skipper",
+      "askName": "the offshore skipper ticket",
+      "aliases": ["offshore", "offshore course", "offshore skipper course"],
+      "purpose": "Asked of anyone who takes a boat out of sight of land for a week.",
+      "heldLine": "You hold the offshore skipper ticket.",
+      "noCourse": "No course is offered yet: the club does not run one.",
+      "asks": [
+        { "kind": "miles", "need": 2500 },
+        { "kind": "daysAboard", "need": 50 },
+        { "kind": "passagesOver", "nm": 60, "need": 5, "asSkipper": true },
+        { "kind": "passagesOverNight", "nm": 60, "need": 2 },
+        { "kind": "seasonsNoTow", "need": 1 },
+        { "kind": "firstAid" }
+      ],
+      "course": {
+        "name": "The offshore skipper course",
+        "days": 5,
+        "weekdays": true,
+        "offers": [],
+        "dayLines": []
+      }
+    }
+  ]
+}

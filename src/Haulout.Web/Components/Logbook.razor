@@ -18,7 +18,7 @@
                 <li @key="i" class="@Kind(e)">
                     <span class="stamp">D@(e.Day) @e.TimeOfDay</span>
                     <span class="text">@e.Text</span>
-                    @if (e.Document is not null && !e.Document.StartsWith("letter", StringComparison.Ordinal)) { <button class="read" data-action="read-document" @onclick="() => ReadDocument(e.Document)">read</button> }
+                    @if (e.Document is { } doc) { <button class="read" data-action="read-document" @onclick="() => Session.ReadDocument(doc)">read</button> }
                     @if (e.CostNok > 0) { <span class="amount">@Session.Money(e.CostNok)</span> }
                 </li>
             }
@@ -28,12 +28,6 @@
 
 @code {
     protected override void OnInitialized() => Session.Changed += OnChanged;
-
-    private void ReadDocument(string document)
-    {
-        if (document.StartsWith("season ", StringComparison.Ordinal) && int.TryParse(document.AsSpan(7), out var n)) Session.ShowSeasonPage(n);
-        else Session.ShowSurvey();
-    }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
 

@@ -1,0 +1,96 @@
+{
+  "placeholders": [
+    "PLACEHOLDER / UNVERIFIED (design note 012, step 5; design note 011 decisions 1 and 2): the broker's window. Every number here is a placeholder: the four asking prices, the lengths, the years and the yard's quotes for the running costs. They are the yard's quote and the broker's word, not the sim's truth (rule 5): nothing in this file is what the boat would cost the player.",
+    "SOURCES (researched 2026-11-09, broker and insurer pages with a commercial interest, so rough): used 40 ft centre-cockpit bluewater boats of the 1980s and 1990s are listed at about 49 000 to 140 000 US dollars (rightboat.com, bluewateryachtsales.com, brewerYacht listings: a 1986 40 ft with a watermaker, 1985 custom 40 with a windvane, a Tayana 42 centre-cockpit asking 140 000), about 0.5 to 1.4 million units at roughly 10 units to the dollar, so the 40 ft boat asks 1 250 000 for a sound one with the gear listed. Used 42 ft catamarans of the 2000s are listed at about 125 000 to 285 000 dollars (catamarans.com, multihullcompany.com, boatzon.com), so the catamaran asks 2 100 000. Catamaran running costs: insurance about 0.7 to 1.5 percent of value a year, an owner-cost comparison of about 60 percent more than a monohull, and berth fees of 1.5 to 2 times a monohull's because of the beam (multihullcompany.com, catamarans-lagoon.com, catamarans.com, nammert.com; the berth multiple rests on the weakest of them). The 32 ft and 36 ft prices are not researched: the 32 ft is chosen so that she is about 240 000 over what the player's own boat fetches (design note 011: you are 240 000 short), the 36 ft is a step on the way. Running costs scale as design note 011 decision 2 says: berth with length and beam, insurance with value, the lift and storage with weight, parts and service with size. This sim's own insurance is about 4.6 percent of its broker's figure, far over a real 1 percent; the yard's quotes here follow the sim's rate for the smaller boats so the ladder reads on the same scale as the player's own bills.",
+    "PLACEHOLDER (design note 012, decision 6): the tickets. Her insurer asks the coastal skipper ticket for any boat over 10 m or kept in the outer region (the 32 ft, the 36 ft and the catamaran) and the offshore skipper ticket for the bluewater boat. UNVERIFIED: that real insurers ask by length and region like this (design note 011, tickets). The broker's rule that he deals only with a skipper who can insure her is the sim's invention.",
+    "All the boats, yards and names are fictional."
+  ],
+  "port": "skjaervik",
+  "words": {
+    "ownLine": "{type}: the broker's figure for her today is {value}.",
+    "ownCosts": "Her bills as you pay them: {costs}.",
+    "ownTicket": "Her ticket: {ticket}, held.",
+    "line": "{name}, {yard}, a {lengthFt} ft ({lengthM} m) {type} of {year}, {lies}. Asking {price}. {pro} {con}",
+    "costs": "The yard quotes her running costs a year: {costs}, {total} in all.",
+    "costItem": "{label} {nok}",
+    "labelBerth": "Berth",
+    "labelInsurance": "Insurance",
+    "labelLift": "Lift and storage",
+    "moneyShort": "You are {short} short: she asks {price}, you have {balance} in the bank and the broker's {value} for your own boat.",
+    "moneyEnough": "You have the money for her, but she is not for sale to you yet: the broker deals only with a skipper who can insure her.",
+    "ticketHave": "Her insurer wants {ticket}: you have it.",
+    "ticketLack": "Her insurer wants {ticket}: you don't."
+  },
+  "yours": {
+    "type": "Your 28 ft sloop",
+    "lengthFt": 28,
+    "lengthM": 8.5,
+    "ticket": "boat-licence"
+  },
+  "boats": [
+    {
+      "name": "Lunde",
+      "yard": "built by Rønning Båtbyggeri",
+      "lengthFt": 32, "lengthM": 9.8, "type": "cutter", "year": 1984,
+      "lies": "lying at a broker's in the south",
+      "askingNok": 440000,
+      "pro": "Older but sound, with a bigger engine than yours and a diesel heater already fitted.",
+      "con": "A second headsail to look after and nothing new about her but the heater.",
+      "costs": [
+        { "label": "Berth", "nok": 15000 },
+        { "label": "Insurance", "nok": 11000 },
+        { "label": "Lift and storage", "nok": 21000 },
+        { "label": "the usual parts and service", "nok": 8000 }
+      ],
+      "ticket": "coastal"
+    },
+    {
+      "name": "Ternen",
+      "yard": "built by Strand & Sønn",
+      "lengthFt": 36, "lengthM": 11.0, "type": "fin-keel cruiser-racer", "year": 1991,
+      "lies": "lying at a broker's up the coast",
+      "askingNok": 790000,
+      "pro": "Fast, and light on her feet in a breeze.",
+      "con": "Thin on comforts: a cold, wet boat to live aboard, with a deep keel that finds the bottom.",
+      "costs": [
+        { "label": "Berth", "nok": 19000 },
+        { "label": "Insurance", "nok": 17000 },
+        { "label": "Lift and storage", "nok": 28000 },
+        { "label": "the usual parts and service", "nok": 12000 }
+      ],
+      "ticket": "coastal"
+    },
+    {
+      "name": "Havsula",
+      "yard": "built by Haugvik Verft",
+      "lengthFt": 40, "lengthM": 12.2, "type": "centre-cockpit bluewater boat", "year": 1988,
+      "lies": "lying at a broker's in the south",
+      "askingNok": 1250000,
+      "pro": "Built for a long way from land, with a watermaker and a windvane on her stern.",
+      "con": "A maintenance list to match: every system aboard is one more thing to fail, and the yard charges for her weight.",
+      "costs": [
+        { "label": "Berth", "nok": 25000 },
+        { "label": "Insurance", "nok": 26000 },
+        { "label": "Lift and storage", "nok": 40000 },
+        { "label": "the usual parts and service", "nok": 30000 }
+      ],
+      "ticket": "offshore"
+    },
+    {
+      "name": "Tvillingen",
+      "yard": "built by Aune Marine",
+      "lengthFt": 42, "lengthM": 12.8, "type": "catamaran", "year": 2003,
+      "lies": "lying at a broker's up the coast",
+      "askingNok": 2100000,
+      "pro": "Two engines, two hulls and room to spare; she sails upright.",
+      "con": "Twice the berth bill because of her beam, and a terror in a yard crane: the lift and the storage are priced by the width.",
+      "costs": [
+        { "label": "Berth", "nok": 48000 },
+        { "label": "Insurance", "nok": 38000 },
+        { "label": "Lift and storage", "nok": 70000 },
+        { "label": "the usual parts and service", "nok": 28000 }
+      ],
+      "ticket": "coastal"
+    }
+  ]
+}

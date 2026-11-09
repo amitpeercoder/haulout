@@ -1,0 +1,68 @@
+@using Haulout.Web.Services
+@using Haulout.Sim.Play
+@inject GameSession Session
+@implements IDisposable
+
+@* What stops the player where they are: the ferry's call on channel 16, the examiner's question, the marked paper, and the document being read.
+   All of it is what the facade's Trip, ExamQuestion and ReadDocument queries and the last Answer's result say. *@
+@{ var trip = Session.Trip; var exam = Session.Exam; }
+@if (trip.FerryCall is { Length: > 0 } call)
+{
+    <section class="card ferry" data-ferry-call>
+        <h2>A ferry is calling you</h2>
+        <p>@call</p>
+        <div class="row">
+            <button class="primary" data-action="answer-ferry" @onclick='() => Session.Call("ferry")'>Answer on 16</button>
+        </div>
+        <p class="faint">If you move on without answering, the close call happens as it would have.</p>
+    </section>
+}
+@if (exam.Open)
+{
+    <section class="card exam" data-exam>
+        <h2>The exam: question @exam.Number of @exam.Total</h2>
+        <p data-exam-question>@exam.Text</p>
+        <div class="options">
+            @foreach (var o in exam.Options)
+            {
+                <button data-action="answer" data-letter="@o.Letter" @onclick="() => Session.Answer(o.Letter)"><span class="letter">@o.Letter)</span> @o.Text</button>
+            }
+        </div>
+    </section>
+}
+else if (Session.LastResult is { Action: "answer", Accepted: true } marked)
+{
+    <section class="card exam marked" data-exam-result>
+        <h2>The paper is marked</h2>
+        @foreach (var line in marked.Narrative) { <p>@line</p> }
+    </section>
+}
+@if (Session.Reading is { } doc)
+{
+    <article class="card reader" data-reader>
+        @if (doc.Title.Length == 0)
+        {
+            <p>@doc.Note</p>
+        }
+        else
+        {
+            <h2>@doc.Title</h2>
+            @foreach (var pg in doc.Pages)
+            {
+                <section class="page">
+                    @if (doc.Pages.Count > 1 || pg.Title.Length > 0) { <h3>@(doc.Pages.Count > 1 ? $"{pg.Number}. " : "")@pg.Title</h3> }
+                    @foreach (var para in pg.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <p>@para</p> }
+                </section>
+            }
+        }
+        <div class="row"><button data-action="close-reader" @onclick="Session.CloseReader">Close</button></div>
+    </article>
+}
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+}

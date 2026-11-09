@@ -392,6 +392,11 @@ public sealed partial class Game
             if (_sunk) return null;
             // Water the floorboards would explain wants the player's hands now; rain through the open hatch is only told at the end.
             if (_water.CyclesSinceAboard > 0 && !_water.HatchDominant) PumpCounterAlert();
+            if (CourseStartsTodayWords() is { } courseStarts)
+            {
+                why = courseStarts;
+                break;
+            }
             if (_bookedDay is { } booked && Day == booked)
             {
                 why = $"You come back on day {booked} for your haulout slot.";

@@ -1,0 +1,265 @@
+{
+  "placeholders": [
+    "PLACEHOLDER (design note 012, step 2): the notice boards. The club's board by the slipway at Skjaervik carries everything (events and courses; step 4 adds crewing places and step 5 the ladder); the board at another port carries only what is posted there, by the ids of the calendar's events. The words are ours. The briefing's two closing lines (the shop's hours and the board) are told once at the start.",
+    "PLACEHOLDER / UNVERIFIED (design note 012, step 4, decision 5 and the \"Crewing places\" paragraph of Amit's answers): crewing places. Every number in \"crewing\" is a placeholder: the two dates, the legs (nm, hours, departure hours), the asks (60 miles and 3 nights away), the meeting hours, the return hours and the price of the far boat. SOURCES (researched 2026-11-09): crew-wanted listings on crewseekers.net and crewbay.com and the cruisers' wiki (cruiserswiki.org) describe unpaid delivery places with food aboard and expenses covered by the owner, taken for the sea time and a signed-off logbook, with the crew bringing their own lifejacket and harness; new 45 ft aluminium expedition cutters (Garcia Exploration 45, Boreal 44, Ovni 450) are listed from about 0.8 to 1.1 million euros (boats.com, rightboat.com and yachtall.com broker listings, a third-party estimate for the Boreal), about 9 to 12 million in game units at roughly 11.5 NOK to the euro, so the far boat's price here is 10 500 000 (placeholder). The delivery's legs are the chart's own straight distance between Hestholmen and Storholmen (31.6 nm, so 63 nm over the weekend, not the 50 the brief guessed); the week north is invented: its four far places (Brandholmen, Tindskjaer, Ytterlykt, Myrsund) are fictional and not on the player's chart, and its 240 nm, one night passage of 12 hours through the dark and six passages over 20 nm are chosen so that a week of it gives a log worth the asking. DATES: the delivery is the first Saturday on or after day 163 (June, clear of the regatta on the first Saturday on or after 150, Midsummer on 172 to 173 and the May radio course); the week north is the first Monday on or after day 231 (late August, after the club cruise on the Friday on or after 214 and the August radio course on the Saturday on or after 225, before the coastal course on the Monday on or after 245). THE PICK-UP: the delivery's owner collects the player from the club pontoon at Skjaervik in a launch, so the player's own boat stays on her mooring at home; the week north sails from Skjaervik itself. NIGHTS: a night aboard another boat away from Skjaervik counts as a night away, as in a real logbook. THE PHONE: the owner is a person, not an office: the call is taken at any hour, 5 minutes (the orders' phone minutes)."
+  ],
+  "briefing": {
+    "hours": "{shop} opens at {hour}; the yard office too.",
+    "board": "The club's board by the slipway has the season on it."
+  },
+  "atSea": "You're at sea: the board is at the club.",
+  "noBoard": "There is no board here.",
+  "ports": {
+    "skjaervik": {
+      "header": "The club's board by the slipway, pinned by the committee:",
+      "all": true,
+      "empty": "The club's board is bare."
+    },
+    "hestholmen": {
+      "header": "The notice board at the Hestholmen quay:",
+      "events": [
+        "regatta"
+      ],
+      "empty": "Nothing is pinned at the quay."
+    },
+    "storholmen": {
+      "header": "",
+      "events": [],
+      "empty": "The board outside the harbour office has a notice about the ferry, and nothing else."
+    },
+    "kvitnes": {
+      "header": "",
+      "events": [],
+      "empty": "The board by the boathouse is empty but for a faded notice about the water."
+    }
+  },
+  "crewing": {
+    "port": "skjaervik",
+    "enrolDaysBefore": 1,
+    "words": {
+      "takeLine": "You ring {owner} and say you will come: {when}, on {boat}. {pay}",
+      "takeLog": "Took a crewing place on {boat}: {when}.",
+      "vacation": "It will cost {vacation} by the usual rule.",
+      "stops": "A wait will stop on the first morning.",
+      "unknown": "Nobody is asking for crew on '{name}'.",
+      "taken": "You've said you will come already: {when}.",
+      "gone": "That place has gone this year.",
+      "tooClose": "{owner} needs to know the day before: {when} is too close.",
+      "asksNotMet": "{owner} wants {asks}: you have {have}.",
+      "haveLine": "{miles} of {needMiles} miles and {nights} of {needNights} {nightWord} away",
+      "clash": "That clashes with {what} ({when}).",
+      "clashCourse": "your {course}",
+      "clashFriend": "your friend's week",
+      "clashCrew": "your place on {boat}",
+      "morning": "You come back on day {day}: today you crew on {boat}; {meet}.",
+      "gate": "You leave that for later: {meet}.",
+      "head": "{weekday}, day {day}: day {n} of {total}, {route}.",
+      "underWay": "Under way at {depart} for {hours}{night}.",
+      "night": ", through the night",
+      "offChart": " (not on your chart)",
+      "awayLog": "Away crewing on {boat}: days {from} to {to}.",
+      "missed": "{boat} sailed without you: you were not at {port} by {meetHour}. {owner} went without a word.",
+      "missedLog": "Missed the crewing place on {boat}: not at {port} when she sailed.",
+      "summary": "You come home with {list} in your log.",
+      "sumMiles": "{n} miles",
+      "sumNights": "{n} {nights} away",
+      "sumDark": "{n} {hours} under way after dark",
+      "sumForce": "a force {n} at the worst",
+      "sumNone": "nothing much",
+      "letterMat": "There is a letter from the harbourmaster on the mat of the club office (read letter {n}).",
+      "letterHead": "Dear owner, while you were away crewing on {boat} I looked in on your boat.",
+      "letterTail": "Nothing else to report. The harbourmaster's office.",
+      "boardLine": "{card}{vac}",
+      "route": "{from} to {to}{off}, {nm} nm",
+      "routeLay": "at {to}{off}",
+      "cardTaken": "You are crewing on {boat}.",
+      "letterDay": "Day {day}",
+      "letterDays": "Days {from} to {to}"
+    },
+    "places": [
+      {
+        "id": "delivery",
+        "title": "The weekend delivery",
+        "aliases": [
+          "delivery",
+          "weekend",
+          "weekend delivery",
+          "teist",
+          "36 ft",
+          "36 ft cutter"
+        ],
+        "fromDayOfYear": 163,
+        "weekday": "saturday",
+        "days": 2,
+        "owner": "Per Aune",
+        "boat": "the cutter Teist",
+        "pay": "Food aboard, no pay.",
+        "card": "Crew wanted: a 36 ft cutter from Hestholmen to Storholmen and back, {when}; food aboard, no pay.",
+        "asks": null,
+        "meetHour": 9,
+        "returnHour": 18,
+        "meet": "the owner's launch leaves the club pontoon at nine",
+        "boatCard": {
+          "title": "The cutter Teist",
+          "aliases": [
+            "teist",
+            "cutter teist",
+            "delivery cutter"
+          ],
+          "lines": [
+            "Teist is a 36 ft cutter, long-keeled, built in wood in the sixties and kept up by one man with a varnish tin. Her owner, Per Aune, is moving her to Storholmen for the summer and wants hands on the sheets and a second pair of eyes in the fairway. She is a boat for the coast: slow, dry and forgiving."
+          ]
+        },
+        "costLine": "",
+        "returnLine": "Per Aune's launch drops you at the club pontoon at six, and you walk down to your own boat in the evening light.",
+        "plan": [
+          {
+            "from": "Hestholmen",
+            "to": "Storholmen",
+            "nm": 31.6,
+            "departHour": 10.5,
+            "hours": 6.5,
+            "awayNight": true,
+            "line": "The launch takes you round to Hestholmen in an hour, and Per Aune is already aboard Teist with the engine ticking. Out past the point he hands you the helm and a thermos, and says nothing for the best part of an hour. Storholmen's white light comes up in the afternoon, and you eat in the cockpit with the harbour kiosk shut."
+          },
+          {
+            "from": "Storholmen",
+            "to": "Hestholmen",
+            "nm": 31.6,
+            "departHour": 9,
+            "hours": 6.5,
+            "awayNight": false,
+            "line": "Teist rolls home on a long swell with a mainsail Per Aune keeps patting as if it were a dog. You learn that he trims by feel and that his feel is good. At Hestholmen he shakes your hand and says the sandwiches were the best part of the weekend."
+          }
+        ]
+      },
+      {
+        "id": "north",
+        "title": "The week north",
+        "aliases": [
+          "north",
+          "week",
+          "week north",
+          "a week north",
+          "fjellrype",
+          "45 ft",
+          "45 ft cutter",
+          "aluminium cutter",
+          "outer skerries"
+        ],
+        "fromDayOfYear": 231,
+        "weekday": "monday",
+        "days": 7,
+        "owner": "Mari Heiane",
+        "boat": "the cutter Fjellrype",
+        "pay": "Food aboard, no pay.",
+        "card": "Crew for a week on a 45 ft aluminium cutter going north to the outer skerries, {when}; a coastal skipper ticket or a season's log asked: 60 miles and 3 nights away from home. Food aboard, no pay.",
+        "asks": {
+          "ticket": "coastal",
+          "miles": 60,
+          "nightsAway": 3,
+          "words": "the coastal skipper ticket or a season's log of 60 miles and 3 nights away from home"
+        },
+        "meetHour": 9,
+        "returnHour": 20,
+        "meet": "she sails at nine",
+        "boatCard": {
+          "title": "The cutter Fjellrype",
+          "aliases": [
+            "fjellrype",
+            "cutter fjellrype",
+            "far boat",
+            "north cutter"
+          ],
+          "lines": [
+            "Fjellrype is a 45 ft aluminium cutter with a lifting keel and a doghouse, built in a yard in the far north for the kind of water that has no marinas. Her owner, Mari Heiane, takes her up to the outer skerries every August with whoever she can find, and has done it nine years. She is a boat for the sea: strong, tall and unlovely, with a diesel stove, a chart table you could sleep on and sails that cost more than most boats."
+          ]
+        },
+        "costLine": "She cost {owner} {price} when she was new; you could buy a 28-footer like yours for the price of her sails.",
+        "newPriceNok": 10500000,
+        "returnLine": "Fjellrype lies on her mooring at half past five. You wash down, Mari Heiane stands you supper at the club, and you are back aboard your own boat by eight.",
+        "plan": [
+          {
+            "from": "Skjærvik",
+            "to": "Brandholmen",
+            "nm": 34,
+            "departHour": 9,
+            "hours": 6.5,
+            "awayNight": true,
+            "toOffChart": true,
+            "line": "Mari Heiane casts off at nine without ceremony and hands you the staysail sheet. You learn where she keeps everything. By half past three you are tying up at Brandholmen, a place that is not on your chart, with the cutter's doghouse steaming gently."
+          },
+          {
+            "from": "Brandholmen",
+            "to": "Tindskjær",
+            "nm": 41,
+            "departHour": 6.5,
+            "hours": 7.5,
+            "awayNight": true,
+            "toOffChart": true,
+            "line": "An early start in grey light, and your first watch alone at the helm while she reads the chart. The skerries thin out; Tindskjær is a light and a jetty and nothing else."
+          },
+          {
+            "from": "Tindskjær",
+            "to": "Ytterlykt",
+            "nm": 29,
+            "departHour": 8,
+            "hours": 5.5,
+            "awayNight": true,
+            "toOffChart": true,
+            "line": "A short day to the outer skerries. Ytterlykt is bare rock, birds and a lighthouse with its door painted red. You row ashore to see it and are given coffee by a man who has not seen a boat for a week."
+          },
+          {
+            "from": "Ytterlykt",
+            "to": "Myrsund",
+            "nm": 64,
+            "departHour": 18,
+            "hours": 12,
+            "awayNight": true,
+            "toOffChart": true,
+            "line": "A lay day at Ytterlykt: the owner will not go until the afternoon, and you mend the genoa's chafe patch and sleep. At six she casts off for the night passage home by the outside: long hours in the dark, watch and watch, the loom of the light astern and then nothing at all. Myrsund comes up with the dawn."
+          },
+          {
+            "from": "Myrsund",
+            "to": "Brandholmen",
+            "nm": 38,
+            "departHour": 10,
+            "hours": 7,
+            "awayNight": true,
+            "line": "You sleep until ten and are woken for the next leg. A steady day under sail, the sea running after the night, and Brandholmen again in the evening light, where the harbour dog remembers you."
+          },
+          {
+            "from": "Brandholmen",
+            "to": "Brandholmen",
+            "nm": 0,
+            "departHour": 0,
+            "hours": 0,
+            "awayNight": true,
+            "line": "A lay day at Brandholmen. The wind is up, the owner will not go, and the crew do what crew do on a lay day: mend, wash, read the almanac and eat too much. Mari Heiane talks about the boat for an hour."
+          },
+          {
+            "from": "Brandholmen",
+            "to": "Skjærvik",
+            "nm": 34,
+            "departHour": 11,
+            "hours": 6.5,
+            "awayNight": false,
+            "line": "The last leg home, and you are given the helm into Skjærvik's fairway. You pick up her mooring on the second try."
+          }
+        ]
+      }
+    ],
+    "letterLines": {
+      "harbourmaster": "{days}: she was sitting low on her mooring; the bilge wants looking at.",
+      "mooring-parted": "{days}: her mooring parted in the night; the towboat brought her back and she is on new lines. The bill is in your logbook.",
+      "chafe": "{days}: the bow lines were sawing at the fairleads in the wind. They will want looking at."
+    },
+    "boardStatus": {
+      "open": "open",
+      "taken": "taken",
+      "tooClose": "too close",
+      "done": "done",
+      "missed": "missed"
+    }
+  }
+}

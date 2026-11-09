@@ -27,8 +27,13 @@ public sealed record EconomyData
     public FuelData Fuel { get; init; } = new();
     public SurveyFeeData Survey { get; init; } = new();
     public CloseCallsData CloseCalls { get; init; } = new();
+    public RadioMoneyData Radio { get; init; } = new();
     public HoursData Hours { get; init; } = new();
     public SleepData Sleep { get; init; } = new();
+    /// <summary>The club's course prices by ticket id (design note 012, step 2). The tickets themselves are in tickets.json.</summary>
+    public Dictionary<string, int> Courses { get; init; } = [];
+    /// <summary>The exam fee for a re-sit, by ticket id (design note 012, decision 8): paid at enrolling for the re-sit.</summary>
+    public Dictionary<string, int> ExamFees { get; init; } = [];
 
     public sealed record StartData
     {
@@ -83,6 +88,9 @@ public sealed record EconomyData
 
     public sealed record CloseCallsData { public int LetterNok { get; init; } }
 
+    /// <summary>What a call made without the radio ticket costs: the harbourmaster's letter (design note 012, step 3).</summary>
+    public sealed record RadioMoneyData { public int UnlicensedLetterNok { get; init; } }
+
     /// <summary>
     /// The shops' hours and the harbourmaster's night (design note 012). Times are "HH:MM" in the file and minutes of the day in
     /// <see cref="HoursRules"/>. A file with no <c>hours</c> block has no hours: shops are always open.
@@ -133,6 +141,12 @@ public sealed record EconomyData
         public string WakeHour { get; init; } = "08:00";
         public int SleepHours { get; init; }
         public int MinSleepHours { get; init; }
+        /// <summary>The sleep command sleeps to the wake hour only when it is no further than this (step 1 follow-up a).</summary>
+        public int MaxSleepHours { get; init; }
+        /// <summary>How fast the hours awake grow under way at sea (0.5: you doze in the cockpit).</summary>
+        public double AtSeaRate { get; init; }
+        /// <summary>A passage longer than this makes the arrival a tired one.</summary>
+        public int TiredArrivalHours { get; init; }
 
         public SleepRules ToRules() => TiredAtHours <= 0
             ? SleepRules.Default
@@ -141,6 +155,7 @@ public sealed record EconomyData
                 TiredAtMinutes = TiredAtHours * 60, ExhaustedAtMinutes = ExhaustedAtHours * 60,
                 BotchFactorTired = BotchFactorTired, BotchFactorExhausted = BotchFactorExhausted,
                 WakeMinute = HoursData.Minute(WakeHour), SleepMinutes = SleepHours * 60, MinSleepMinutes = MinSleepHours * 60,
+                MaxSleepMinutes = MaxSleepHours > 0 ? MaxSleepHours * 60 : int.MaxValue, AtSeaRate = AtSeaRate, TiredArrivalMinutes = TiredArrivalHours * 60,
             };
     }
 }

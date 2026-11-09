@@ -37,7 +37,7 @@
 .cover-toggle .state { color: var(--ink-faint); font-family: var(--face-type); font-size: 0.8rem; margin-left: 0.4rem; }
 .position { font-family: var(--face-type); font-size: 0.8rem; color: var(--water-pale); }
 
-.tabs { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
 .tabs button.on { font-weight: bold; text-decoration: underline; }
 .flagged { color: #a05a00; font-style: italic; }
 .letter, .problem { border-top: 1px solid #0003; padding: 0.4rem 0; }

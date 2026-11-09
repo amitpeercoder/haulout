@@ -27,6 +27,8 @@
         }
     </div>
 
+    <Interrupts />
+
     @{ var unseen = Session.UnseenAlerts; }
     <nav class="tabs">
         <button class="@(Session.Tab == PanelTab.Here ? "on" : "")" data-tab="here" @onclick="() => Session.ShowTab(PanelTab.Here)">Here</button>
@@ -34,6 +36,7 @@
         <button class="@(Session.Tab == PanelTab.Trip ? "on" : "")" data-tab="trip" @onclick="() => Session.ShowTab(PanelTab.Trip)">Trip</button>
         <button class="@(Session.Tab == PanelTab.Season ? "on" : "")" data-tab="season" @onclick="() => Session.ShowTab(PanelTab.Season)">Season</button>
         <button class="@(Session.Tab == PanelTab.Calendar ? "on" : "")" data-tab="calendar" @onclick="() => Session.ShowTab(PanelTab.Calendar)">Calendar</button>
+        <button class="@(Session.Tab == PanelTab.Board ? "on" : "")" data-tab="board" @onclick="() => Session.ShowTab(PanelTab.Board)">Board</button>
     </nav>
 
     @if (Session.Tab == PanelTab.Season)
@@ -49,7 +52,7 @@
                     <p class="cost">Day @sold.Day · @Session.Money(sold.PriceNok) · @sold.Days days · @sold.HoursWorked h of your own work · @sold.Trips @(sold.Trips == 1 ? "trip" : "trips") · @sold.Tows @(sold.Tows == 1 ? "tow" : "tows")</p>
                 </section>
             }
-            @if (Session.LastResult is { } sr && sr.Observation is not ClosingView)
+            @if (Session.ShownResult is { } sr && sr.Observation is not ClosingView)
             {
                 <section class="result @(sr.Accepted ? "" : "refused")">
                     @foreach (var line in sr.Narrative) { <p>@line</p> }
@@ -202,7 +205,7 @@
     {
         var cal = Session.Calendar;
         <section class="season calendar">
-            @if (Session.LastResult is { } cr)
+            @if (Session.ShownResult is { } cr)
             {
                 <section class="result @(cr.Accepted ? "" : "refused")">
                     @foreach (var line in cr.Narrative) { <p>@line</p> }
@@ -217,6 +220,7 @@
             <div class="row">
                 <button data-action="next-weekend" @onclick="() => Session.NextWeekend()">Next weekend</button>
                 <button data-action="wait-week" @onclick="() => Session.WaitWeek()">Wait a week</button>
+                <button data-action="sleep" @onclick="() => Session.Sleep()">Sleep</button>
             </div>
 
             @if (cal.Ahead.Count > 0)
@@ -268,6 +272,10 @@
             }
         </section>
     }
+    else if (Session.Tab == PanelTab.Board)
+    {
+        <Board />
+    }
     else if (Session.Tab == PanelTab.Trip)
     {
         var trip = Session.Trip;
@@ -280,7 +288,7 @@
                     <p class="cost">@tr.Destination · @Duration(tr.Minutes)@(tr.MoneySpentNok > 0 ? $", {Session.Money(tr.MoneySpentNok)}" : "")</p>
                 </section>
             }
-            @if (Session.LastResult is { } lr && lr.Observation is not TripResultView)
+            @if (Session.ShownResult is { } lr && lr.Observation is not TripResultView)
             {
                 <section class="result @(lr.Accepted ? "" : "refused")">
                     @foreach (var line in lr.Narrative) { <p>@line</p> }
@@ -291,6 +299,7 @@
             @if (trip.AtSea)
             {
                 <p data-trip-text>@trip.Text</p>
+                @if (trip.RadioFitted) { <RadioCalls /> }
                 <p class="faint">@trip.From to @trip.To · @trip.PositionNm.ToString("0.0") nm made good, @trip.RemainingNm.ToString("0.0") nm to go · @trip.Mode@(trip.NearestShelter is { Length: > 0 } sh ? " · shelter: " + sh : "")</p>
                 <div class="options">
                     <div class="option"><button class="primary" data-action="continue" @onclick="() => Session.Continue()">Continue</button></div>
@@ -306,6 +315,7 @@
             {
                 var plan = Session.PlanTrip();
                 var inv = Session.Inventory;
+                @if (trip.RadioFitted) { <RadioCalls /> }
                 <h3>@plan.From to @plan.To</h3>
                 <p>@plan.DistanceNm.ToString("0.0") nm · @plan.Estimate</p>
                 @foreach (var f in plan.Forecast) { <p class="faint">Day @f.Day: @f.Text</p> }
@@ -351,6 +361,7 @@
                     <div class="option"><button data-action="read-survey" @onclick="() => Session.ToggleSurvey()">@(Session.SurveyOpen ? "Close survey" : "Read survey")</button></div>
                 }
                 <div class="option"><button data-action="wait" @onclick="() => Session.Wait(1)">Wait a day</button></div>
+                <div class="option"><button data-action="sleep" @onclick="() => Session.Sleep()">Sleep</button></div>
                 @if (rd.Launched && rd.Afloat)
                 {
                     <div class="option"><button data-action="emergency-lift" @onclick="() => Session.EmergencyLift()">Emergency lift (@Session.Money(rd.EmergencyLiftNok))</button></div>
@@ -430,7 +441,7 @@
         }
     </section>
 
-    @if (Session.LastResult is { } r && !ReferenceEquals(r.Narrative, Session.ClosingNarrative))
+    @if (Session.ShownResult is { } r && !ReferenceEquals(r.Narrative, Session.ClosingNarrative))
     {
         <section class="result @(r.Accepted ? "" : "refused")">
             @foreach (var line in r.Narrative)

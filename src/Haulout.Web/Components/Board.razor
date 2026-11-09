@@ -1,0 +1,101 @@
+@using Haulout.Web.Services
+@using Haulout.Sim.Play
+@inject GameSession Session
+@implements IDisposable
+
+@* The club's noticeboard (docs/design/012, decision 6). Everything here is what the facade's Noticeboard, Tickets and Skipper queries say; the buttons send Enrol and TakeCrewingPlace. *@
+<section class="board" data-board>
+    @if (Session.ShownResult is { } r)
+    {
+        <section class="result @(r.Accepted ? "" : "refused")">
+            @foreach (var line in r.Narrative) { <p>@line</p> }
+            @if (r.Accepted && (r.MinutesTaken > 0 || r.CostNok > 0)) { <p class="cost">@Cost(r)</p> }
+        </section>
+    }
+    @{ var board = Session.Board; }
+    <p data-board-header>@board.Header</p>
+    @if (board.Empty is { Length: > 0 } empty) { <p class="faint" data-board-empty>@empty</p> }
+
+    @{ var firstOpenCourse = board.Cards.OfType<CourseCard>().Where(c => c.Status == "open").GroupBy(c => c.Title).Select(g => g.First()).ToHashSet(); }
+    @foreach (var card in board.Cards)
+    {
+        switch (card)
+        {
+            case EventCard e:
+                <div class="task" data-card="event" data-title="@e.Title">
+                    <p><strong>@e.Title</strong> @(e.Event.Place.Length > 0 && !e.Title.Contains(e.Event.Place, StringComparison.Ordinal) ? "at " + e.Event.Place : "") · @e.Event.When · <span class="done">@e.Event.Status</span></p>
+                    @foreach (var rq in e.Event.Requirements)
+                    {
+                        <p class="faint">@(rq.Met switch { true => "met", false => "not met", _ => "not known yet" }): @rq.Text (@rq.Note)</p>
+                    }
+                </div>
+                break;
+            case CourseCard c:
+                <div class="task" data-card="course" data-title="@c.Title">
+                    <p><strong>@c.Title</strong> · @c.When · <span class="done" data-status>@c.Status</span></p>
+                    <p class="faint">@c.Place · @Session.Money(c.PriceNok) · @c.Days @(c.Days == 1 ? "day" : "days")@(c.VacationDays > 0 ? $" · {c.VacationDays} vacation {(c.VacationDays == 1 ? "day" : "days")}" : "")</p>
+                    @foreach (var s in c.Shortfall) { <p class="faint" data-shortfall>Your log: @Haulout.Prose.Prose.LowerFirst(s)</p> }
+                    @if (firstOpenCourse.Contains(c))
+                    {
+                        <div class="row"><button data-action="enrol" @onclick="() => Session.Enrol(c.Title)">Enrol</button></div>
+                    }
+                </div>
+                break;
+            case CrewingCard k:
+                <div class="task" data-card="crewing" data-title="@k.Title">
+                    <p><strong>@k.Title</strong> · @k.When · <span class="done" data-status>@k.Status</span></p>
+                    <p class="faint">@k.Line</p>
+                    @foreach (var s in k.Shortfall) { <p class="faint" data-shortfall>Your log: you have @s.</p> }
+                    @if (k.Status == "open")
+                    {
+                        <div class="row"><button data-action="take-crewing-place" @onclick="() => Session.TakeCrewingPlace(k.Title)">Take the place</button></div>
+                    }
+                </div>
+                break;
+        }
+    }
+
+    @{ var tickets = Session.TicketList; var skipper = Session.SkipperLog; }
+    <h3>Your tickets</h3>
+    @foreach (var t in tickets.Tickets)
+    {
+        <div class="task" data-ticket="@t.Name">
+            <p><strong>@t.Name</strong> · <span class="done" data-held>@(t.Held ? "held" : "not held")</span></p>
+            <p class="faint">@t.Purpose</p>
+            @foreach (var a in t.Asks) { <p class="faint" data-ask>@(a.Met ? "[x]" : "[ ]") @a.Text</p> }
+            <p class="faint">@t.NextCourse</p>
+        </div>
+    }
+    <h3>Your log</h3>
+    <article class="letter" data-skipper>
+        @foreach (var line in skipper.Lines) { <p>@line</p> }
+    </article>
+
+    @if (board.Ladder is { Count: > 0 } ladder)
+    {
+        <h3>The broker's window, by the club</h3>
+        @foreach (var b in ladder)
+        {
+            <div class="task ladder @(b.Yours ? "yours" : "")" data-ladder="@b.Title">
+                <p><strong>@b.Title</strong>@(b.Line.StartsWith(b.Title, StringComparison.Ordinal) ? b.Line[b.Title.Length..] : " " + b.Line)</p>
+                @foreach (var s in b.Shortfall) { <p class="faint" data-shortfall>@s</p> }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private string Cost(CommandResult r)
+    {
+        var parts = new List<string>();
+        if (r.MinutesTaken > 0) parts.Add(r.MinutesTaken >= 60 && r.MinutesTaken % 60 == 0 ? $"+{r.MinutesTaken / 60} h" : $"+{r.MinutesTaken} min");
+        if (r.CostNok > 0) parts.Add(Session.Money(r.CostNok));
+        return string.Join(", ", parts);
+    }
+}

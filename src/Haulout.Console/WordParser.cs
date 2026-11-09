@@ -59,7 +59,10 @@ public static class WordParser
             "turn" => new Problem("Usage: turn back | turn in"),
             "tow" => new RunCommand(new CallTow()),
             "call" when arg.Equals("tow", StringComparison.OrdinalIgnoreCase) => new RunCommand(new CallTow()),
-            "call" => new Problem("Usage: call tow"),
+            "call" => WithArg(StripTo(arg), "call <harbour | ferry | coast radio> (or call tow)", a => new Call(a)),
+            "radio" when arg.Length == 0 || arg.Equals("check", StringComparison.OrdinalIgnoreCase) => new RunCommand(new Call("coast radio")),
+            "radio" => WithArg(StripTo(arg), "call <harbour | ferry | coast radio>", a => new Call(a)),
+            "vhf" => WithArg(StripTo(arg), "call <harbour | ferry | coast radio>", a => new Call(a)),
             "inventory" or "inv" or "spares" => new RunQuery(new Inventory()),
             "trip" => new RunQuery(new Trip()),
             "chart" => new RunQuery(new Chart(OrNull(StripTo(arg)))),
@@ -94,12 +97,21 @@ public static class WordParser
             "calendar" or "week" => ParseCalendar(arg),
             "install" => WithArg(arg, "install <item>", a => new Install(a)),
             "upgrades" => new RunQuery(new Upgrades()),
+            "skipper" or "cv" => new RunQuery(new Skipper()),
+            "tickets" or "ticket" => new RunQuery(new Tickets()),
+            "board" or "noticeboard" => new RunQuery(new Noticeboard()),
+            "enrol" or "enroll" => WithArg(StripOn(arg), "enrol <course>", a => new Enrol(a)),
+            "crew" or "crewing" => WithArg(StripCrew(arg), "crew <delivery | north>", a => new TakeCrewingPlace(a)),
+            "take" when arg.StartsWith("crewing place", StringComparison.OrdinalIgnoreCase) => WithArg(StripCrew(arg["crewing place".Length..].Trim()), "take crewing place <delivery | north>", a => new TakeCrewingPlace(a)),
+            "exam" => new RunQuery(new ExamQuestion()),
+            "answer" => WithArg(arg, "answer <a, b, c or d>", a => new Answer(a)),
             "invite" => ParseInvite(arg),
             "next" when arg.Equals("weekend", StringComparison.OrdinalIgnoreCase) => new RunCommand(new NextWeekend()),
             "next" => new Problem("Usage: next weekend"),
             "weekend" => new RunCommand(new NextWeekend()),
             "read" when arg.Equals("survey", StringComparison.OrdinalIgnoreCase) => new RunQuery(new SurveyReport()),
-            "read" => new Problem("Usage: read survey"),
+            "read" when arg.Length == 0 => new Problem("Usage: read survey | read <document>"),
+            "read" => new RunQuery(new ReadDocument(arg)),
             "survey" => new RunQuery(new SurveyReport()),
             "readiness" or "ready" => new RunQuery(new Readiness()),
             "wait" => ParseWait(arg),
@@ -114,6 +126,22 @@ public static class WordParser
             "quit" or "exit" => new Quit(),
             _ => new Problem($"I don't know how to '{verb}'. Type 'help'."),
         };
+    }
+
+    /// <summary>"crew on the north cutter", "crew for the week": the place by its words.</summary>
+    private static string StripCrew(string arg)
+    {
+        foreach (var lead in new[] { "on ", "for ", "the " })
+            if (arg.StartsWith(lead, StringComparison.OrdinalIgnoreCase)) return StripCrew(arg[lead.Length..].Trim());
+        return arg;
+    }
+
+    /// <summary>"enrol on the radio course", "enrol for radio": the course by its name.</summary>
+    private static string StripOn(string arg)
+    {
+        foreach (var lead in new[] { "on ", "for ", "in " })
+            if (arg.StartsWith(lead, StringComparison.OrdinalIgnoreCase)) return arg[lead.Length..].Trim();
+        return arg;
     }
 
     private static string? OrNull(string s) => s.Length == 0 ? null : s;

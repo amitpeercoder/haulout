@@ -17,7 +17,7 @@ public class UpgradeTests
     }
 
     private static readonly string[] UpgradeIds =
-        ["diesel-heater", "marine-heads", "galley-stove", "chartplotter", "radar", "bunk-cushions", "cockpit-varnish"];
+        ["diesel-heater", "marine-heads", "galley-stove", "chartplotter", "radar", "vhf-radio", "bunk-cushions", "cockpit-varnish"];
 
     private static CommandResult Ok(CommandResult r)
     {
@@ -102,7 +102,7 @@ public class UpgradeTests
     // ------------------------------------------------------------------ the data
 
     [Fact]
-    public void Seven_upgrades_load_are_not_components_until_fitted_and_each_has_one_chandlery_item()
+    public void Eight_upgrades_load_are_not_components_until_fitted_and_each_has_one_chandlery_item()
     {
         var boat = BoatLoader.LoadSloop28();
         Assert.Equal(52, boat.Components.Count);
@@ -319,9 +319,9 @@ public class UpgradeTests
     {
         var g = Afloat(77);
         var items = Ups(g).Items;
-        Assert.Equal(7, items.Count);
+        Assert.Equal(8, items.Count);
         Assert.Equal(
-            ["diesel heater", "marine heads with holding tank", "gas stove", "chart plotter", "marine radar", "bunk cushions", "varnish and brushes"],
+            ["diesel heater", "marine heads with holding tank", "gas stove", "chart plotter", "marine radar", "VHF radio", "bunk cushions", "varnish and brushes"],
             items.Select(i => i.Name));
         var radar = items.Single(i => i.Name == "marine radar");
         Assert.Equal((24000, 480, 5000, 3, "fog at full speed", 12000, "not aboard"),
@@ -334,7 +334,7 @@ public class UpgradeTests
         Assert.Equal("aboard, not fitted", Up(g, "gas stove").Status);
         Install(g, "companionway", "stove");
         Assert.StartsWith("fitted on day ", Up(g, "gas stove").Status);
-        Assert.Equal(7, ((SeasonView)g.Ask(new Haulout.Sim.Play.Season())).Upgrades!.Count);
+        Assert.Equal(8, ((SeasonView)g.Ask(new Haulout.Sim.Play.Season())).Upgrades!.Count);
     }
 
     [Fact]
@@ -853,7 +853,7 @@ public class UpgradeTests
         Assert.Contains("\"type\":\"upgrades\"", JsonSerializer.Serialize<Query>(new Upgrades()));
         var g = Afloat(77);
         var view = JsonSerializer.Deserialize<QueryResult>(JsonSerializer.Serialize<QueryResult>(Ups(g)));
-        Assert.Equal(7, Assert.IsType<UpgradesView>(view).Items.Count);
+        Assert.Equal(8, Assert.IsType<UpgradesView>(view).Items.Count);
     }
 
     [Fact]

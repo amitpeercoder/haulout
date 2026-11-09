@@ -112,6 +112,7 @@ public sealed partial class Game
                 "You're standing in the cockpit, the companionway hatch slid open.",
                 $"The yard has her down for launch on day {_launchDeadlineDay}. You have {Money(_boat.Economy.StartingBalanceNok)} for the spring.",
                 "The season runs on past the launch: paydays and bills, a calendar of things worth sailing for, the autumn haulout and the winter; then sell her or keep her for another year.",
+                .. BriefingTail(),
             ]),
             Status => new StatusView(
                 Day, TimeOfDay, _time.WorkMinutes, _money, _lastStart?.ToString(), _running, _finished, KnownStatus(), ToolNames(), CurrentPlace.Name,
@@ -135,6 +136,11 @@ public sealed partial class Game
             Calendar => CalendarSnapshot(),
             Upgrades => UpgradesSnapshot(),
             SeasonPage q => SeasonPageSnapshot(q.Season),
+            Skipper => SkipperSnapshot(),
+            Tickets => TicketsSnapshot(),
+            Noticeboard => NoticeboardSnapshot(),
+            ReadDocument q => ReadDocumentSnapshot(q.Name),
+            ExamQuestion => ExamQuestionSnapshot(),
             _ => throw new ArgumentException($"Unknown query {query.GetType().Name}.", nameof(query)),
         };
     }
@@ -164,6 +170,9 @@ public sealed partial class Game
         new("turn back", null, "At sea: give up the passage and head for the port you left"),
         new("call tow", null, "At sea: call the towboat (costs money and the best part of a day)"),
         new("trip", null, "Where you are on the passage"),
+        new("read", "document", "Read a document of the logbook: a course book, a season page, a letter"),
+        new("exam", null, "At the exam: the question the examiner is waiting on"),
+        new("answer", "letter", "At the exam: answer a, b, c or d (5 minutes)"),
         new("chart", "destination", "The chart: the ports with distance and bearing from here, the shelters, and the track of the passage under way"),
         new("season", null, "The yard calendar: your slot, the first free slot and what lifting costs"),
         new("book haulout", "day", "Ring the yard and book a slot to be lifted out (free; changing the booking costs a fee)"),
@@ -179,6 +188,12 @@ public sealed partial class Game
         new("wait until spring", null, "Leave her for the winter, day by day, coming back early if she has something to tell you or your slot comes"),
         new("list for sale", "nok", "On the hard at the yard: list her with the broker at your asking price and get the broker's valuation letter (half an hour)"),
         new("accept offer", "offer", "Sell her to the best open offer, or to the numbered one: the game ends with the closing card"),
+        new("enrol", "course", "Not at sea: ring the club secretary and enrol on a course (radio, coastal): the fee is paid now, the days are marked and a wait stops on the first morning"),
+        new("crew", "place", "Not at sea: ring the owner and take a crewing place (delivery, north): the days are marked, no money; the day it starts you are away on the other boat"),
+        new("skipper", null, "Your own log in words: miles, nights away, night hours, long passages, the strongest wind, days aboard, tows"),
+        new("tickets", null, "Your tickets: held or not, what each is for, what it asks of your log and the next course"),
+        new("board", null, "The notice board where she lies: the events, the club's courses and the crewing places, by day"),
+        new("call", "to", "On the VHF: call the harbour, the coast radio (a radio check and the forecast) or the ferry that is calling you (5 minutes)"),
         new("sleep", null, "Not under way: turn in until the morning, or for a night's sleep (resets how long you have been up)"),
         new("keep", null, "Keep her for another season: the launch deadline moves to next spring and the logbook starts again"),
         new("sale", null, "The broker's letter, your listing, the viewings and the offers"),
@@ -221,7 +236,7 @@ public sealed partial class Game
     private WeatherView TodayView()
     {
         var w = Today;
-        return new WeatherView(Day, WeatherWords.Describe(w, HourOfDay, withSky: true, minutesOut: MinutesOut), w.WindForce, w.WindFrom, w.RainMm, w.TempC);
+        return new WeatherView(Day, WeatherWords.Describe(w, HourOfDay, withSky: true, minutesOut: MinutesOut), w.WindForce, w.WindFrom, w.RainMm, w.TempC, CoastRadioLine());
     }
 
     /// <summary>A job that needs a dry day is refused when it is raining today.</summary>
@@ -304,8 +319,18 @@ public sealed partial class Game
         ArgumentNullException.ThrowIfNull(command);
         if (_sunk) return Reject(command.GetType().Name.ToLowerInvariant(), SunkMessage);
         if (_sold) return Reject(command.GetType().Name.ToLowerInvariant(), SoldMessage);
+        // The exam (design note 012, decision 8): while the paper is open only an answer, or leaving the table, is carried out; the rest needs hands or the boat.
+        if (_exam is not null && command is not Answer && !LeavesExam(command)) return Reject(command.GetType().Name.ToLowerInvariant(), ExamText.Waiting);
+        if (_exam is null && command is Answer) return Reject("answer", ExamText.NoExam.Length > 0 ? ExamText.NoExam : "There is no exam to sit.");
         var turn = new Turn();
         CollectWaiting(turn);
+        if (_exam is not null)
+        {
+            if (command is Answer answer) return DoAnswer(turn, answer.Letter);
+            FinishExam(turn);   // a wait or a sleep leaves the paper: what is not answered counts as wrong
+        }
+        if (CourseGate(command, turn) is { } clubDay) return clubDay;
+        if (CrewingGate(command, turn) is { } awayDays) return awayDays;
         return command switch
         {
             Look => DoLook(turn),
@@ -362,6 +387,10 @@ public sealed partial class Game
             AcceptOffer c => DoAcceptOffer(turn, c.Offer),
             Keep => DoKeep(turn),
             Sleep => DoSleep(turn),
+            Enrol c => DoEnrol(turn, c.Course),
+            TakeCrewingPlace c => DoTakeCrewingPlace(turn, c.Place),
+            Call c => DoCall(turn, c.To),
+            Answer => throw new InvalidOperationException("An answer is taken before the command switch."),
             _ => throw new ArgumentException($"Unknown command {command.GetType().Name}.", nameof(command)),
         };
     }
@@ -946,6 +975,7 @@ public sealed partial class Game
             obs = FinishArrival(t, arrived);
         }
         if (!_sunk && !AtSea) CheckEvents(t);
+        if (_passage is { Ferry: { Told: false } } calling) TellFerryCall(t, calling); // a ferry that called during these minutes (a call, a heave-to) is heard now
         return new CommandResult(true, action, t.Narrative.ToList(), minutes, costNok, obs, t.Newly.ToList(), _running, _finished, TakeUnread());
     }
 }

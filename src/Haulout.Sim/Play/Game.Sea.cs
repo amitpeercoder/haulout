@@ -46,6 +46,7 @@ public sealed partial class Game
         var p = _passage!;
         var rules = _boat.SeaRules;
         double h = step / 60.0;
+        if (p.Ferry is not null && !_inCall) ReleaseFerry(p); // time passes without an answer: the close call comes as it would have (design note 012, step 3)
         var w = _weather[StepDay(step)];
         int seaState = Sea.SeaState(rules, w.WindForce);
 
@@ -60,6 +61,12 @@ public sealed partial class Game
         if (underWay && BlindInFog(midDay, midHour, minutesOut)) RollCloseCall(p, "fog", midDay, midHour);
         if (underWay && IsDark(midDay, midHour) && !ComponentWorks(NavLightsId)) RollCloseCall(p, "night", midDay, midHour);
         p.FogCap = fogCap;
+        // The skipper's log (design note 012): the hours under way after dark, and the strongest wind met under way (at anchor she is not under way).
+        if (p.Mode != SeaMode.Anchored)
+        {
+            if (IsDark(midDay, midHour)) p.NightMinutes += step;
+            p.MaxForce = Math.Max(p.MaxForce, w.WindForce);
+        }
         double Capped(double knots) => fogCap is { } cap ? Math.Min(knots, cap) : knots;
 
         switch (p.Mode)
@@ -148,6 +155,7 @@ public sealed partial class Game
         p.EndClockMinutes = ClockMinutes;
         MarkTrack($"Arrived at {PortName(p.DestinationPortId)}.");
         ArchivePassage(p, p.TurnedBack ? "turned back" : "arrived");
+        LogPassage(p, towed: false);
         _running = false;
         _portId = p.DestinationPortId;
         _passage = null;
@@ -161,6 +169,7 @@ public sealed partial class Game
         t.Narrative.Add("You pick up a mooring and stop the engine.");
         var lines = ArrivalLinesFor(t, port);
         t.Narrative.AddRange(lines);
+        TiredArrival(t, p);
         if (p.Onward is { Count: > 0 } onward && !p.TurnedBack)
         {
             double rest = onward.Sum(l => l.DistanceNm);
@@ -172,6 +181,7 @@ public sealed partial class Game
         _log.Add(new LogEntry(DayAt(p.EndClockMinutes), FormatTime(p.EndClockMinutes), $"Arrived at {port.Name}."));
         CountArrival(p, port);
         JudgeTrip(t, p, port);
+        TicketsCheck(t); // the log has this passage now: a ticket that waited for it is held
         return ResultOf(p, towed: false, lines.ToList());
     }
 
@@ -415,7 +425,7 @@ public sealed partial class Game
         p.Mode = SeaMode.UnderTow;
         p.OverheatMinutes = 0;
         p.DestinationPortId = target;
-        t.Narrative.Add("You call the towboat on the VHF and give your position. It comes alongside, takes your line, and the engine stays silent.");
+        t.Narrative.Add((VhfFitted ? "You call the towboat on the VHF" : "You ring the towboat on your phone") + " and give your position. It comes alongside, takes your line, and the engine stays silent.");
         t.Narrative.Add($"{home} is the nearer port, {towNm.ToString("0.0", CultureInfo.InvariantCulture)} nm off; that's where they take her.");
         _log.Add(new LogEntry(Day, TimeOfDay, $"Called the towboat: {Money(towNok)} to be towed {towed}.", towNok));
         CountTow($"Called the towboat: {Money(towNok)} to be towed {towed}.");
@@ -428,6 +438,7 @@ public sealed partial class Game
         _portId = target;
         p.EndClockMinutes = ClockMinutes;
         ArchivePassage(p, "towed");
+        LogPassage(p, towed: true);
         _passage = null;
         _log.Add(new LogEntry(Day, TimeOfDay, $"The towboat left her on her mooring at {home}."));
         Tick(t, tow.LostHours * 60, aboard: false);
@@ -441,6 +452,7 @@ public sealed partial class Game
         ];
         t.Narrative.AddRange(lines);
         CheckEvents(t);
+        TicketsCheck(t);
         return new CommandResult(true, "call-tow", t.Narrative.ToList(), ClockMinutes - before, towNok,
             ResultOf(p, towed: true, lines), t.Newly.ToList(), _running, _finished, TakeUnread());
     }
@@ -467,7 +479,7 @@ public sealed partial class Game
                 ? all.RoutesFrom(_portId).Select(r => $"{PortName(r.To)}, {r.DistanceNm.ToString("0.#", ci)} nm").ToList()
                 : [];
             return new TripView(false, CurrentPort?.Name, null, null, 0, 0, null, 0, false, null, serves,
-                at.Length > 0 ? $"She lies at {at}." : "She lies at her mooring.", out_);
+                at.Length > 0 ? $"She lies at {at}." : "She lies at her mooring.", out_, VhfFitted);
         }
 
         var near = NearestAnchorage(p);
@@ -479,8 +491,10 @@ public sealed partial class Game
             + $"and {p.RemainingNm.ToString("0.0", ci)} nm to {PortName(p.Route.To)}. "
             + $"{WeatherWords.WindPhrase(w)[..1].ToUpperInvariant()}{WeatherWords.WindPhrase(w)[1..]}, {Sea.StateWord(rules, Sea.SeaState(rules, w.WindForce))}. "
             + (canAnchor ? $"You could anchor: {near.Name} is {near.DistanceNm.ToString("0.0", ci)} nm {AheadOrAstern(near.AtNm, p.ProgressNm)}."
-                : $"{near.Name} is {near.DistanceNm.ToString("0.0", ci)} nm {AheadOrAstern(near.AtNm, p.ProgressNm)}.");
+                : $"{near.Name} is {near.DistanceNm.ToString("0.0", ci)} nm {AheadOrAstern(near.AtNm, p.ProgressNm)}.")
+            + (p.Ferry is { Told: true } waiting ? " " + Fill(Radio.Ferry.Waiting, ("ferry", waiting.Ferry)) : "");
         return new TripView(true, null, PortName(p.Route.From), PortName(p.Route.To), Math.Round(p.ProgressNm, 1), Math.Round(p.RemainingNm, 1),
-            mode, Math.Max(1, (int)Math.Ceiling((ClockMinutes - p.DepartClockMinutes) / 60.0 - 1e-9)), canAnchor, shelter, serves2, text);
+            mode, Math.Max(1, (int)Math.Ceiling((ClockMinutes - p.DepartClockMinutes) / 60.0 - 1e-9)), canAnchor, shelter, serves2, text,
+            null, VhfFitted, p.Ferry is { Told: true } call ? FerryCallLine(call) : null);
     }
 }

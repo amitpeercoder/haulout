@@ -114,6 +114,26 @@ def calendar_fields(rows):
     }
 
 
+def club_fields(rows):
+    """Design note 012: the club. Trace fields added in step 6 (ticketsHeld, vhfFitted, crewingDays, courseDays, examsPassed); a trace without them scores
+    no tickets, no set and zeros. The days and exams are the largest value seen, because the board is not readable at sea and a new year clears the cards."""
+    held = []
+    for r in rows:
+        if isinstance(r.get("ticketsHeld"), list):
+            held = r["ticketsHeld"]
+
+    def biggest(key):
+        return max([r.get(key, 0) for r in rows if isinstance(r.get(key, 0), int)] or [0])
+
+    return {
+        "tickets_held": held,
+        "vhf_fitted": "yes" if any(r.get("vhfFitted") for r in rows) else "no",
+        "crewing_days": biggest("crewingDays"),
+        "course_days": biggest("courseDays"),
+        "exam_passed": biggest("examsPassed"),
+    }
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     as_json = "--json" in argv
@@ -147,7 +167,7 @@ def main(argv):
             target = norm(a.get("component", a.get("item", "")))
             if target not in fixes:
                 decoys += 1
-    trip, seas, cal = trip_fields(rows), season_fields(rows), calendar_fields(rows)
+    trip, seas, cal, club = trip_fields(rows), season_fields(rows), calendar_fields(rows), club_fields(rows)
     m = re.match(r"\d{8}-\d{6}-(.+)\.trace\.jsonl$", os.path.basename(path))
     out = {
         "solved": "yes" if solved else "no",
@@ -158,7 +178,7 @@ def main(argv):
         "money": last.get("moneySpentNok", 0),
         "decoys": decoys,
         "rejected": sum(1 for r in upto if r.get("accepted") is False),
-        **trip, **seas, **cal,
+        **trip, **seas, **cal, **club,
         "goal_wants": "yes" if (trip["trip_goal"] == "yes" and cal["midsummer"] == "yes" and seas["hauled_out"] == "yes" and cal["kept"] == "yes") else "no",
         "model": m.group(1) if m else "unknown",
         "trace": path,
@@ -166,7 +186,9 @@ def main(argv):
     if as_json:
         print(json.dumps(out))
     else:
-        print(" ".join(f"{k}={v}" for k, v in out.items()))
+        # A list prints on one token: ticket names joined with "+", their spaces as "_".
+        show = {k: ("+".join(x.replace(" ", "_") for x in v) if isinstance(v, list) else v) for k, v in out.items()}
+        print(" ".join(f"{k}={v}" for k, v in show.items()))
     return 0
 
 

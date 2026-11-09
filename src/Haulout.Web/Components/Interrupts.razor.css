@@ -1,0 +1,17 @@
+.card {
+    border: 1px solid var(--amber);
+    padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem;
+    animation: fade-in 300ms ease-in-out;
+}
+.card h2 { font-family: var(--face-type); font-weight: normal; font-size: 1.1rem; }
+.card h3 { font-family: var(--face-type); font-weight: normal; font-size: 0.9rem; }
+.card.ferry { border-width: 2px; }
+.card.reader { border-color: var(--slate-soft); }
+.card .row { display: flex; gap: 0.5rem; align-items: center; }
+.card .options { display: flex; flex-direction: column; gap: 0.4rem; }
+.card .options button { text-align: left; }
+.card .letter { font-family: var(--face-type); margin-right: 0.3rem; }
+.card .faint { color: var(--ink-faint); font-size: 0.85rem; }
+.card h2 { color: var(--amber); }
+.reader { max-height: 24rem; overflow-y: auto; flex: 0 0 auto; }
+.reader .page { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #0003; padding-top: 0.4rem; }

@@ -22,6 +22,8 @@ public sealed class SystemValues
     /// <summary>Design note 010, second pass G: how wet the plotter's plug has been since the plotter was fitted, and how chafed the scanner cable since the radar was.</summary>
     public const string PlugWetness = "deck.plugWetness";
     public const string ScannerChafe = "mast.scannerChafe";
+    /// <summary>Design note 012, step 3: how wet the VHF antenna connector has been since the set was fitted.</summary>
+    public const string ConnectorWetness = "mast.connectorWetness";
 
     private readonly Dictionary<string, double> _values = new();
 

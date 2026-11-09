@@ -42,7 +42,8 @@ public sealed record ComponentSpec(
     string? ReplaceText = null,
     bool NeedsDry = false,
     bool Stocked = true,
-    bool NoPoorJob = false)
+    bool NoPoorJob = false,
+    bool Aloft = false)
 {
     public static ComponentSpec Default { get; } = new(
         Subsystem.Engine, "", [], [], "", null, null, 0, 0, new Dictionary<string, double>());

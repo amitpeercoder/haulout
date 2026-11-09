@@ -124,13 +124,13 @@ wait week
 wait week
 go cockpit
 check filter
+wait 3
+check filter
 calendar
 wait week
 go cockpit
 start
 fill tank
-check filter
-wait week
 check filter
 replace primary filter
 start

@@ -18,6 +18,8 @@ public sealed partial class Game
     private const string NavLightsId = "nav-lights";
     private const string PlotterId = "chartplotter";
     private const string RadarId = "radar";
+    private const string VhfId = "vhf-radio";
+    private const string ConnectorId = "vhf-antenna-connector";
     private const string AnchorId = "anchor-gear";
     private const string EmptyAlert = "The engine coughs and dies. The fuel gauge needle lies on empty.";
 
@@ -197,6 +199,8 @@ public sealed partial class Game
         if (pool.Count == 0) pool = rules.Narrations.ToList();
         var narration = pool[Math.Min(pool.Count - 1, (int)(pick * pool.Count))];
         bool ferry = reported && narration.Ferry;
+        // With a set aboard a ferry's close call is her call on channel 16 first (design note 012, step 3); the roll above is the same.
+        if (ferry && OfferFerryCall(p, rules, narration, day, whole, ferryPick)) return;
         p.CloseCalls.Add((narration.Text, ferry ? rules.ReportLine : null));
         if (ferry) _ferryReports++;
         if (ferry && rules.Letter) QueueLetter(rules, day, whole, ferryPick);
@@ -205,6 +209,8 @@ public sealed partial class Game
     /// <summary>Tells the close calls of the step in the narrative and the logbook (after the hour line).</summary>
     private void TellCloseCalls(Turn t, Passage p)
     {
+        // She made harbour in the hour the ferry called: there was no time to answer, and the close call is as it would have been.
+        if (_passage is null) ReleaseFerry(p);
         foreach (var (text, report) in p.CloseCalls)
         {
             string line = report is null ? text : $"{text} {report}";
@@ -213,12 +219,13 @@ public sealed partial class Game
             MarkTrack(text);
         }
         p.CloseCalls.Clear();
+        TellFerryCall(t, p);
     }
 
     // ------------------------------------------------------------------ the harbourmaster's letter
 
     /// <summary>A reported close call whose cause brings a letter, waiting for the morning post.</summary>
-    private sealed record PendingLetter(int Number, int PostedDay, string Text, string Alert, string Discovers);
+    private sealed record PendingLetter(int Number, int PostedDay, string Text, string Alert, string Discovers, int? Nok = null, string? BillText = null);
 
     private readonly List<PendingLetter> _letters = [];
     private int _lettersWritten;
@@ -250,8 +257,8 @@ public sealed partial class Game
         foreach (var letter in _letters.Where(l => l.PostedDay < today).ToList())
         {
             _letters.Remove(letter);
-            int nok = _boat.CloseCalls.LetterNok;
-            Spend(nok, LedgerBill, _boat.CloseCalls.LetterBillText);
+            int nok = letter.Nok ?? _boat.CloseCalls.LetterNok;
+            Spend(nok, LedgerBill, letter.BillText ?? _boat.CloseCalls.LetterBillText);
             _weekEvents.Add($"the harbourmaster's letter {Money(nok)}");
             Raise($"letter-{letter.Number}", letter.Alert, nok, onPassage: false);
             _log.Add(new LogEntry(Day, TimeOfDay, letter.Text, 0, $"letter {letter.Number}"));

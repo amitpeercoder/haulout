@@ -471,7 +471,8 @@ public class SaleTests
         Ok(Walk.Start(g));
         Ok(g.Execute(new Launch()));
         entries = Log(g).Entries.Count;
-        No(g.Execute(new ListForSale(150000)), "The broker sells her from the hard.");
+        // Step 5 (design note 012, decision 7): she can be listed afloat at Skjærvik, so the old refusal is gone; the zero price is still refused.
+        No(g.Execute(new ListForSale(0)), "Name a price above zero: list for sale <nok>.");
         Assert.Equal(entries, Log(g).Entries.Count);
         Assert.False(Sale(g).Listed);
     }
@@ -481,18 +482,18 @@ public class SaleTests
     {
         var g = Afloat(out _);
         Ok(g.Execute(new Depart()));
-        No(g.Execute(new ListForSale(150000)), "You're at sea.");
+        No(g.Execute(new ListForSale(150000)), "You're at sea: list her from Skjærvik or the yard.");
         No(g.Execute(new AcceptOffer()), "You're at sea.");
         No(g.Execute(new Keep()), "You're at sea.");
         MotorToArrival(g);                  // now at Hestholmen, afloat
         Walk.ToPlace(g, "cockpit");
-        No(g.Execute(new ListForSale(150000)), "The yard is at Skjærvik.");
+        No(g.Execute(new ListForSale(150000)), "The broker is at Skjærvik: bring her home to list her.");
     }
 
     // ------------------------------------------------------------------ the buyers
 
     [Fact]
-    public void Viewings_come_only_while_she_is_listed_and_on_the_hard()
+    public void Viewings_come_only_while_she_is_listed_and_afloat_ones_only_on_weekends()
     {
         var unlisted = Fresh();
         Wait(unlisted, 40);
@@ -504,9 +505,11 @@ public class SaleTests
         Prepare(g);
         Ok(Walk.Start(g));
         Ok(g.Execute(new Launch()));
+        // Afloat (step 5): a listing made on the hard stays, and a buyer comes at weekends only.
+        Assert.True(Sale(g).Listed);
         int before = Sale(g).Viewings.Count;
-        Wait(g, 20);
-        Assert.Equal(before, Sale(g).Viewings.Count);
+        Wait(g, 60);
+        Assert.All(Sale(g).Viewings.Skip(before), v => Assert.True(new Haulout.Sim.Time.GameClock(v.Day).IsWeekend, $"a viewing on day {v.Day}"));
     }
 
     [Fact]
@@ -959,7 +962,7 @@ public class SaleTests
     }
 
     [Fact]
-    public void Launch_withdraws_a_listing_with_a_line_and_the_offers_with_it()
+    public void Launch_leaves_a_listing_and_its_open_offers_in_place_and_says_so()
     {
         var g = Fresh();
         Prepare(g);
@@ -967,13 +970,14 @@ public class SaleTests
         WaitForOpenOffers(g, 1);
         Ok(Walk.Start(g));
         var r = Ok(g.Execute(new Launch()));
-        Assert.Contains("You tell the broker she's going back in the water: the listing is withdrawn, and the offers with it.", r.Narrative);
+        Assert.Contains("The broker is told she's back in the water: she stays listed, and viewings will be at the weekends.", r.Narrative);
+        Assert.True(Sale(g).Listed);
+        Assert.True(Season(g).Listed);
+        Assert.True(Season(g).OpenOffers >= 1);
+        Assert.Contains(Sale(g).Viewings, v => v.Open);
+        Assert.DoesNotContain(Log(g).Entries, e => e.Text.StartsWith("Took her off the market", StringComparison.Ordinal));
+        Ok(g.Execute(new Keep())); // Keep still withdraws it
         Assert.False(Sale(g).Listed);
-        Assert.False(Season(g).Listed);
-        Assert.Equal(0, Season(g).OpenOffers);
-        Assert.All(Sale(g).Viewings, v => Assert.False(v.Open));
-        Assert.Contains(Log(g).Entries, e => e.Text == "Took her off the market: the listing is withdrawn.");
-        No(g.Execute(new AcceptOffer()), "She isn't listed: list for sale <nok>.");
     }
 
     [Fact]

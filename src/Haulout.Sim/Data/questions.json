@@ -1,0 +1,788 @@
+{
+  "placeholders": [
+    "UNVERIFIED (design note 012, decision 8, step 2b): every question in this file is UNVERIFIED until Amit has read it. Each was checked by Claude against the sources named in 'source' and 'checked' (web search, 2026-11-09); several sources are secondary (boating sites, training pages, forums) because the regulators' own pages could not be fetched; article and appendix numbers of the ITU Radio Regulations were not read and are from memory. One wrong answer in this bank costs more trust than a wrong price.",
+    "Rules cited are the international collision regulations (COLREGs), the ITU Radio Regulations, the Beaufort scale and common seamanship; the game's world is fictional (Skjærvik, the ferry to Hestholmen) and the questions use only its own names.",
+    "Bank rule: a question whose answer never matters aboard is not in the bank. The radio questions are the ones the club's radio ticket asks of anyone who will use the VHF; the coastal questions are the weather line, the passage plan, the rules a sailing boat meets, and the faults the player meets on the boat.",
+    "UNVERIFIED book text: ship-to-ship working channel numbers are deliberately not given; the line on force 6 and force 7 for a 28-footer (reef early, stay in) is a seamanship judgement for Amit to correct; the line 'the coast radio reports a call made without the ticket' is design note 012 decision 4, not a real rule.",
+    "Format: 'answer' is the letter of the right option (never shown to the player); 'bookPage' is the 1-based page of the course book that teaches the answer."
+  ],
+  "books": [
+    {
+      "ticket": "radio",
+      "title": "The radio course book",
+      "aliases": [
+        "radio course book",
+        "radio book",
+        "radio course manual"
+      ],
+      "handedLine": "The club secretary hands you the radio course book.",
+      "pages": [
+        {
+          "number": 1,
+          "title": "Channel 16 and channel 70",
+          "text": "Channel 16 is the calling and distress channel. It is for four things only: distress, urgency, safety and calling. A call on 16 is how you reach another station for the first time; it is never the place to chat.\n\nChannel 70 is different. It carries digital selective calling, the DSC alerts that radios send to each other as data. You never speak on channel 70: it is for digital alerts only, not for voice."
+        },
+        {
+          "number": 2,
+          "title": "Calling, and the working channels",
+          "text": "To call a station, say its name up to three times, then \"this is\", then your own boat's name: \"Skjærvik harbour, Skjærvik harbour, Skjærvik harbour, this is sailing yacht Marit, Marit, Marit, over.\"\n\nWhen the station answers, do not carry on talking on 16. Agree a working channel and both of you switch to it. That keeps 16 free for the next distress call or the next stranger trying to reach someone. Ship-to-ship working channels are set aside for talk between boats; the harbour office names its own working channel when it answers.\n\nA radio check, to find out whether your set works, is made on a working channel and never on 16: call a friendly station and ask for a radio check. If it answers \"loud and clear\", it is receiving you strongly and you can be understood. If it says weak or unreadable, check the aerial, the plug and the power setting, and ask again."
+        },
+        {
+          "number": 3,
+          "title": "Over, out and the alphabet",
+          "text": "Say \"over\" when you have finished speaking and expect a reply. Say \"out\" when the conversation is finished and no reply is wanted. They mean opposite things, so do not say \"over and out\".\n\nWhen a name or a call sign must be understood over a poor signal, spell it with the phonetic alphabet: Alfa, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliett, Kilo, Lima, Mike, November, Oscar, Papa, Quebec, Romeo, Sierra, Tango, Uniform, Victor, Whiskey, X-ray, Yankee, Zulu. Kvitnes is Kilo Victor India Tango November Echo Sierra."
+        },
+        {
+          "number": 4,
+          "title": "The licence",
+          "text": "A VHF radio may be used only by someone who holds the operator's certificate: here, the radio ticket, which this course earns. The boat needs a call sign as well, from her ship radio licence (which is not one of your tickets); it gives her the call sign and an MMSI, the nine-digit number her radio sends in a DSC alert.\n\nWithout the ticket you may not make a call, and the coast radio reports a call made without one."
+        },
+        {
+          "number": 5,
+          "title": "Mayday, Pan-Pan and Sécurité",
+          "text": "Three words say how serious a call is. Each is said three times, and a call that begins with one of them begins on channel 16.\n\nMAYDAY is distress: grave and imminent danger to a person or to the boat, and immediate help needed. A fire, a boat sinking, a person lost overboard whom you cannot recover. Use the word for nothing else, not even in conversation.\n\nPAN-PAN is urgency: a message about the safety of a person or of the boat, but no immediate danger. An engine failed and the boat drifting toward rocks, but with time still in hand.\n\nSÉCURITÉ is safety: a message about the safety of navigation, such as a warning of a hazard, or a weather warning."
+        },
+        {
+          "number": 6,
+          "title": "The Mayday message",
+          "text": "With no DSC, send the call by voice on channel 16, in this order:\n1. MAYDAY, MAYDAY, MAYDAY.\n2. This is sailing yacht Marit, Marit, Marit: your boat's name three times.\n3. Your call sign and MMSI.\n4. MAYDAY, Marit: once more.\n5. Your position: latitude and longitude, or a bearing and distance from a mark, or \"position unknown\".\n6. The nature of your distress: sinking, fire, collision.\n7. The help you need: \"I require immediate assistance.\"\n8. The number of people on board.\n9. Anything else that helps: the boat's length and colour, a liferaft.\n10. \"Over.\"\n\nSpeak slowly and clearly. The order is easy to lose under stress, so learn it: Mayday, identity, position, distress, assistance, number on board, other information, over."
+        },
+        {
+          "number": 7,
+          "title": "The DSC alert, and keeping silent",
+          "text": "A DSC radio has a red distress button under a cover. Lift the cover, press it and hold it until the radio confirms it has sent the alert. The alert goes out on channel 70 as data: your boat's identity (the MMSI), your position if the radio is wired to a position receiver, the time and, if you chose one, the nature of the distress. It repeats until another station acknowledges it.\n\nThe radio then switches to channel 16. Wait a few seconds, then send the voice Mayday call and message as on the page before: the alert does not replace the voice call.\n\nWhen you hear a Mayday that is not yours, stay silent. Distress traffic has priority over everything else: listen on the channel and do not call the boat or carry on with your own talk."
+        }
+      ]
+    },
+    {
+      "ticket": "coastal",
+      "title": "The coastal skipper course book",
+      "aliases": [
+        "coastal course book",
+        "coastal book",
+        "coastal skipper course book",
+        "coastal skipper book"
+      ],
+      "handedLine": "The club secretary hands you the coastal skipper course book.",
+      "pages": [
+        {
+          "number": 1,
+          "title": "Lights at night",
+          "text": "Red to port, green to starboard, white astern. A boat shows a red light on her port (left) side and a green light on her starboard (right) side. Each sidelight shines over 112.5 degrees, from straight ahead to 22.5 degrees abaft the beam. A white sternlight shines over the remaining 135 degrees astern. A power-driven boat adds a white masthead light shining forward over 225 degrees, the same arc as the two sidelights together.\n\nSo a red light on its own means you are looking at the other boat's port side; green, her starboard side; white, her stern."
+        },
+        {
+          "number": 2,
+          "title": "Under sail and under power",
+          "text": "A sailing boat under sail shows the sidelights and the sternlight and no white masthead light. (On a boat under 20 metres the three may be combined in one lantern at the top of the mast.)\n\nWhen she runs her engine she is a power-driven boat in the rules, even with the sails up: at night she shows the masthead light as well, and by day she hangs a black cone, point down, forward where it can best be seen (a boat under 12 metres need not). Motor-sailing counts as motoring."
+        },
+        {
+          "number": 3,
+          "title": "Who gives way",
+          "text": "Two sailing boats, wind on opposite sides: the boat with the wind on her port side (on port tack) keeps clear. If you are on port tack and cannot tell which side the other has her wind, keep clear.\n\nTwo sailing boats on the same tack: the windward boat, the one nearer the wind, keeps clear of the leeward boat.\n\nOvertaking: any boat that overtakes keeps clear of the boat she overtakes, sail or power. A boat is overtaking if she comes up from more than 22.5 degrees abaft the other's beam, where she would see only the other's sternlight.\n\nPower and sail: a power-driven boat keeps clear of a sailing boat. The exceptions are boats that can only navigate inside a narrow channel: a sailing boat must not get in their way. The ferry that runs the channel to Hestholmen is one. A boat fishing, or not under command, also has the right of way over a boat under sail.\n\nTwo power-driven boats meeting head-on both alter course to starboard and pass port to port. Two power-driven boats crossing: the one that has the other on her starboard side keeps clear, and must not cross ahead of her."
+        },
+        {
+          "number": 4,
+          "title": "Seeing the danger",
+          "text": "Keep a lookout all the time, by eye and by ear. To tell whether an approaching boat is a danger, take a compass bearing on her and take it again: if the bearing does not change appreciably while she comes nearer, there is a risk of collision, and you should assume it.\n\nWhen you act, act early, and make the change large and bold, so that the other boat can see at once what you have done. A string of small alterations is not seen.\n\nIn sight of another boat a power-driven boat may sound her intentions: one short blast means \"I am altering my course to starboard\"; two short blasts, \"I am altering my course to port\"; three short blasts, \"my engine is going astern\". At least five short and rapid blasts mean you doubt what the other boat is doing."
+        },
+        {
+          "number": 5,
+          "title": "Fog signals",
+          "text": "In fog, slow down and sound your signal at intervals of not more than two minutes. A prolonged blast is a long one, four to six seconds.\n\nA power-driven boat making way through the water: one prolonged blast.\n\nA power-driven boat underway but stopped, making no way: two prolonged blasts in succession, about two seconds apart.\n\nA sailing boat (and a boat fishing, or towing): one prolonged blast followed by two short blasts, the same every two minutes. Whatever you are, keep a lookout and listen."
+        },
+        {
+          "number": 6,
+          "title": "The weather",
+          "text": "The Beaufort scale gives the wind a force. Force 4, moderate breeze: 11 to 16 knots. Force 5, fresh breeze: 17 to 21 knots. Force 6, strong breeze: 22 to 27 knots. Force 7, near gale: 28 to 33 knots. Force 8, gale: 34 to 40 knots. On a 28-footer force 6 is a day to reef early or stay in, with the sea turning short and steep; force 7 is a day for harbour.\n\nFog at sea forms when warm, damp air passes over a colder sea and is cooled to its dew point. The weather line gives both numbers. When the dew point is at or above the sea temperature, fog is likely if the wind is light. When the sea is many degrees warmer than the dew point, as with a dew point of 6 and a sea of 13, the air is not cooled to its dew point and there will be no fog.\n\nA lee shore is a shore that the wind blows onto. If the engine fails or the boat will not claw off, the wind sets her onto it. Keep sea room, and plan so that you can get away from it, to windward or into shelter."
+        },
+        {
+          "number": 7,
+          "title": "The passage plan",
+          "text": "Before you cast off, plan the passage, and write it down. The distance and the time. The forecast for the whole window, not only for the start: the weather line, and the days after. Daylight: when it gets dark, and whether you will arrive after dark. Fuel: the rule of thirds, a third to get there, a third to get back and a third in reserve, worked from the litres an hour the engine burns; the trip plan tells you the litres needed and the litres aboard. The tide, where it matters.\n\nA bolt hole: a harbour or an anchorage you can reach if the plan goes wrong. The trip plan names the shelter on the way. And tell someone ashore where you are going and when you expect to be back."
+        },
+        {
+          "number": 8,
+          "title": "The engine",
+          "text": "A voltage drop is what a meter reads across one connection while current flows through it: a terminal clamp, a cable end. With the starter cranking, a good connection reads almost nothing. A reading of a volt or more across a single clamp means resistance there, corrosion or a loose clamp, and the voltage is being lost as heat in it. Clean it and tighten it.\n\nWatch the exhaust water. At every start, look for water at the outlet. A weak flow comes first: the raw-water impeller or the intake is failing. The overheat alarm comes later, when the damage has begun, so a weak flow is the time to stop and look, not the alarm.\n\nWater in the fuel is heavier than diesel and settles in the bowl of the primary filter. Drain the bowl and look. In a seaway the tank is stirred up and the water reaches the filter: the engine fires and dies just when you need it. A bowl with water in it means water in the tank, so drain it again on other days and then fit a new element. Keeping the tank full leaves no room for damp air to condense."
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "radio-1",
+      "ticket": "radio",
+      "text": "What is channel 16 for?",
+      "options": [
+        "Chat between friendly boats",
+        "Distress, urgency, safety and calling",
+        "Weather forecasts and tide times only",
+        "Booking a berth with the harbour"
+      ],
+      "answer": "b",
+      "bookPage": 1,
+      "source": "ITU Radio Regulations Appendix 18 (VHF maritime channels); https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net guide: 16 is for distress, safety and initial contact, 'not the channel for conversation'. Appendix 18 itself not read."
+    },
+    {
+      "id": "radio-2",
+      "ticket": "radio",
+      "text": "You have called a boat on channel 16 and it has answered. What do you do next?",
+      "options": [
+        "Carry on talking on channel 16",
+        "Switch to channel 70 and talk there",
+        "Say 'out' and call again on 16",
+        "Agree a working channel and both switch to it"
+      ],
+      "answer": "d",
+      "bookPage": 2,
+      "source": "RYA SRC syllabus (calling procedure); https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net guide: 'Initiate on 16; move to a working channel; complete the conversation; close the contact.'"
+    },
+    {
+      "id": "radio-3",
+      "ticket": "radio",
+      "text": "What is channel 70 used for?",
+      "options": [
+        "Calling ferries and the harbour",
+        "Voice calls to the coast radio",
+        "Digital selective calling alerts, never voice",
+        "Weather forecasts"
+      ],
+      "answer": "c",
+      "bookPage": 3,
+      "source": "ITU Radio Regulations Appendix 18 (channel 70, DSC); https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net table: 70 is 'DSC digital distress (do not voice transmit)'."
+    },
+    {
+      "id": "radio-4",
+      "ticket": "radio",
+      "text": "When may you say MAYDAY?",
+      "options": [
+        "When a person or the boat is in grave and imminent danger and needs immediate help",
+        "Whenever you want to be heard quickly",
+        "When the engine fails in a calm harbour",
+        "At the start of every call on 16"
+      ],
+      "answer": "a",
+      "bookPage": 5,
+      "source": "ITU Radio Regulations Article 33 (distress); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: 'Grave and Imminent Danger to a Person, Ship ... Requiring Immediate Assistance'; the word is only for distress. Article number from memory, not read."
+    },
+    {
+      "id": "radio-5",
+      "ticket": "radio",
+      "text": "What is a PAN-PAN call for?",
+      "options": [
+        "Grave and imminent danger needing immediate help",
+        "An urgent message about the safety of a person or the boat, but not an immediate danger",
+        "A warning of a navigational hazard",
+        "A radio check"
+      ],
+      "answer": "b",
+      "bookPage": 5,
+      "source": "ITU Radio Regulations Article 33 (urgency); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org and sea.net: urgency, 'urgent but not immediately life-threatening'."
+    },
+    {
+      "id": "radio-6",
+      "ticket": "radio",
+      "text": "What does a call beginning SÉCURITÉ introduce?",
+      "options": [
+        "A distress message from another boat",
+        "A request for a radio check",
+        "A message about the safety of navigation, such as a hazard or a weather warning",
+        "A message from the harbourmaster about your berth"
+      ],
+      "answer": "c",
+      "bookPage": 5,
+      "source": "ITU Radio Regulations Article 33 (safety); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: 'Transmissions concerning the safety of navigation are prefixed with SECURITE.'"
+    },
+    {
+      "id": "radio-7",
+      "ticket": "radio",
+      "text": "How does a voice Mayday call begin?",
+      "options": [
+        "MAYDAY three times, then the boat's name three times",
+        "MAYDAY once, then your position",
+        "The boat's name once, then MAYDAY once",
+        "PAN-PAN three times, then MAYDAY once"
+      ],
+      "answer": "a",
+      "bookPage": 6,
+      "source": "ITU Radio Regulations Article 32 (distress call); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: 'Mayday three times, then your vessel's name three times'; sea.net agrees. Article number from memory."
+    },
+    {
+      "id": "radio-8",
+      "ticket": "radio",
+      "text": "In a Mayday message, what comes straight after your boat's name, call sign and MMSI?",
+      "options": [
+        "The nature of your distress",
+        "The number of people on board",
+        "The word 'over'",
+        "Your position"
+      ],
+      "answer": "d",
+      "bookPage": 6,
+      "source": "UK GMDSS distress procedure (RYA SRC syllabus); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org order: names, call sign and MMSI, 'Mayday' once with the name once, then position, nature of distress, assistance, people on board, other information, 'Over'."
+    },
+    {
+      "id": "radio-9",
+      "ticket": "radio",
+      "text": "After the nature of the distress, which two things does a Mayday message give?",
+      "options": [
+        "The harbour you left, and the time",
+        "The help you need, and the number of people on board",
+        "A radio check, and the weather",
+        "Your fuel, and your insurer"
+      ],
+      "answer": "b",
+      "bookPage": 6,
+      "source": "UK GMDSS distress procedure (RYA SRC syllabus); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org list: nature of distress, 'I require immediate assistance', total number of people on board, other useful information."
+    },
+    {
+      "id": "radio-10",
+      "ticket": "radio",
+      "text": "What does a DSC distress alert carry?",
+      "options": [
+        "Only the word Mayday",
+        "A voice message of fifteen seconds",
+        "Your boat's identity (MMSI), position and time, and the nature of the distress if you chose one",
+        "The names of your crew"
+      ],
+      "answer": "c",
+      "bookPage": 7,
+      "source": "ITU Radio Regulations Appendix 18 / RYA SRC syllabus; https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: data burst on 70 'with your MMSI, position, time, and nature of distress (if selected)'."
+    },
+    {
+      "id": "radio-11",
+      "ticket": "radio",
+      "text": "You have sent a DSC distress alert. What do you do next?",
+      "options": [
+        "Send the voice Mayday call and message on channel 16",
+        "Nothing, the alert is enough",
+        "Send a PAN-PAN on channel 70",
+        "Switch the radio off to save the battery"
+      ],
+      "answer": "a",
+      "bookPage": 7,
+      "source": "UK GMDSS distress procedure (RYA SRC syllabus); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: after the alert the screen switches to 16; wait 15 seconds, then give the voice call and message. soundingsonline.com agrees: the alert does not replace the voice call."
+    },
+    {
+      "id": "radio-12",
+      "ticket": "radio",
+      "text": "How do you open a routine call to the harbour?",
+      "options": [
+        "Your own boat's name, then the harbour's name, then 'over and out'",
+        "MAYDAY, then the harbour's name",
+        "Your name only, once, and then silence",
+        "The harbour's name, then 'this is' and your own boat's name"
+      ],
+      "answer": "d",
+      "bookPage": 2,
+      "source": "ITU Radio Regulations Article 52 (calling); https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net guide: say the called vessel's name three times, then 'this is' and your own name. Article number from memory."
+    },
+    {
+      "id": "radio-13",
+      "ticket": "radio",
+      "text": "Where do you make a radio check?",
+      "options": [
+        "On channel 16, so that everyone hears it",
+        "On channel 70, so that it is digital",
+        "On a working channel, not on channel 16",
+        "At the start of every call"
+      ],
+      "answer": "c",
+      "bookPage": 2,
+      "source": "RYA SRC syllabus; UK Coastguard guidance; https://www.sailboat-cruising.com/correct-VHF-radio-procedure.html",
+      "checked": "Several boating sites agree (search 2026-11): not on 16, on an open working channel. Not read at the regulator's own page."
+    },
+    {
+      "id": "radio-14",
+      "ticket": "radio",
+      "text": "Another boat answers your radio check: 'loud and clear'. What does that tell you?",
+      "options": [
+        "It receives you strongly and can understand you",
+        "Your papers are in order",
+        "You must move to channel 70",
+        "You must repeat the check on 16"
+      ],
+      "answer": "a",
+      "bookPage": 2,
+      "source": "RYA SRC syllabus (radio check); https://www.bwsailing.com/bw/vhf-operations/",
+      "checked": "Informal sources only (boating sites, forums): replies like 'loud and clear', 'weak but readable'. UNVERIFIED against the syllabus."
+    },
+    {
+      "id": "radio-15",
+      "ticket": "radio",
+      "text": "What does 'over' mean on the radio?",
+      "options": [
+        "The conversation is finished",
+        "I have finished speaking and expect a reply",
+        "This is an emergency",
+        "Switch to channel 16"
+      ],
+      "answer": "b",
+      "bookPage": 3,
+      "source": "ITU Radio Regulations Appendix 14 / ICAO radiotelephony procedure; https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net: 'over' ends a transmission that expects a reply."
+    },
+    {
+      "id": "radio-16",
+      "ticket": "radio",
+      "text": "What does 'out' mean on the radio?",
+      "options": [
+        "I have finished speaking and expect a reply",
+        "Say that again",
+        "I am switching to a working channel",
+        "The conversation is finished and no reply is wanted"
+      ],
+      "answer": "d",
+      "bookPage": 3,
+      "source": "ICAO radiotelephony procedure; https://www.sea.net/education/vhf-radio-guide",
+      "checked": "sea.net: 'out' ends the conversation; a boating site notes 'over and out' is contradictory."
+    },
+    {
+      "id": "radio-17",
+      "ticket": "radio",
+      "text": "What do you need to use a VHF radio on your boat?",
+      "options": [
+        "Nothing, if you stay in harbour",
+        "Only the licence to handle the boat",
+        "The radio ticket, and a call sign for the boat",
+        "The coastal skipper ticket"
+      ],
+      "answer": "c",
+      "bookPage": 4,
+      "source": "Ofcom, Ships' radio licence and operator's certificate; https://www.ofcom.org.uk/manage-your-licence/radiocommunication-licences/ships-radio",
+      "checked": "Ofcom/ybw.com: ship licence with call sign and MMSI, operator holds the SRC. UK rule; the game's rule is Amit's (design note 012)."
+    },
+    {
+      "id": "radio-18",
+      "ticket": "radio",
+      "text": "Why do you spell a boat's name or call sign with the phonetic alphabet?",
+      "options": [
+        "So that nobody else can understand it",
+        "So that the letters are not misheard over a poor signal",
+        "Because every word on the radio must be spelled",
+        "Because it is quicker"
+      ],
+      "answer": "b",
+      "bookPage": 3,
+      "source": "ITU Radio Regulations Appendix 14 (spelling alphabet); https://www.qsl.net/sccarc/file/itu.htm",
+      "checked": "The spelling alphabet's use stated in several sources; the word list matches the ICAO list."
+    },
+    {
+      "id": "radio-19",
+      "ticket": "radio",
+      "text": "In the phonetic alphabet, which word stands for the letter K?",
+      "options": [
+        "Kilo",
+        "Karl",
+        "King",
+        "Kappa"
+      ],
+      "answer": "a",
+      "bookPage": 3,
+      "source": "ITU Radio Regulations Appendix 14 / ICAO spelling alphabet; https://en.wikipedia.org/wiki/NATO_phonetic_alphabet",
+      "checked": "Word list checked in search results (Alfa ... Kilo ... Zulu)."
+    },
+    {
+      "id": "radio-20",
+      "ticket": "radio",
+      "text": "You hear a Mayday from a boat that is not yours. What do you do?",
+      "options": [
+        "Call the boat for details",
+        "Carry on with your own call on 16",
+        "Send a PAN-PAN",
+        "Stay silent and listen on the channel"
+      ],
+      "answer": "d",
+      "bookPage": 7,
+      "source": "ITU Radio Regulations Article 33 (silence); https://portreath-harbour.org/distress-proceedures",
+      "checked": "portreath-harbour.org: all stations hearing a Mayday must cease transmitting and keep listening; distress calls take priority."
+    },
+    {
+      "id": "coastal-1",
+      "ticket": "coastal",
+      "text": "At night you can see only a red light on another boat. Which side of her are you looking at?",
+      "options": [
+        "Her starboard side",
+        "Her stern",
+        "Her port side",
+        "Her bow"
+      ],
+      "answer": "c",
+      "bookPage": 1,
+      "source": "COLREGs Rule 21 and Rule 22; https://www.cultofsea.com/colregs/part-c-lights-and-shapes-rules-20-31/rule-21-definitions",
+      "checked": "Arcs and colours confirmed in search results: green starboard, red port, white astern."
+    },
+    {
+      "id": "coastal-2",
+      "ticket": "coastal",
+      "text": "Over what arc does the white sternlight shine?",
+      "options": [
+        "135 degrees",
+        "112.5 degrees",
+        "225 degrees",
+        "360 degrees"
+      ],
+      "answer": "a",
+      "bookPage": 1,
+      "source": "COLREGs Rule 21(c); https://ialacolreg.com/en/colreg/rule-21",
+      "checked": "Search results (ialacolreg.com, flashcards): sternlight covers the remaining 135 degrees; sidelights 112.5 each; masthead 225."
+    },
+    {
+      "id": "coastal-3",
+      "ticket": "coastal",
+      "text": "A boat shows a white light over 225 degrees ahead, as well as her sidelights and sternlight. What is she?",
+      "options": [
+        "A sailing boat under sail",
+        "A boat at anchor",
+        "A power-driven boat",
+        "A boat fishing"
+      ],
+      "answer": "c",
+      "bookPage": 1,
+      "source": "COLREGs Rule 23 and Rule 21(a); https://ialacolreg.com/en/colreg/rule-21",
+      "checked": "The masthead light shares the 225 degree forward arc; a sailing vessel shows no masthead light (Rule 25), per search results."
+    },
+    {
+      "id": "coastal-4",
+      "ticket": "coastal",
+      "text": "A sailing boat under sail at night shows:",
+      "options": [
+        "A white masthead light and a sternlight only",
+        "Sidelights and a sternlight, and no white masthead light",
+        "A white masthead light and sidelights",
+        "A single all-round white light"
+      ],
+      "answer": "b",
+      "bookPage": 2,
+      "source": "COLREGs Rule 25(a); https://www.cultofsea.com/colregs/part-c-lights-and-shapes-rules-20-31/rule-25-sailing-vessels-underway-and-vessels-under-oars",
+      "checked": "cultofsea.com / ialacolreg.com: 'A sailing vessel underway shall exhibit sidelights and a sternlight.'"
+    },
+    {
+      "id": "coastal-5",
+      "ticket": "coastal",
+      "text": "By day a sailing boat has her sails up and her engine running. What does she hang forward?",
+      "options": [
+        "A black cone, point down",
+        "A black cone, point up",
+        "A black ball",
+        "Nothing: she is sailing"
+      ],
+      "answer": "a",
+      "bookPage": 2,
+      "source": "COLREGs Rule 25(e); https://www.cultofsea.com/colregs/part-c-lights-and-shapes-rules-20-31/rule-25-sailing-vessels-underway-and-vessels-under-oars",
+      "checked": "Search results: a sailing vessel also propelled by machinery shows forward a conical shape, apex downwards; under 12 m not required."
+    },
+    {
+      "id": "coastal-6",
+      "ticket": "coastal",
+      "text": "Two sailing boats meet, one with the wind on her port side and one on her starboard. Which keeps clear?",
+      "options": [
+        "The one with the wind on her starboard side",
+        "The one with the wind on her port side",
+        "The faster one",
+        "The one nearer the shore"
+      ],
+      "answer": "b",
+      "bookPage": 3,
+      "source": "COLREGs Rule 12(a)(i); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-12-sailing-vessels",
+      "checked": "Wikipedia COLREGs summary: the vessel with the wind on its port side keeps out of the way."
+    },
+    {
+      "id": "coastal-7",
+      "ticket": "coastal",
+      "text": "Two sailing boats are on the same tack. Which keeps clear?",
+      "options": [
+        "The leeward boat",
+        "The smaller boat",
+        "The one that is overtaking",
+        "The windward boat"
+      ],
+      "answer": "d",
+      "bookPage": 3,
+      "source": "COLREGs Rule 12(a)(ii); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-12-sailing-vessels",
+      "checked": "Wikipedia COLREGs summary: when both have the wind on the same side, the windward vessel keeps out of the way."
+    },
+    {
+      "id": "coastal-8",
+      "ticket": "coastal",
+      "text": "A motor boat comes up astern of your sailing boat and means to pass. Who keeps clear?",
+      "options": [
+        "You, because she is power-driven",
+        "Neither: both alter to starboard",
+        "The motor boat, because she is overtaking",
+        "You, because she is faster"
+      ],
+      "answer": "c",
+      "bookPage": 3,
+      "source": "COLREGs Rule 13(a); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-13-overtaking",
+      "checked": "Wikipedia: the overtaking vessel keeps clear; for sailing vessels Rule 13 takes precedence over Rules 12 and 18."
+    },
+    {
+      "id": "coastal-9",
+      "ticket": "coastal",
+      "text": "You are under sail in the narrow channel to Hestholmen and the ferry, which can only navigate inside it, comes up. Who must not get in the other's way?",
+      "options": [
+        "You must not impede the ferry",
+        "The ferry, because you are under sail",
+        "Neither: both alter to starboard",
+        "The ferry, because you are smaller"
+      ],
+      "answer": "a",
+      "bookPage": 3,
+      "source": "COLREGs Rule 9(b) and Rule 18(a); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-18-responsibilities-between-vessels",
+      "checked": "Wikipedia: a sailing vessel must not impede a vessel that can navigate only within a narrow channel; Rule 18(a) keeps Rule 9 above the sail-over-power rule."
+    },
+    {
+      "id": "coastal-10",
+      "ticket": "coastal",
+      "text": "A motor boat and a sailing boat meet in open water. Which keeps clear?",
+      "options": [
+        "The sailing boat",
+        "The motor boat",
+        "The one on the left",
+        "The slower one"
+      ],
+      "answer": "b",
+      "bookPage": 3,
+      "source": "COLREGs Rule 18(a); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-18-responsibilities-between-vessels",
+      "checked": "Rule 18(a) text fetched: a power-driven vessel underway shall keep out of the way of a sailing vessel (except where Rules 9, 10 and 13 require otherwise)."
+    },
+    {
+      "id": "coastal-11",
+      "ticket": "coastal",
+      "text": "Two power-driven boats meet head-on. What does each do?",
+      "options": [
+        "Alters course to port",
+        "The slower keeps clear",
+        "Alters course to starboard and passes port to port",
+        "Holds her course and sounds five short blasts"
+      ],
+      "answer": "c",
+      "bookPage": 3,
+      "source": "COLREGs Rule 14(a); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-14-head-on-situation",
+      "checked": "Wikipedia: both alter course to starboard so as to pass port to port."
+    },
+    {
+      "id": "coastal-12",
+      "ticket": "coastal",
+      "text": "You take a compass bearing of an approaching boat, and a minute later it has not changed. What does that tell you?",
+      "options": [
+        "She will pass clear astern",
+        "She is slowing down",
+        "Nothing: a bearing means nothing without radar",
+        "There is a risk of collision"
+      ],
+      "answer": "d",
+      "bookPage": 4,
+      "source": "COLREGs Rule 7(d)(i); https://www.cultofsea.com/colregs/part-b-steering-and-sailing-rules-rules-4-19/rule-7-risk-of-collision",
+      "checked": "Rule 7(d)(i) text fetched: risk shall be deemed to exist if the compass bearing of an approaching vessel does not appreciably change."
+    },
+    {
+      "id": "coastal-13",
+      "ticket": "coastal",
+      "text": "You decide to alter course to avoid a collision. How?",
+      "options": [
+        "Early, with a large and bold alteration the other boat can see",
+        "Late, to be sure she has not changed course",
+        "With a string of small alterations",
+        "By sounding five short blasts and holding on"
+      ],
+      "answer": "a",
+      "bookPage": 4,
+      "source": "COLREGs Rule 8(b); https://en.wikipedia.org/wiki/International_Regulations_for_Preventing_Collisions_at_Sea",
+      "checked": "Wikipedia summary of Rule 8: 'a large and bold angle of course alteration'. Rule text not read in full."
+    },
+    {
+      "id": "coastal-14",
+      "ticket": "coastal",
+      "text": "A power-driven boat in sight sounds one short blast. What does it mean?",
+      "options": [
+        "I am altering my course to port",
+        "I am altering my course to starboard",
+        "My engine is going astern",
+        "I doubt what you are doing"
+      ],
+      "answer": "b",
+      "bookPage": 4,
+      "source": "COLREGs Rule 34(a)(i); https://www.ialacolreg.com/en/colreg/rule-34",
+      "checked": "Fetched: one short = starboard, two short = port, three short = astern; five short and rapid = doubt (34(d))."
+    },
+    {
+      "id": "coastal-15",
+      "ticket": "coastal",
+      "text": "In fog your engine is running and you are making way. What do you sound, at least every two minutes?",
+      "options": [
+        "One prolonged blast",
+        "Two prolonged blasts",
+        "One prolonged and two short blasts",
+        "Five short blasts"
+      ],
+      "answer": "a",
+      "bookPage": 5,
+      "source": "COLREGs Rule 35(a); https://www.cultofsea.com/colregs/part-d-sound-and-light-signals-rules-32-37/rule-35-sound-signals-in-restricted-visibility",
+      "checked": "Rule 35(a) text fetched: one prolonged blast at intervals of not more than 2 minutes."
+    },
+    {
+      "id": "coastal-16",
+      "ticket": "coastal",
+      "text": "In fog you are under sail. What do you sound, at least every two minutes?",
+      "options": [
+        "One prolonged blast",
+        "Two prolonged blasts",
+        "Three short blasts",
+        "One prolonged blast followed by two short blasts"
+      ],
+      "answer": "d",
+      "bookPage": 5,
+      "source": "COLREGs Rule 35(c); https://www.cultofsea.com/colregs/part-d-sound-and-light-signals-rules-32-37/rule-35-sound-signals-in-restricted-visibility",
+      "checked": "Rule 35(c) text fetched: sailing vessel (with NUC, RAM, fishing ...) sounds one prolonged followed by two short."
+    },
+    {
+      "id": "coastal-17",
+      "ticket": "coastal",
+      "text": "What wind speed is force 6 on the Beaufort scale?",
+      "options": [
+        "11 to 16 knots",
+        "17 to 21 knots",
+        "22 to 27 knots",
+        "34 to 40 knots"
+      ],
+      "answer": "c",
+      "bookPage": 6,
+      "source": "Beaufort scale, Met Office; https://metoffice.gov.uk/guide/weather/marine/beaufort-scale",
+      "checked": "Met Office table via search: force 6 strong breeze 22-27 kt."
+    },
+    {
+      "id": "coastal-18",
+      "ticket": "coastal",
+      "text": "What is the top of force 4 on the Beaufort scale?",
+      "options": [
+        "16 knots",
+        "11 knots",
+        "21 knots",
+        "27 knots"
+      ],
+      "answer": "a",
+      "bookPage": 6,
+      "source": "Beaufort scale, Met Office; https://metoffice.gov.uk/guide/weather/marine/beaufort-scale",
+      "checked": "Met Office table via search: force 4 moderate breeze 11-16 kt."
+    },
+    {
+      "id": "coastal-19",
+      "ticket": "coastal",
+      "text": "The weather line says: dew point 6, sea 13. What does it tell you about fog?",
+      "options": [
+        "Fog is likely: the sea is warm",
+        "None is likely: the sea is far warmer than the dew point",
+        "Fog is certain in the morning",
+        "Nothing, fog depends only on the wind"
+      ],
+      "answer": "b",
+      "bookPage": 6,
+      "source": "Met Office / Bureau of Meteorology notes on sea fog; https://www.bom.gov.au/aviation/data/education/hwp-fog.pdf",
+      "checked": "Search: sea fog forms when warm, moist air is cooled to its dew point over a colder sea; if the dew point is below the sea temperature fog is unlikely. The game's own fog margin is in weather.json."
+    },
+    {
+      "id": "coastal-20",
+      "ticket": "coastal",
+      "text": "What is a lee shore?",
+      "options": [
+        "A shore that the wind blows onto",
+        "A shore with no wind",
+        "A shore that is always sheltered",
+        "A shore with a lighthouse"
+      ],
+      "answer": "a",
+      "bookPage": 6,
+      "source": "RYA Day Skipper / Coastal Skipper theory; https://en.wikipedia.org/wiki/Lee_shore",
+      "checked": "Sources agree: the shore on the lee side of a vessel, the wind blowing toward it; keep sea room."
+    },
+    {
+      "id": "coastal-21",
+      "ticket": "coastal",
+      "text": "For a passage you work out the fuel by the rule of thirds. What is it?",
+      "options": [
+        "A third now, a third at the half way, a third in the tank at the end",
+        "Enough for a third of the passage under power",
+        "A third to go, a third to come back, a third in reserve",
+        "A third of the tank for the engine, the rest for the stove"
+      ],
+      "answer": "c",
+      "bookPage": 7,
+      "source": "RYA Passage Planning (Chennell); https://www.boattests101.com/united-states/boating-resources/trip-planning-and-preparation/fueling-procedures",
+      "checked": "boattests101.com via search: outbound third, return third, emergency reserve third. A rule of thumb, not a regulation."
+    },
+    {
+      "id": "coastal-22",
+      "ticket": "coastal",
+      "text": "What is a bolt hole in a passage plan?",
+      "options": [
+        "The hole the exhaust runs through",
+        "A harbour or anchorage you can reach if the passage goes wrong",
+        "The last harbour on the passage",
+        "A place to leave the boat for the winter"
+      ],
+      "answer": "b",
+      "bookPage": 7,
+      "source": "RYA Passage Planning (Chennell); https://nauticalninja.pages.dev/sailing_guides/voyage_planning/passage-planning-fundamentals",
+      "checked": "Search result: shelter along the route, contingency harbours. Term also in common use among sailors; Amit to confirm the word."
+    },
+    {
+      "id": "coastal-23",
+      "ticket": "coastal",
+      "text": "With the starter cranking, a meter across one terminal clamp reads more than a volt. What does it mean?",
+      "options": [
+        "The battery is fully charged",
+        "The starter motor is worn out",
+        "The alternator belt is slipping",
+        "There is resistance in that connection, probably corrosion or a loose clamp"
+      ],
+      "answer": "d",
+      "bookPage": 8,
+      "source": "ABYC E-11 / marine electrical practice; https://forums.iboats.com/threads/470-poor-starting-after-rebuild.716411/post-5425840",
+      "checked": "Voltage drop across a connection under load indicates resistance there (Ohm's law); limits vary by source (0.1 to 0.5 V per circuit) so the book and the question avoid a threshold apart from 'a volt or more'. UNVERIFIED against ABYC E-11 itself."
+    },
+    {
+      "id": "coastal-24",
+      "ticket": "coastal",
+      "text": "At the start you see only a weak trickle of water at the exhaust outlet. What does it mean?",
+      "options": [
+        "The raw-water impeller or intake is failing: stop and look",
+        "The engine is running well",
+        "The overheat alarm will sound at once",
+        "The fuel is dirty"
+      ],
+      "answer": "a",
+      "bookPage": 8,
+      "source": "Engine maker's start-up checks; https://sailing-blog.nauticed.org/diesel-raw-water-system/",
+      "checked": "nauticed.org: check raw-water outflow at the exhaust at every start; weak flow means the cooling is failing. 'Weak flow comes before the alarm' is common practice, not a quoted rule."
+    },
+    {
+      "id": "coastal-25",
+      "ticket": "coastal",
+      "text": "The bowl of your primary fuel filter has a line of water at the bottom. What do you do?",
+      "options": [
+        "Leave it: water burns off",
+        "Drain it, and drain it again on other days before fitting a new element",
+        "Fit a new element at once and say no more",
+        "Top up the tank with fresh diesel on top"
+      ],
+      "answer": "b",
+      "bookPage": 8,
+      "source": "Filter maker's instructions (Racor); https://www.yacht.de/en/equipment/motors/technology-how-fuel-filters-and-water-separators-prevent-damage-to-the-engine/",
+      "checked": "yacht.de: water settles in the bowl; motion stirs the tank; drain regularly. 'Three separate days' is the game's own fix (sloop28.json), not a standard."
+    }
+  ]
+}

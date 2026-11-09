@@ -121,6 +121,11 @@ public sealed record LossView(
 [JsonDerivedType(typeof(CalendarView), "calendar-view")]
 [JsonDerivedType(typeof(UpgradesView), "upgrades-view")]
 [JsonDerivedType(typeof(SeasonPageView), "season-page-view")]
+[JsonDerivedType(typeof(SkipperView), "skipper-view")]
+[JsonDerivedType(typeof(TicketsView), "tickets-view")]
+[JsonDerivedType(typeof(NoticeboardView), "noticeboard-view")]
+[JsonDerivedType(typeof(DocumentView), "document-view")]
+[JsonDerivedType(typeof(ExamQuestionView), "exam-question-view")]
 public abstract record QueryResult;
 
 public sealed record BriefingView(IReadOnlyList<string> Lines) : QueryResult;
@@ -162,7 +167,7 @@ public sealed record LogEntry(int Day, string TimeOfDay, string Text, int CostNo
 public sealed record LogView(IReadOnlyList<LogEntry> Entries, string? Weather = null, int Day = 0) : QueryResult;
 
 /// <summary>Today's weather: the words and the numbers behind them. Wind from a compass word.</summary>
-public sealed record WeatherView(int Day, string Text, int WindForce, string WindFrom, double RainMm, double TempC) : QueryResult;
+public sealed record WeatherView(int Day, string Text, int WindForce, string WindFrom, double RainMm, double TempC, string? CoastRadio = null) : QueryResult;
 
 public sealed record CommandInfo(string Verb, string? Argument, string Description);
 
@@ -279,10 +284,12 @@ public sealed record PlanLeg(string From, string To, double DistanceNm, int Cour
 /// "under sail", "hove-to", "at anchor", "drifting", "under tow"), Hours the hour in progress since she cast off. CanAnchor: shelter is within
 /// reach; NearestShelter the nearest place to anchor, in words. WindServes: the wind would carry her under sail on this course now.
 /// Destinations: in port, one line per route out ("Hestholmen, 14 nm"); null at sea.
+/// RadioFitted: a VHF is aboard (a Call can be made). FerryCall: the ferry's call on channel 16 while it waits for an answer (null: none is waiting); the passage has stopped at it.
 /// </summary>
 public sealed record TripView(
     bool AtSea, string? Port, string? From, string? To, double PositionNm, double RemainingNm, string? Mode, int Hours,
-    bool CanAnchor, string? NearestShelter, bool WindServes, string Text, IReadOnlyList<string>? Destinations = null) : QueryResult;
+    bool CanAnchor, string? NearestShelter, bool WindServes, string Text, IReadOnlyList<string>? Destinations = null,
+    bool RadioFitted = false, string? FerryCall = null) : QueryResult;
 
 /// <summary>The observation after an hour (or part of one) at sea: Continue, Motor, Sail. Text is the hour line, also in the narrative and the logbook.</summary>
 public sealed record LegView(
@@ -391,7 +398,7 @@ public sealed record ChartPlan(
 /// <summary>One line of the money ledger. Nok is signed: income positive, everything else negative. Kind: income, spending, bill, interest or unpaid.</summary>
 public sealed record LedgerEntry(int Day, string Kind, string Text, int Nok);
 
-/// <summary>Something coming up: Kind is payday, bill, delivery, slot or event (the first day of its window). Nok is signed.</summary>
+/// <summary>Something coming up: Kind is payday, bill, delivery, slot, event, course or crewing (the first day of its window). Nok is signed.</summary>
 public sealed record CalendarEntry(int Day, string Weekday, string Kind, string Text, int Nok);
 
 /// <summary>A part on order. Status: "on its way" or "waiting at the yard". Delivered parts drop out.</summary>
@@ -455,3 +462,82 @@ public sealed record SeasonPageView(
     int Season, int FromDay, int ToDay, double MilesSailed, int NightsAway, IReadOnlyList<string> PlacesReached,
     IReadOnlyList<string> EventsMade, IReadOnlyList<string> EventsMissed, int HoursWorked, int VacationDaysUsed, int UnpaidDays,
     int SpentNok, int IncomeNok, int ValueNok, string Reputation, IReadOnlyList<string> Lines) : QueryResult;
+
+/// <summary>
+/// The skipper's log in words (design note 012, decision 2): "126 miles under way.", "No night passages yet.". No score, no ids; a line per fact.
+/// </summary>
+public sealed record SkipperView(IReadOnlyList<string> Lines) : QueryResult;
+
+/// <summary>One line of a ticket's checklist in words ("300 miles: you have 126."), and whether the log meets it now.</summary>
+public sealed record AskView(string Text, bool Met);
+
+/// <summary>
+/// One ticket (design note 012, decision 3). Held: and since which day (null: held from the start). Words: how it stands ("You hold the radio
+/// ticket." / "Not held."). Purpose: what it is for, in words. Asks: the checklist of the log. NextCourse: the next course in words, or why there is none.
+/// </summary>
+public sealed record TicketView(string Name, bool Held, int? HeldSinceDay, string Words, string Purpose, IReadOnlyList<AskView> Asks, string NextCourse);
+
+/// <summary>The four tickets, held or not, each with its checklist and its next course. Words only: no ids, no scores.</summary>
+public sealed record TicketsView(IReadOnlyList<TicketView> Tickets) : QueryResult;
+
+/// <summary>
+/// A card on a noticeboard (design note 012, decision 6): dated, sorted by day. Open for the crewing places (step 4) and the ladder (step 5) to come;
+/// no card carries an id.
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(EventCard), "event")]
+[JsonDerivedType(typeof(CourseCard), "course")]
+[JsonDerivedType(typeof(CrewingCard), "crewing")]
+public abstract record BoardCard(int Day, string Title);
+
+/// <summary>An event of the calendar of wants, with its status and what it asks in the player's words (the same view the calendar gives).</summary>
+public sealed record EventCard(int Day, string Title, EventView Event) : BoardCard(Day, Title);
+
+/// <summary>
+/// A course of the club. When: "Saturday, day 138". Place: "at the club in Skjærvik". Days and VacationDays: its length and the vacation days it costs by the
+/// weekday rule. Status: "open", "enrolled", "on now", "enrolment closed" or "done". Shortfall: what the ticket's checklist still lacks, in words. Line: the card as the club pins it.
+/// </summary>
+public sealed record CourseCard(
+    int Day, string Title, string When, string Place, int PriceNok, int Days, int VacationDays, bool Enrolled, string Status,
+    IReadOnlyList<string> Shortfall, string Line) : BoardCard(Day, Title);
+
+/// <summary>
+/// A crewing place (design note 012, step 4). When: "Saturday and Sunday, days 166 to 167". Boat: "the cutter Teist". Status: "open", "taken", "too close", "done" or "missed".
+/// Asks: what the owner wants, in words (empty: nothing). Shortfall: what the log still lacks for it, in words. Line: the card as it is pinned.
+/// </summary>
+public sealed record CrewingCard(
+    int Day, string Title, string When, string Boat, int Days, int VacationDays, bool Taken, string Status, string Asks,
+    IReadOnlyList<string> Shortfall, string Line) : BoardCard(Day, Title);
+
+/// <summary>One line of a boat's running costs, as the yard quotes it.</summary>
+public sealed record LadderCost(string Label, int Nok);
+
+/// <summary>
+/// A boat in the broker's window (design note 012, step 5), undated, at the bottom of the club's board. Yours: the player's own boat (PriceNok is the broker's figure
+/// for her, Costs are the player's own bills, Ticket is held). Otherwise a listing: PriceNok is the asking price, Costs the yard's quote (not the sim's truth), CostsTotalNok
+/// their sum, Ticket the one her insurer asks, Shortfall the money and the ticket in words. Line: the card as the broker pins it. None is buyable. No ids.
+/// </summary>
+public sealed record LadderCard(
+    string Title, bool Yours, int LengthFt, double LengthM, string Type, int Year, int PriceNok, string Lies, string Line,
+    IReadOnlyList<LadderCost> Costs, int CostsTotalNok, string Ticket, IReadOnlyList<string> Shortfall);
+
+/// <summary>The board where she lies. Header: the board's own words (or why there is none: at sea). Empty: the line for a board with nothing on it. Ladder: the broker's window at the bottom of the club's board, in order of price, the player's own boat first.</summary>
+public sealed record NoticeboardView(string Header, IReadOnlyList<BoardCard> Cards, string? Empty = null, IReadOnlyList<LadderCard>? Ladder = null) : QueryResult;
+
+/// <summary>One page of a document: its number, its heading and its text (paragraphs separated by blank lines).</summary>
+public sealed record DocumentPage(int Number, string Title, string Text);
+
+/// <summary>
+/// A document of the logbook read in words (design note 012, decision 8). Title empty and Pages empty: there is no such document, and Note says so (and
+/// what can be read). No ids.
+/// </summary>
+public sealed record DocumentView(string Title, IReadOnlyList<DocumentPage> Pages, string? Note = null) : QueryResult;
+
+/// <summary>One option of an exam question: its letter (a to d) and its text.</summary>
+public sealed record ExamOptionView(string Letter, string Text);
+
+/// <summary>
+/// The exam question now open (design note 012, decision 8). Open false: nothing to answer, and Line says so. Number and Total: "Question 2 of 5". Line is the
+/// question as the examiner puts it. The right option is never in this view.
+/// </summary>
+public sealed record ExamQuestionView(bool Open, int Number, int Total, string Text, IReadOnlyList<ExamOptionView> Options, string Line) : QueryResult;

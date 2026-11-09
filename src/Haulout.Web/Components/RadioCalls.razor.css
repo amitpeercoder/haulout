@@ -1,0 +1,2 @@
+.calls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.label { font-family: var(--face-type); font-size: 0.8rem; color: var(--water-pale); }

@@ -60,11 +60,16 @@ public sealed partial class Game
         /// <summary>The (absolute day * 24 + hour) of the hours of this passage already rolled for a close call, and the close calls waiting to be told in the hour line.</summary>
         public HashSet<(string Cause, int Hour)> CloseCallHoursRolled { get; } = [];
         public List<(string Text, string? Report)> CloseCalls { get; } = [];
+        /// <summary>A ferry's call on channel 16 that the player has not answered (design note 012, step 3).</summary>
+        public PendingFerry? Ferry { get; set; }
         public List<string> Failures { get; } = [];
         public List<string> Fixes { get; } = [];
         /// <summary>The clock year she left in, and the hourly fixes of the passage (design note 009).</summary>
         public int Year { get; init; }
         public List<TrackFix> Track { get; } = [];
+        /// <summary>Minutes under way (not at anchor) after dark, and the strongest force met under way: what the skipper's log reads (design note 012, step 2).</summary>
+        public int NightMinutes { get; set; }
+        public int MaxForce { get; set; }
 
         /// <summary>Net distance along the route from its start, drift taken off (never below 0).</summary>
         public double ProgressNm => Math.Max(0, PositionNm - DriftNm);
@@ -307,7 +312,7 @@ public sealed partial class Game
                     : $"Part of the passage is in the dark (the light comes at about {LightComes(depart)}).";
                 if (KnownOpenFaults().Any(f => f.ComponentId == NavLightsId)
                     && _boat.CloseCalls.Causes.TryGetValue("night", out var nightCause) && nightCause.PlanLine.Length > 0)
-                    text = text[..^1] + ", and you know the navigation lights have a problem: " + nightCause.PlanLine;
+                    text = text[..^1] + ", and you know the navigation lights have a problem: " + nightCause.PlanLine + VhfPlanSentence(depart);
                 warnings.Add(text);
             }
         }
@@ -323,7 +328,7 @@ public sealed partial class Game
                 else
                 {
                     string when = fogDay.FogUntilHour >= 24 ? "the day" : "the morning";
-                    warnings.Add($"Fog forecast for {when}: without a plotter or radar you creep at {knots} knots and listen for ferries.");
+                    warnings.Add($"Fog forecast for {when}: without a plotter or radar you creep at {knots} knots and listen for ferries." + VhfPlanSentence(depart));
                 }
             }
         }

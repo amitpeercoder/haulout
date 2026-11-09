@@ -14,6 +14,10 @@
     <EmbeddedResource Include="Data\sloop28.json" LogicalName="Haulout.Sim.Data.sloop28.json" />
     <EmbeddedResource Include="Data\economy.json" LogicalName="Haulout.Sim.Data.economy.json" />
     <EmbeddedResource Include="Data\weather.json" LogicalName="Haulout.Sim.Data.weather.json" />
+    <EmbeddedResource Include="Data\tickets.json" LogicalName="Haulout.Sim.Data.tickets.json" />
+    <EmbeddedResource Include="Data\board.json" LogicalName="Haulout.Sim.Data.board.json" />
+    <EmbeddedResource Include="Data\ladder.json" LogicalName="Haulout.Sim.Data.ladder.json" />
+    <EmbeddedResource Include="Data\questions.json" LogicalName="Haulout.Sim.Data.questions.json" />
   </ItemGroup>
 
 </Project>

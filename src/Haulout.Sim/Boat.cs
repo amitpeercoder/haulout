@@ -49,8 +49,12 @@ public sealed class Boat
         YardRules? yard = null, FoulingRules? fouling = null, MooringRules? mooring = null, LayupRules? layup = null,
         SaleRules? sale = null, CalendarRules? calendar = null, OrderRules? orders = null, FuelRules? fuel = null, NightRules? night = null,
         IEnumerable<UpgradeRule>? upgrades = null, ReputationRules? reputation = null, Currency? currency = null, CloseCallRules? closeCalls = null, InstrumentRules? instruments = null,
-        HoursRules? hours = null, SleepRules? sleep = null)
+        HoursRules? hours = null, SleepRules? sleep = null, TicketRules? tickets = null, BoardRules? board = null,
+        RadioRules? radio = null)
     {
+        Radio = radio ?? RadioRules.Default;
+        Tickets = tickets ?? TicketRules.Default;
+        Board = board ?? BoardRules.Default;
         Hours = hours ?? HoursRules.Default;
         Sleep = sleep ?? SleepRules.Default;
         Currency = currency ?? Currency.Default;
@@ -177,11 +181,17 @@ public sealed class Boat
     public HoursRules Hours { get; }
     /// <summary>Hours awake and the tiredness they bring (design note 012).</summary>
     public SleepRules Sleep { get; }
+    /// <summary>The skipper's tickets and the club that runs the courses (design note 012, step 2).</summary>
+    public TicketRules Tickets { get; }
+    /// <summary>The notice boards (design note 012, decision 6).</summary>
+    public BoardRules Board { get; }
     public OrderRules Orders { get; }
     public FuelRules Fuel { get; }
     public NightRules Night { get; }
     public CloseCallRules CloseCalls { get; }
     public InstrumentRules Instruments { get; }
+    /// <summary>The VHF and its words (design note 012, step 3).</summary>
+    public RadioRules Radio { get; }
     public ReputationRules Reputation { get; }
     /// <summary>Null: this boat has no surveyor.</summary>
     public SurveyData? Survey { get; }

@@ -181,11 +181,14 @@ public sealed partial class Game
         // A wait cut at the hour of a beat of the friend's week is not whole days: it ends at the hour.
         if (Afloat) return DoWaitMoored(t, "wait", minutes, $"leave her for {Days(Math.Max(1, (minutes + 1439) / 1440))}",
             minutes % 1440 == 0 ? $"You leave her for {Days(days)}." : null, null);
-        t.Narrative.Add($"You leave her for {Days(days)}.");
+        // A wait cut on a morning that is not a whole day on (a crewing place's first morning, design note 012, step 4) ends at that hour.
+        bool whole = minutes % 1440 == 0;
+        if (!whole) days = DayAt(ClockMinutes + minutes) - Day;
+        t.Narrative.Add(whole ? $"You leave her for {Days(days)}." : $"You leave her until {FormatTime(ClockMinutes + minutes)} on day {DayAt(ClockMinutes + minutes)}.");
         // The days left behind: today up to the day before she is next seen (the arrival day is not counted).
         var left = Enumerable.Range(Day, days).Select(d => _weather[d]).ToList();
-        t.Narrative.Add(WeatherWords.Summarise(left));
-        return Accept(t, "wait", days * 1440, 0, null, $"Waited {Days(days)}.", work: false, afterTick: () =>
+        if (left.Count > 0) t.Narrative.Add(WeatherWords.Summarise(left));
+        return Accept(t, "wait", whole ? days * 1440 : minutes, 0, null, whole ? $"Waited {Days(days)}." : $"Waited until {FormatTime(ClockMinutes + minutes)} on day {DayAt(ClockMinutes + minutes)}.", work: false, afterTick: () =>
         {
             AddWeekLine(t);
             return null;

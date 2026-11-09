@@ -182,6 +182,8 @@ public sealed partial class Game
         foreach (var (eventDay, name, _) in OpenWindowStarts().Where(e => e.Going && e.Day > Day && e.Day <= endDay))
             StopAtDay(eventDay, $"You come back on day {eventDay}: {name} starts today.");
         WeekStops(minutes, endDay, StopAtDay, StopAtMinutes);
+        CourseStops(endDay, StopAtDay);
+        CrewStops(minutes, StopAtMinutes);
         if (why is null) return minutes;
         t.Narrative.Add(why);
         return best;
@@ -252,6 +254,12 @@ public sealed partial class Game
                 yield return new AheadItem(d, "delivery", $"The {o.Name} is due at the yard", $"the {o.Name} due at the yard", 0);
             foreach (var (eventDay, name, _) in OpenWindowStarts().Where(e => e.Day == d))
                 yield return new AheadItem(d, "event", name, name, 0);
+            foreach (var rec in EnrolledCourses.Where(c => c.From == d && d > Day))
+                if (TicketData.Find(rec.TicketId) is { } ticket)
+                    yield return rec.Resit
+                        ? new AheadItem(d, "course", $"The exam of the {CourseWord(ticket)}", $"the exam of the {CourseWord(ticket)}", 0)
+                        : new AheadItem(d, "course", $"The {CourseWord(ticket)} starts", $"the {CourseWord(ticket)}", 0);
+            foreach (var item in CrewAhead(d)) yield return item;
             if (_bookedDay == d)
             {
                 var yard = _boat.Yard;

@@ -66,12 +66,14 @@ public sealed partial class Game
     private enum Tiredness { Fresh, Tired, Exhausted }
 
     /// <summary>Minutes since the skipper last slept. Runs on own work ashore and at anchor; not under way at sea (the watches take turns).</summary>
-    private int _awakeMinutes;
+    private double _awakeMinutes;
+    /// <summary>A long passage made the arrival a tired one: tired, at least, until the skipper sleeps (step 1 follow-up b).</summary>
+    private bool _tiredArrival;
 
     private Tiredness TirednessNow =>
         !SleepRule.Enabled ? Tiredness.Fresh
         : _awakeMinutes >= SleepRule.ExhaustedAtMinutes ? Tiredness.Exhausted
-        : _awakeMinutes >= SleepRule.TiredAtMinutes ? Tiredness.Tired
+        : _awakeMinutes >= SleepRule.TiredAtMinutes || _tiredArrival ? Tiredness.Tired
         : Tiredness.Fresh;
 
     private double BotchFactor => TirednessNow switch
@@ -82,29 +84,50 @@ public sealed partial class Game
     };
 
     /// <summary>For tests only (the player never sees a number): minutes since the skipper slept, and the factor on the botch chance.</summary>
-    internal int AwakeMinutesForTests => _awakeMinutes;
+    internal int AwakeMinutesForTests => (int)Math.Round(_awakeMinutes);
+    internal bool TiredArrivalForTests => _tiredArrival;
     internal double BotchFactorForTests => BotchFactor;
 
-    private int HoursAwake => _awakeMinutes / 60;
+    private int HoursAwake => (int)(_awakeMinutes / 60);
 
     /// <summary>"You've been up 17 hours: tired." in words, no score; null when fresh.</summary>
     private string? TiredWords() => TirednessNow switch
     {
         Tiredness.Exhausted => $"You've been up {HoursAwake} hours: exhausted, your eyes are not to be trusted.",
+        Tiredness.Tired when _awakeMinutes < SleepRule.TiredAtMinutes => TiredFromPassageWords,
         Tiredness.Tired => $"You've been up {HoursAwake} hours: tired.",
         _ => null,
     };
 
+    private const string TiredFromPassageWords = "You came in tired from the long passage: it will show in anything you do before you sleep.";
     private const string TiredJobLine = "You're tired; this is the kind of job that gets done twice.";
     private const string ExhaustedJobLine = "You're exhausted; this job will almost certainly have to be done twice.";
     private const string EyesLine = "Your eyes are not to be trusted tonight.";
 
     /// <summary>Called after time has passed: the awake count runs on, or an away stretch of sleeping length resets it.</summary>
-    private void CountAwake(int minutes, bool aboard)
+    private void CountAwake(int minutes, bool aboard, int underWayMinutes = 0)
     {
         if (!SleepRule.Enabled) return;
-        if (!aboard && minutes >= SleepRule.MinSleepMinutes) _awakeMinutes = 0;
-        else if (NotUnderWay) _awakeMinutes += minutes;
+        if (_atClub) _awakeMinutes += minutes; // a day at the club is a day awake, not a night's sleep
+        else if (!aboard && minutes >= SleepRule.MinSleepMinutes)
+        {
+            _awakeMinutes = 0;
+            _tiredArrival = false; // slept
+        }
+        else _awakeMinutes += minutes - underWayMinutes + underWayMinutes * SleepRule.AtSeaRate; // under way you doze in the cockpit
+    }
+
+    /// <summary>
+    /// A passage of more than the data's hours makes the arrival a tired one: the skipper has been at the helm too long to be at their best, and it
+    /// shows in any own work until they sleep. Told in the arrival's narrative.
+    /// </summary>
+    private void TiredArrival(Turn t, Passage p)
+    {
+        if (!SleepRule.Enabled || SleepRule.TiredArrivalMinutes <= 0) return;
+        int minutes = p.EndClockMinutes - p.DepartClockMinutes;
+        if (minutes <= SleepRule.TiredArrivalMinutes) return;
+        _tiredArrival = true;
+        t.Narrative.Add($"{Capital(Number((int)Math.Round(minutes / 60.0)))} hours at the helm: you're tired, and it will show in anything you do before you sleep.");
     }
 
     private CommandResult DoSleep(Turn t)
@@ -113,7 +136,7 @@ public sealed partial class Game
         if (!SleepRule.Enabled) return Reject(action, "There's no need to turn in.");
         if (!NotUnderWay) return Reject(action, "You're under way: heave to or anchor first.");
         int toWake = (SleepRule.WakeMinute - MinuteOfDay + 1440) % 1440;
-        int minutes = toWake >= SleepRule.MinSleepMinutes ? toWake : SleepRule.SleepMinutes;
+        int minutes = toWake >= SleepRule.MinSleepMinutes && toWake <= SleepRule.MaxSleepMinutes ? toWake : SleepRule.SleepMinutes;
         int wakeDay = DayAt(ClockMinutes + minutes);
         string up = FormatTime(ClockMinutes + minutes);
         t.Narrative.Add($"You turn in. {new GameClock(wakeDay).WeekdayName}, day {wakeDay}: up at {up}.");

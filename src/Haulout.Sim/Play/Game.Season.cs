@@ -33,6 +33,7 @@ public sealed partial class Game
     private const int SaltCloseCall = 11;
     /// <summary>The own spread of a fault whose progression names its range (design note 010, second pass F).</summary>
     private const int SaltFaultSpread = 12;
+    // 13: the questions of an exam, keyed on the ticket and the day (Game.Exam.cs, design note 012, decision 8).
 
     /// <summary>The day the yard has her down for launch. Starts at the data's deadline; a later round moves it.</summary>
     private int _launchDeadlineDay;
@@ -141,7 +142,19 @@ public sealed partial class Game
         int earliest = Math.Max(from, today + yard.MinLeadDays);
         // Reputation (design note 010, step 4): a yard that knows you keeps a slot nearer, one that doesn't pushes it later; never before the earliest.
         int first = Math.Max(earliest, earliest + drift - _boat.Reputation.SlotDaysPerPoint * ReputationScore);
+        // The yard lifts on the days its office is open (design note 012, step 1 follow-up c: not on a Sunday): a first slot on a shut day moves to the next open one.
+        while (YardLiftsNot(first) && first <= to) first++;
         return first > to ? null : first;
+    }
+
+    /// <summary>The yard's crane does not work on a day its office is shut (a Sunday), when the shops and the yard keep hours.</summary>
+    private bool YardLiftsNot(int day) => DayHours.Enabled && DayHours.ShopOn(new GameClock(day).Weekday).IsShut;
+
+    private int NextLiftingDay(int day)
+    {
+        int d = day;
+        while (YardLiftsNot(d)) d++;
+        return d;
     }
 
     /// <summary>Why the yard will not take a booking (for the day, or for any day when it is null); null: it would.</summary>
@@ -156,6 +169,7 @@ public sealed partial class Game
             if (d < Day) return $"Day {d} has already gone by.";
             if (d > to) return $"The yard stops lifting on day {to}.";
             if (d < free) return $"The yard's first free slot is day {free}.";
+            if (YardLiftsNot(d)) return $"The yard doesn't lift on {new GameClock(d).WeekdayName}s: the nearest day it does is day {NextLiftingDay(d)}.";
             if (_bookedDay == d) return $"You're already booked for day {d}.";
         }
         if (OfficeOpenRefusal() is { } shut) return shut;

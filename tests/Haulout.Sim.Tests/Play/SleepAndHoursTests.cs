@@ -184,16 +184,125 @@ public class SleepAndHoursTests
     }
 
     [Fact]
-    public void At_sea_under_way_the_hours_awake_do_not_run_and_on_arrival_they_are_what_they_were_at_departure()
+    public void At_sea_under_way_the_hours_awake_grow_at_half_rate_because_you_doze_in_the_cockpit()
     {
         var g = Afloat();
         UntilAtLeast(g, "12:00");
         int before = g.AwakeMinutesForTests;
         Ok(g.Execute(new Depart("hestholmen")));
+        int afterDeparting = g.AwakeMinutesForTests;
         var r = Ok(g.Execute(new Motor()));
         for (int i = 0; i < 40 && r.Observation is not TripResultView; i++) r = Ok(g.Execute(new Continue()));
-        Assert.IsType<TripResultView>(r.Observation);
-        Assert.InRange(g.AwakeMinutesForTests - before, 0, 90);   // the hours of the passage did not count
+        var trip = Assert.IsType<TripResultView>(r.Observation);
+        // Casting off is on the mooring (full rate); the passage after it counts half.
+        double expected = trip.Minutes * 0.5;
+        Assert.InRange(g.AwakeMinutesForTests - afterDeparting, expected - 5, expected + 5);
+        Assert.InRange(afterDeparting - before, 0, 30);
+    }
+
+    private static string ShortTiredArrivalEconomy() => TestEconomy.Edited(n =>
+    {
+        foreach (var day in new[] { "weekday", "saturday", "sunday" }) n["hours"]!["shop"]![day] = new JsonArray("00:00", "24:00");
+        n["sleep"]!["tiredArrivalHours"] = 2;
+    });
+
+    private static TripResultView Passage(Game g, out CommandResult last)
+    {
+        Ok(g.Execute(new Depart("hestholmen")));
+        last = Ok(g.Execute(new Motor()));
+        for (int i = 0; i < 40 && last.Observation is not TripResultView; i++) last = Ok(g.Execute(new Continue()));
+        return Assert.IsType<TripResultView>(last.Observation);
+    }
+
+    [Fact]
+    public void A_passage_longer_than_the_tired_arrival_hours_makes_the_arrival_a_tired_one_until_the_skipper_sleeps()
+    {
+        var g = Afloat(boat: BoatLoader.Load(Sloop28Json(), true, ShortTiredArrivalEconomy(), withHours: true));
+        Assert.False(g.TiredArrivalForTests);
+        Passage(g, out var r);
+        Assert.Contains("Three hours at the helm: you're tired, and it will show in anything you do before you sleep.", r.Narrative);
+        Assert.True(g.TiredArrivalForTests);
+        Assert.Equal(1.5, g.BotchFactorForTests);                     // at least the tired factor, though only a few hours awake
+        Assert.Equal("You came in tired from the long passage: it will show in anything you do before you sleep.", Status(g).Tired);
+        Assert.InRange(g.AwakeMinutesForTests, 0, 16 * 60 - 1);
+
+        // Any own-work job that can botch says so; a sleep puts it right.
+        Ok(g.Execute(new Buy("primary filter element")));
+        var job = Ok(Walk.Do(g, "primary filter", n => new Replace(n)));        // a subsystem she has not worked in yet: a job that can come out poor
+        Assert.Contains("You're tired; this is the kind of job that gets done twice.", job.Narrative);
+        Ok(g.Execute(new Sleep()));
+        Assert.False(g.TiredArrivalForTests);
+        Assert.Equal(1.0, g.BotchFactorForTests);
+        Assert.Null(Status(g).Tired);
+    }
+
+    [Fact]
+    public void An_away_stretch_of_six_hours_also_clears_a_tired_arrival_and_a_short_passage_never_sets_one()
+    {
+        var g = Afloat(boat: BoatLoader.Load(Sloop28Json(), true, ShortTiredArrivalEconomy(), withHours: true));
+        Passage(g, out _);
+        Assert.True(g.TiredArrivalForTests);
+        Ok(g.Execute(new WaitDays(1)));
+        Assert.False(g.TiredArrivalForTests);
+
+        // The shipped twelve hours: a passage of three hours is not a tired arrival.
+        var h = Afloat();
+        Passage(h, out var s);
+        Assert.False(h.TiredArrivalForTests);
+        Assert.DoesNotContain(s.Narrative, l => l.Contains("at the helm", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Sleep_sleeps_to_the_next_eight_when_that_is_six_to_twelve_hours_away_else_eight_hours()
+    {
+        var g = NewGame();
+        Until(g, "08:30");
+        var r = Ok(g.Execute(new Sleep()));
+        Assert.Equal(8 * 60, r.MinutesTaken);                          // from 08:30 not 23 and a half hours
+        Assert.Equal("16:30", Status(g).TimeOfDay);
+        Assert.Equal(75, Status(g).Day);
+        Assert.Contains("up at 16:30", Text(r));
+
+        var h = NewGame();
+        UntilAtLeast(h, "20:00");
+        var wake = Ok(h.Execute(new Sleep()));                         // twelve hours away (or a little less): to eight
+        Assert.Equal("08:00", Status(h).TimeOfDay);
+        Assert.Equal(76, Status(h).Day);
+        Assert.InRange(wake.MinutesTaken, 6 * 60, 12 * 60);
+    }
+
+    // ------------------------------------------------------------------ the yard lifts Monday to Saturday
+
+    [Fact]
+    public void The_yard_never_offers_a_Sunday_slot_in_any_year_and_the_rule_is_what_moved_it()
+    {
+        int sundays = 0, sundaysWithoutHours = 0;
+        foreach (int year in new[] { 0, 1, 2 })
+            for (int d = 235; d <= 300; d++)
+            {
+                int day = year * 360 + d;
+                var withHours = new Game(BoatLoader.LoadSloop28(withHours: true), day, new FixedRandom(0.99), Game.DefaultSeed, Warm());
+                if (((SeasonView)withHours.Ask(new Season())).FirstFreeDay is { } first && new Haulout.Sim.Time.GameClock(first).Weekday == 6) sundays++;
+                var plain = new Game(BoatLoader.LoadSloop28(), day, new FixedRandom(0.99), Game.DefaultSeed, Warm());
+                if (((SeasonView)plain.Ask(new Season())).FirstFreeDay is { } f && new Haulout.Sim.Time.GameClock(f).Weekday == 6) sundaysWithoutHours++;
+            }
+        Assert.Equal(0, sundays);
+        Assert.True(sundaysWithoutHours > 0);   // without the rule the same sweep does find Sundays
+    }
+
+    [Fact]
+    public void Booking_a_Sunday_is_refused_with_the_reason_free_and_a_Saturday_or_Monday_is_accepted()
+    {
+        var g = new Game(BoatLoader.LoadSloop28(withHours: true), 75, new FixedRandom(0.99), Game.DefaultSeed, Warm());
+        Assert.Equal(6, new Haulout.Sim.Time.GameClock(258).Weekday);   // a Sunday inside the window
+        UntilAtLeast(g, "09:00");                                       // the office opens at nine
+        var no = No(g.Execute(new BookHaulout(258)));
+        Assert.Equal("The yard doesn't lift on Sundays: the nearest day it does is day 259.", Text(no));
+        Assert.Null(((SeasonView)g.Ask(new Season())).BookedDay);
+        Ok(g.Execute(new BookHaulout(259)));
+        Assert.Equal(259, ((SeasonView)g.Ask(new Season())).BookedDay);
+        Ok(g.Execute(new BookHaulout(257)));                            // a Saturday is fine
+        Assert.Equal(257, ((SeasonView)g.Ask(new Season())).BookedDay);
     }
 
     // ------------------------------------------------------------------ tiredness and the botch chance

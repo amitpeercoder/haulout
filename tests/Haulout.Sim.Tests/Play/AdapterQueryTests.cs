@@ -238,6 +238,40 @@ public class AdapterQueryTests
     }
 }
 
+/// <summary>The skipper, tickets and board are queries and Enrol is a command through the one facade, with their own wire names (design note 012, step 2).</summary>
+public class ClubAdapterTests
+{
+    [Fact]
+    public void The_new_queries_and_the_enrol_command_have_wire_names_and_their_results_name_their_types()
+    {
+        Assert.Equal("{\"type\":\"skipper\"}", JsonSerializer.Serialize<Query>(new Skipper()));
+        Assert.Equal("{\"type\":\"tickets\"}", JsonSerializer.Serialize<Query>(new Tickets()));
+        Assert.Equal("{\"type\":\"noticeboard\"}", JsonSerializer.Serialize<Query>(new Noticeboard()));
+        Assert.Equal("{\"type\":\"enrol\",\"Course\":\"radio\"}", JsonSerializer.Serialize<Command>(new Enrol("radio")));
+        Assert.IsType<Enrol>(JsonSerializer.Deserialize<Command>("{\"type\":\"enrol\",\"Course\":\"coastal\"}"));
+        var g = Game.NewFirstFault(withHours: true);
+        Assert.Contains("\"type\":\"skipper-view\"", JsonSerializer.Serialize(g.Ask(new Skipper()), typeof(QueryResult)));
+        Assert.Contains("\"type\":\"tickets-view\"", JsonSerializer.Serialize(g.Ask(new Tickets()), typeof(QueryResult)));
+        Assert.Contains("\"type\":\"noticeboard-view\"", JsonSerializer.Serialize(g.Ask(new Noticeboard()), typeof(QueryResult)));
+    }
+
+    [Fact]
+    public void The_skipper_tickets_and_board_never_leak_component_or_fault_ids_or_undiscovered_faults()
+    {
+        var reference = BoatLoader.LoadSloop28(withHours: true);
+        var hyphenated = reference.Components.Select(c => c.Id).Concat(reference.AllFaults.Select(f => f.Id)).Concat(reference.Places.Select(p => p.Id))
+            .Concat(reference.Tickets.Tickets.Select(t => t.Id)).Where(id => id.Contains('-')).ToList();
+        var faultNames = reference.AllFaults.Select(f => f.Name).ToList();
+        var g = Game.NewFirstFault(withHours: true);
+        foreach (var q in new Query[] { new Skipper(), new Tickets(), new Noticeboard(), new ReadDocument("radio course book"), new ReadDocument("nonsense"), new ExamQuestion() })
+        {
+            var json = JsonSerializer.Serialize(g.Ask(q), typeof(QueryResult));
+            foreach (var id in hyphenated) Assert.DoesNotContain($"\"{id}\"", json, StringComparison.OrdinalIgnoreCase);
+            foreach (var name in faultNames) Assert.DoesNotContain(name, json, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}
+
 public class LogReceiptTests
 {
     [Fact]

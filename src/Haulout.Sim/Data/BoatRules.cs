@@ -418,6 +418,10 @@ public sealed record SaleRules
     public IReadOnlyList<double> OfferSpread { get; init; } = [0.88, 1.02];
     public int OfferHoldsDays { get; init; } = 7;
     public int ListMinutes { get; init; } = 30;
+    /// <summary>Afloat (listed at her mooring in season, design note 012 decision 7): buyers come on weekends only, Saturday and Sunday.</summary>
+    public bool AfloatWeekendOnly { get; init; } = true;
+    /// <summary>Afloat, the per-day chance of a viewing on a weekend day is multiplied by this (a buyer's weekend: fewer days, more of them make it).</summary>
+    public double AfloatViewingFactor { get; init; } = 1.5;
     public string Broker { get; init; } = "Holm & Datter, yacht brokers";
     /// <summary>Replacing one of these (or winterising the engine) is an engine service entry in the logbook.</summary>
     public IReadOnlyList<string> ServiceComponents { get; init; } =
@@ -515,6 +519,12 @@ public sealed record SleepRules
     public int SleepMinutes { get; init; }
     /// <summary>An away stretch this long is sleep: it resets the hours awake.</summary>
     public int MinSleepMinutes { get; init; }
+    /// <summary>The sleep command sleeps to the wake hour when that is no more than this away, else for <see cref="SleepMinutes"/>.</summary>
+    public int MaxSleepMinutes { get; init; } = int.MaxValue;
+    /// <summary>The share of an under-way minute that counts as a minute awake (you doze in the cockpit).</summary>
+    public double AtSeaRate { get; init; }
+    /// <summary>A passage longer than this makes the arrival a tired one (tired until the skipper sleeps). Zero: never.</summary>
+    public int TiredArrivalMinutes { get; init; }
 
     public bool Enabled => TiredAtMinutes > 0;
 
@@ -628,6 +638,10 @@ public sealed record InstrumentRules
     public PlotterPlugRules PlotterPlug { get; init; } = new();
     /// <summary>The scanner cable on the mast: chafe an hour adds in a wind of force FromForce, FromForce + 1 ..., times UnderWayFactor when she is at sea.</summary>
     public ScannerCableRules ScannerCable { get; init; } = new();
+    /// <summary>The antenna connector at the masthead: wetness counts like the plotter's plug (design note 012, step 3).</summary>
+    public PlotterPlugRules VhfConnector { get; init; } = new();
+    /// <summary>A job up the mast is refused in more wind than this force. 0 (no data): no rule.</summary>
+    public int AloftMaxForce { get; init; }
 
     public static InstrumentRules Default { get; } = new();
 }
@@ -832,6 +846,8 @@ public sealed record ReputationRules
     public int BillPastLimit { get; init; }
     /// <summary>Points for a ferry's report after a close call (design note 010, second pass D).</summary>
     public int FerryReport { get; init; }
+    /// <summary>Points for a radio call made without the radio ticket (design note 012, step 3).</summary>
+    public int UnlicensedRadio { get; init; }
     public int Min { get; init; } = -5;
     public int Max { get; init; } = 5;
     /// <summary>Each point takes this share off the tow (a negative point adds it).</summary>
@@ -868,4 +884,77 @@ public sealed record FuelBurn(double LitresPerHour, IReadOnlyList<FuelAdd> Adds)
     /// <summary>"heavy fouling adds a third; a clogged fuel filter adds a tenth".</summary>
     public static string Words(FuelRules rules, IReadOnlyList<FuelAdd> adds) =>
         string.Join("; ", adds.Select(a => $"{a.Cause} adds {Band.Pick(rules.AddWords, a.Add)}"));
+}
+
+/// <summary>
+/// The VHF and what is said on it (design note 012, step 3): the call's minutes, the boat's name and call sign, the channels and the words of each
+/// call. Every figure and every line is data; the amount of the letter for a call made without the radio ticket is economy.json's
+/// (<see cref="UnlicensedLetterNok"/>). The default has no words: a boat without a radio block has no calls. PLACEHOLDERS, UNVERIFIED.
+/// </summary>
+public sealed record RadioRules
+{
+    public int CallMinutes { get; init; }
+    public string BoatName { get; init; } = "";
+    public string CallSign { get; init; } = "";
+    public int Channel { get; init; }
+    public int ForecastChannel { get; init; }
+    public string ForecastHour { get; init; } = "";
+    public int HarbourChannel { get; init; }
+    /// <summary>From economy.json (radio.unlicensedLetterNok), never the boat file.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public int UnlicensedLetterNok { get; init; }
+    public string NoRadio { get; init; } = "You have no radio aboard.";
+    public string Identity { get; init; } = "";
+    public string WithSign { get; init; } = "";
+    public string NoSign { get; init; } = "";
+    public string Unheard { get; init; } = "";
+    public string ReportedNote { get; init; } = "";
+    public RadioHarbour Harbour { get; init; } = new();
+    public RadioCoast Coast { get; init; } = new();
+    public RadioFerry Ferry { get; init; } = new();
+    public RadioLetter Letter { get; init; } = new();
+    public RadioPlan Plan { get; init; } = new();
+    public string Weather { get; init; } = "";
+
+    public bool Enabled => CallMinutes > 0 && Identity.Length > 0;
+
+    public static RadioRules Default { get; } = new();
+}
+
+public sealed record RadioHarbour
+{
+    public string Call { get; init; } = "";
+    public string Answer { get; init; } = "";
+    public IReadOnlyList<string> Lines { get; init; } = [];
+    public string NoOffice { get; init; } = "";
+}
+
+public sealed record RadioCoast
+{
+    public string Call { get; init; } = "";
+    public string Answer { get; init; } = "";
+    public string Forecast { get; init; } = "";
+}
+
+public sealed record RadioFerry
+{
+    public string Call { get; init; } = "";
+    public string Answer { get; init; } = "";
+    public string Nobody { get; init; } = "";
+    /// <summary>What the trip query adds while a ferry's call waits for an answer.</summary>
+    public string Waiting { get; init; } = "";
+    public string Log { get; init; } = "";
+}
+
+public sealed record RadioLetter
+{
+    public string BillText { get; init; } = "";
+    public string Alert { get; init; } = "";
+    public string Text { get; init; } = "";
+}
+
+public sealed record RadioPlan
+{
+    public string WithSet { get; init; } = "";
+    public string NoTicket { get; init; } = "";
+    public string NoTicketNone { get; init; } = ".";
 }

@@ -1,0 +1,348 @@
+look
+board
+tickets
+go companionway
+go quarter berth
+remove battery-box lid
+inspect negative terminal
+clean negative terminal
+go companionway
+go saloon
+remove saloon floorboards
+look
+inspect raw-water seacock
+look
+look
+look
+replace raw-water seacock
+go companionway
+go cockpit
+remove cockpit-locker lid
+inspect cockpit drain hoses
+buy hose clamps
+replace cockpit drain hoses
+buy alternator belt
+buy impeller
+buy impeller
+buy primary filter element
+buy secondary filter element
+buy engine oil
+go companionway
+remove companionway steps
+inspect alternator belt
+replace alternator belt
+inspect raw-water impeller
+replace raw-water impeller
+inspect raw-water impeller
+buy impeller
+replace raw-water impeller
+inspect raw-water impeller
+go quarter berth
+charge start battery
+sleep
+go companionway
+go cockpit
+start
+stop
+wait 1
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+season
+book haulout 262
+start
+launch
+calendar plan regatta
+calendar plan midsummer
+calendar plan club cruise
+order bunk cushions
+go on deck
+inspect anchor chain
+inspect shackle
+buy shackle
+replace shackle
+inspect shackle
+wait week
+wait week
+next weekend
+go cockpit
+go companionway
+go saloon
+install bunk cushions
+go forepeak
+look
+inspect heads
+inspect joker valve
+look
+look
+look
+look
+look
+look
+look
+buy joker valve
+replace joker valve
+go saloon
+look
+inspect bilge
+inspect bilge pump
+go companionway
+go cockpit
+go on deck
+inspect mooring lines
+buy mooring lines
+replace mooring lines
+enrol radio
+order vhf radio
+wait week
+wait 1
+go cockpit
+go companionway
+go saloon
+install vhf radio
+go companionway
+go cockpit
+next weekend
+wait week
+wait week
+wait week
+wait week
+board
+tickets
+read radio course book
+look
+answer c
+answer d
+answer c
+answer b
+answer a
+tickets
+skipper
+call coast radio
+wait week
+go cockpit
+check filter
+wait 3
+check filter
+calendar
+wait week
+go cockpit
+start
+fill tank
+check filter
+replace primary filter
+start
+plan trip hestholmen
+call harbour
+depart hestholmen
+motor
+motor
+motor
+status
+calendar
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+crew delivery
+wait week
+go cockpit
+start
+fill tank
+wait week
+look
+skipper
+wait 7
+status
+start
+plan trip storholmen
+depart storholmen
+motor
+motor
+motor
+motor
+motor
+motor
+status
+calendar
+wait 1
+log
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+motor
+motor
+motor
+invite friend 187
+wait week
+wait week
+calendar
+wait 1
+calendar
+start
+check flow
+stop
+buy impeller
+go companionway
+replace raw-water impeller
+inspect raw-water impeller
+go cockpit
+start
+check flow
+stop
+wait 1
+calendar
+start
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+motor
+motor
+calendar
+wait week
+wait 1
+calendar
+log
+wait week
+wait week
+wait week
+start
+plan trip kvitnes
+depart kvitnes
+motor
+motor
+motor
+motor
+status
+calendar
+wait 1
+wait 1
+start
+plan trip hestholmen
+depart hestholmen
+motor
+motor
+motor
+motor
+start
+plan trip skjaervik
+depart skjaervik
+motor
+motor
+motor
+motor
+calendar
+next weekend
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+look
+enrol coastal
+read coastal skipper course book
+scrub
+wait week
+wait week
+wait week
+wait week
+wait week
+look
+answer b
+answer c
+answer d
+answer b
+answer a
+tickets
+skipper
+season
+wait week
+wait week
+go companionway
+replace engine oil
+go cockpit
+fill tank
+start
+haul out
+season
+go companionway
+go quarter berth
+battery ashore
+go companionway
+winterise
+go cockpit
+go on deck
+fit cover
+look
+go beside the hull
+look
+inspect hull
+clean hull
+look
+inspect antifouling
+inventory
+season page
+calendar
+skipper
+tickets
+board
+keep
+status
+skipper
+tickets
+quit

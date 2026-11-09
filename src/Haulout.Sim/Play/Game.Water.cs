@@ -57,6 +57,7 @@ public sealed partial class Game
     /// <summary>The plug behind the binnacle's wetness and the scanner cable's chafe, counted from the day each was fitted (design note 010, second pass G).</summary>
     private double _plugWetness;
     private double _scannerChafe;
+    private double _connectorWetness;
 
     /// <summary>
     /// The wear of the instruments over one step of <paramref name="minutes"/> on <paramref name="day"/>. The plug: the day's rain term (which a winter
@@ -73,6 +74,12 @@ public sealed partial class Game
             _plugWetness += rules.PlotterPlug.RainPerDay * RainTerm(day) * hours / 24.0;
             if (AtSea && weather.WindForce >= rules.PlotterPlug.SprayFromForce) _plugWetness += rules.PlotterPlug.SprayPerHourAtSea * hours;
             _values.Set(SystemValues.PlugWetness, _plugWetness);
+        }
+        if (_boat.IsFitted(VhfId))
+        {
+            _connectorWetness += rules.VhfConnector.RainPerDay * RainTerm(day) * hours / 24.0;
+            if (AtSea && weather.WindForce >= rules.VhfConnector.SprayFromForce) _connectorWetness += rules.VhfConnector.SprayPerHourAtSea * hours;
+            _values.Set(SystemValues.ConnectorWetness, _connectorWetness);
         }
         if (_boat.IsFitted(RadarId))
         {

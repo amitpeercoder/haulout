@@ -73,6 +73,7 @@ public sealed partial class Game
     private void CountTow(string text)
     {
         _tows++;
+        _skipper = _skipper with { Tows = _skipper.Tows + 1 };
         _firstTowLine ??= $"Day {Day}: {text}";
     }
 
@@ -180,11 +181,15 @@ public sealed partial class Game
         foreach (var v in _viewings) v.Closed = true;
     }
 
+    /// <summary>The broker is at Skjaervik (the home port): she is listed from the yard, on the hard, or from her mooring afloat. Never under way, never from another port.</summary>
     private string? ListRefusal(int? askNok)
     {
+        if (AtSea) return "You're at sea: list her from Skjærvik or the yard.";
+        if (Afloat && _boat.Trips is { } trips && _portId != trips.Home) return "The broker is at Skjærvik: bring her home to list her.";
         if (YardGate() is { } away) return away;
-        if (Afloat) return "The broker sells her from the hard.";
         if (askNok <= 0) return "Name a price above zero: list for sale <nok>.";
+        // The broker's office keeps the yard office's hours, afloat or on the hard (step 6: the same rule for both).
+        if (OfficeOpenRefusal() is { } shut) return shut;
         return null;
     }
 
@@ -201,21 +206,29 @@ public sealed partial class Game
         var letter = BuildLetter(Day);
         t.Narrative.Add(change
             ? $"You ring {rules.Broker} and change the asking price to {Money(askNok)}."
-            : $"You ring {rules.Broker}. Someone comes down to the yard, walks round her with a clipboard and sends you their valuation letter. You list her at {Money(askNok)}.");
+            : Afloat
+                ? $"You ring {rules.Broker}. Someone comes down to the pontoon, looks her over from the quay with a clipboard and sends you their valuation letter. You list her at {Money(askNok)}."
+                : $"You ring {rules.Broker}. Someone comes down to the yard, walks round her with a clipboard and sends you their valuation letter. You list her at {Money(askNok)}.");
         return Accept(t, action, rules.ListMinutes, 0, new ListingView(letter),
             change
                 ? $"Changed the asking price to {Money(askNok)}. The broker values her at {Money(letter.ValueNok)}."
                 : $"Listed her for sale with {rules.Broker} at {Money(askNok)}. The broker values her at {Money(letter.ValueNok)}.");
     }
 
-    /// <summary>At launch: she is off the market, and so are the offers. Also clears the "kept" mark: a new stretch afloat has begun.</summary>
+    /// <summary>At launch: a new stretch afloat has begun, so the "kept" mark clears. A listing stays (design note 012, decision 7: she can be listed in any season), and so do the offers.</summary>
     private void LaunchSaleLines(Turn t)
     {
         _kept = false;
         if (!_listed) return;
-        WithdrawListing();
-        t.Narrative.Add("You tell the broker she's going back in the water: the listing is withdrawn, and the offers with it.");
-        _log.Add(new LogEntry(Day, TimeOfDay, "Took her off the market: the listing is withdrawn."));
+        t.Narrative.Add("The broker is told she's back in the water: she stays listed, and viewings will be at the weekends.");
+    }
+
+    /// <summary>The days a passage was under way for any part of: no buyer is shown a boat that is away.</summary>
+    private readonly HashSet<int> _awayDays = [];
+
+    private void MarkAway(Passage p)
+    {
+        for (int d = DayAt(p.DepartClockMinutes); d <= DayAt(p.EndClockMinutes); d++) _awayDays.Add(d);
     }
 
     // ------------------------------------------------------------------ the buyers
@@ -223,14 +236,17 @@ public sealed partial class Game
     /// <summary>The midnight's part of the market: offers lapse by themselves (an offer is open to its day), then at most one viewing.</summary>
     private void SaleDaily(Turn t, int day)
     {
-        if (!_listed || !_onTheHard || _sold) return;
+        if (!_listed || _sold) return;
         var rules = _boat.Sale;
+        // Afloat in season (design note 012, decision 7): she must be home at her mooring, and a buyer comes on a weekend only.
+        bool home = _boat.Trips is not { } trips || _portId == trips.Home;
+        if (Afloat && (AtSea || !home || _awayDays.Contains(day) || (rules.AfloatWeekendOnly && !new GameClock(day).IsWeekend))) return;
         int letterValue = BuildLetter(day).ValueNok;
         double gap = letterValue <= 0 ? 0 : (double)(letterValue - _askNok) / letterValue;
         double sensitivity = Math.Clamp(1 + rules.AskSensitivity * gap, 0.1, 2.0);
         string season = new GameClock(day).Season.ToString().ToLowerInvariant();
         double seasonal = rules.SeasonViewingFactor.GetValueOrDefault(season, 1.0);
-        double chance = Math.Min(1.0, rules.ViewingChancePerDay * sensitivity * seasonal);
+        double chance = Math.Min(1.0, rules.ViewingChancePerDay * sensitivity * seasonal * (Afloat ? rules.AfloatViewingFactor : 1.0));
         if (SeasonRoll(SaltViewing, day, 0) >= chance) return;
 
         // The buyer's surveyor goes over her with the player's own tools and finds what they would find.
@@ -241,12 +257,13 @@ public sealed partial class Game
         for (int i = 0; i < faults.Count; i++)
         {
             var f = faults[i];
+            if (Afloat && AfloatRefusal(f, _boat.Get(f.ComponentId)) is not null) continue; // a surveyor on the quay cannot see below the waterline or what needs her on the hard
             if (!f.Present || f.Harmless || !f.Reveals.Any(r => r.Discovers && BuyerSurveyActions.Contains(r.Action))) continue;
             if (SeasonRoll(SaltBuyerSurvey, day, i) >= rules.FindChance) continue;
             findings.Add(FindingOf(f));
             Discover(t, f);
         }
-        if (Fouling >= rules.FoulingFindFrom)
+        if (!Afloat && Fouling >= rules.FoulingFindFrom)
         {
             findings.Add(FoulingFinding());
             SeeFouling();
@@ -276,6 +293,7 @@ public sealed partial class Game
     private string? AcceptRefusal(int? number)
     {
         if (AtSea) return "You're at sea.";
+        if (Afloat && _boat.Trips is { } home && _portId != home.Home) return "The broker is at Skjærvik: bring her home to accept an offer.";
         if (!_listed) return "She isn't listed: list for sale <nok>.";
         var open = OpenViewings().ToList();
         if (number is { } n)
@@ -355,6 +373,7 @@ public sealed partial class Game
         _seasonFromDay = Day;
         _seasonWorkBase = _time.WorkMinutes;
         _nightsAway = 0;
+        _skipperTowsAtSeasonStart = _skipper.Tows;
         t.Narrative.Add($"You keep her. The yard has her down for launch on day {deadline}.");
         if (NextSeasonLine() is { } ahead) t.Narrative.Add(ahead);
         if (pageWritten) t.Narrative.Add($"The page of season {keptSeason} is in the logbook.");

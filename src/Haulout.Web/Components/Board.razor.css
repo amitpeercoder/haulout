@@ -1,0 +1,11 @@
+.board { display: flex; flex-direction: column; gap: 0.7rem; }
+.board h3 { font-family: var(--face-type); font-weight: normal; font-size: 0.9rem; color: var(--water-pale); }
+.board .row { display: flex; gap: 0.5rem; align-items: center; }
+.task { border-top: 1px solid #0003; padding: 0.4rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.task .done { color: var(--water-pale); font-family: var(--face-type); }
+.task.yours { border-left: 2px solid var(--water-pale); padding-left: 0.5rem; }
+.faint { color: var(--ink-faint); }
+.letter { border-top: 1px solid #0003; padding: 0.4rem 0; }
+.result { display: flex; flex-direction: column; gap: 0.6rem; animation: fade-in 300ms ease-in-out; }
+.result.refused p { color: var(--ink-faint); font-style: italic; }
+.result .cost { font-family: var(--face-type); font-size: 0.85rem; color: var(--water-pale); font-style: normal; }

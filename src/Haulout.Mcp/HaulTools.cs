@@ -278,6 +278,57 @@ public sealed class HaulTools(GameSession session)
         "The broker's valuation letter as it stands now (only what you know of her), whether she is listed and at what ask, and every viewing so far with what the buyer's surveyor found, what they offer and whether the offer is still open. Costs no time.")]
     public string Sale() => session.Ask("sale", new Sale());
 
+    [McpServerTool(Name = "skipper", ReadOnly = true), Description(
+        "Your own log in words, a line per fact and no score: the miles under way, the nights away from home, the hours under way after dark, the passages over 20 and 60 miles and whether you were skipper, the strongest wind under way, days aboard, tows. " +
+        "It is what the tickets read. Costs no time.")]
+    public string Skipper() => session.Ask("skipper", new Skipper());
+
+    [McpServerTool(Name = "tickets", ReadOnly = true), Description(
+        "Your tickets: each held or not, what it is for, a checklist of what it asks of your log (\"300 miles: you have 126.\") and the next course in words. Costs no time.")]
+    public string Tickets() => session.Ask("tickets", new Tickets());
+
+    [McpServerTool(Name = "noticeboard", ReadOnly = true), Description(
+        "The notice board where she lies, cards sorted by day: the events (with what each asks of the boat) and, at the club in the home port, the club\x27s courses (date, price, days, the vacation days it costs, and what your log still lacks for the ticket), the crewing places (a boat that wants crew: when, what the owner asks, and what your log still lacks) and, under the cards, the broker\x27s window: the other boats for sale, with what each costs a year as the yard quotes it, the ticket her insurer asks, and how far short you are in money and tickets. None of them can be bought yet. This is where the season is posted. Another port has only its own notices; at sea there is no board. Costs no time.")]
+    public string Noticeboard() => session.Ask("noticeboard", new Noticeboard());
+
+    [McpServerTool(Name = "call"), Description(
+        "Call on the VHF (5 minutes, anywhere afloat; needs a VHF radio fitted): to = harbour (the harbourmaster at the port you lie at or the nearer end of the leg), coast radio (a radio check and the forecast read out) or ferry (answers a ferry that is calling you on channel 16 in fog or the dark: the passage stops at her call, and if you move on without answering the close call happens). " +
+        "A call made without the radio ticket is reported by the coast radio: a letter and a bill with the next morning\x27s post. A set that receives but cannot be heard gets no answer: look at the antenna connector at the masthead.")]
+    public string Call([Description("Whom to call: harbour, coast radio (a radio check), or ferry.")] string to) =>
+        session.Do("call", new Call(to), ("to", to));
+
+    [McpServerTool(Name = "enrol"), Description(
+        "Ring the club secretary and enrol on a course by name (radio, coastal): the next one you can still join, at least the day before it starts. A phone call in the club office\x27s hours, 5 minutes; refused at sea. " +
+        "The fee is paid now and the days are marked; a wait stops on the first morning. On each course day your first command is the day at the club (the line of the day, until four, a weekday costs a vacation day); a day missed forfeits the course and the fee. " +
+        "The club hands you the course book (read it). On the last day you sit the exam: five questions, four right to pass (see exam_question, answer); then the ticket is held if your log meets what it asks, else it is held on the first midnight or arrival that your log does. A failed exam is re-sat at the next date for the exam fee only (enrol again). See noticeboard and tickets.")]
+    public string Enrol([Description("The course, e.g. radio, coastal.")] string course) =>
+        session.Do("enrol", new Enrol(course), ("course", course));
+
+    [McpServerTool(Name = "take_crewing_place"), Description(
+        "Ring the owner of a boat that wants crew and say you will come, by the card's words (delivery, weekend, north, week; see noticeboard). A phone call to a person: any hour, 5 minutes, anywhere but at sea, no money. " +
+        "The owner needs to know the day before. The week north asks for the coastal skipper ticket or a season\x27s log (the refusal says how far yours is); a place is refused if its days clash with a course, your friend\x27s week or the other place. " +
+        "A wait stops at 08:00 on the first morning; your next command of any kind, while you are at the home port, begins the days away on the other boat (your own boat stays on her mooring and is looked after by the harbourmaster; her letter tells what happened). " +
+        "Weekdays away cost vacation days. The miles, nights and passages go in your own log as crew (see skipper), not the boat\x27s. If you are not at the home port when the owner casts off, the place is missed.")]
+    public string TakeCrewingPlace([Description("The place, by the card: delivery, weekend, north, week.")] string card) =>
+        session.Do("take_crewing_place", new TakeCrewingPlace(card), ("card", card));
+
+    [McpServerTool(Name = "read", ReadOnly = true), Description(
+        "Read a document of the logbook by name: a course book the club has handed you (the radio course book, the coastal skipper course book), a season page, a letter. Its pages come back in words. Costs no time. " +
+        "The exam asks only what the course book teaches: read the book before you sit it.")]
+    public string Read([Description("The document, as you would say it, e.g. radio course book, season page 1.")] string document) =>
+        session.Ask("read", new ReadDocument(document));
+
+    [McpServerTool(Name = "exam_question", ReadOnly = true), Description(
+        "At the exam: the question the examiner is waiting on (\"Question 2 of 5: ...\") with its four options lettered a to d. Costs no time. Not at an exam: it says so.")]
+    public string ExamQuestion() => session.Ask("exam_question", new ExamQuestion());
+
+    [McpServerTool(Name = "answer"), Description(
+        "At the exam: answer the question with a letter, a to d. Takes 5 minutes. The examiner says only that they write something down, and asks the next; after the last the paper is marked: " +
+        "a pass at four of five right signs the course (and the ticket is held if your log meets what it asks), a fail names each question you missed and the page of the course book that covers it, never the right letter. " +
+        "While the exam is open everything that needs your hands or the boat is refused; a wait or a sleep leaves the paper, and what is not answered counts as wrong.")]
+    public string Answer([Description("The letter of your answer: a, b, c or d.")] string letter) =>
+        session.Do("answer", new Answer(letter), ("letter", letter));
+
     [McpServerTool(Name = "calendar", ReadOnly = true), Description(
         "The week: today's weekday and whether it is a boat day, how much of a weekday evening you have left before it costs a vacation day, the vacation days left this year, the balance and the bank's overdraft limit, " +
         "the paydays, bills, deliveries and your haulout slot coming up, what is on order, and the money of this season. Costs no time.")]
@@ -358,8 +409,8 @@ public sealed class HaulTools(GameSession session)
     /// <summary>The facade lists the console's verbs; say which tool each one is here.</summary>
     private const string HelpFooter =
         "Here each command is a tool of the same name, except: start = start_engine, stop = stop_engine, check filter = check_filter, " +
-        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, next weekend = next_weekend, wait week = wait_week, invite friend = invite_friend, calendar plan = plan_event (going true) and calendar unplan = plan_event (going false), yard install = yard_install, season page = season_page, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer, turn in = sleep. " +
-        "There is no quit; also available: status, aboard (what you have found so far), calendar (the week and the money), readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
+        "check flow = check_flow, log = logbook, order survey = order_survey, emergency lift = emergency_lift, read survey = survey (read <document> = read), exam = exam_question, yard fix = yard_fix, pump bilge = pump_bilge, plan trip = plan_trip, heave to = heave_to, turn back = turn_back, call tow = call_tow, book haulout = book_haulout, haul out = haul_out, yard wash = yard_wash, winterise = winterise_engine, fill tank = fill_tank, battery ashore = battery_ashore, battery aboard = battery_aboard, charger = winter_charger, fit cover = fit_winter_cover, wait until spring = wait_until_spring, next weekend = next_weekend, wait week = wait_week, invite friend = invite_friend, calendar plan = plan_event (going true) and calendar unplan = plan_event (going false), yard install = yard_install, season page = season_page, list for sale = list_for_sale, sell = list_for_sale, accept = accept_offer, turn in = sleep, board = noticeboard, enroll = enrol, crew = take_crewing_place. " +
+        "There is no quit; also available: status, aboard (what you have found so far), calendar (the week and the money), skipper (your own log), tickets, readiness, weather (today's sky and wind), inventory, trip, chart, notices (what the boat has told you), briefing.\n";
 
     [McpServerTool(Name = "briefing", ReadOnly = true), Description(
         "Re-read the situation you started with. Costs no time.")]

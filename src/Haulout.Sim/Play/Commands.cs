@@ -58,6 +58,10 @@ namespace Haulout.Sim.Play;
 [JsonDerivedType(typeof(UnplanEvent), "unplan-event")]
 [JsonDerivedType(typeof(Install), "install")]
 [JsonDerivedType(typeof(YardInstall), "yard-install")]
+[JsonDerivedType(typeof(Enrol), "enrol")]
+[JsonDerivedType(typeof(Answer), "answer")]
+[JsonDerivedType(typeof(Call), "call")]
+[JsonDerivedType(typeof(TakeCrewingPlace), "take-crewing-place")]
 public abstract record Command;
 
 public sealed record Look() : Command;
@@ -182,6 +186,31 @@ public sealed record Install(string Item) : Command;
 /// </summary>
 public sealed record YardInstall(string Item) : Command;
 
+/// <summary>
+/// Ring the club secretary and put your name down for the next course of a ticket (design note 012, step 2): its name as you would say it ("radio",
+/// "coastal"). A phone call in the club office's hours, 5 minutes, anywhere but at sea; the fee is paid at enrolment and the days are marked.
+/// </summary>
+public sealed record Enrol(string Course) : Command;
+
+/// <summary>
+/// Answer the question the examiner has put (design note 012, decision 8): a letter, a to d. Five minutes of the player's own time; the examiner says only that
+/// they write something down, and asks the next; the result comes after the last. Refused when no exam is open.
+/// </summary>
+public sealed record Answer(string Letter) : Command;
+
+/// <summary>
+/// Call on the VHF (design note 012, step 3): "harbour", "coast radio" (a radio check and the forecast) or "ferry" (answers a ferry that is calling you). Needs a set
+/// fitted; afloat, in port or at sea; 5 minutes. A call made without the radio ticket is reported by the coast radio.
+/// </summary>
+public sealed record Call(string To) : Command;
+
+/// <summary>
+/// Ring the owner of a boat that wants crew and say you will come (design note 012, step 4): its card by the words ("delivery", "weekend", "north", "week"). A phone call to a
+/// person, any hour, 5 minutes, anywhere but at sea; no money. The days are marked and a wait stops at 08:00 on the first morning; the next command of any kind then begins
+/// the days away on the other boat. Refused when the date is too close, the asks are not met, or the days clash with a course, the friend's week or the other place.
+/// </summary>
+public sealed record TakeCrewingPlace(string Place) : Command;
+
 /// <summary>Something the player asks about. Costs no time.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(Briefing), "briefing")]
@@ -203,6 +232,11 @@ public sealed record YardInstall(string Item) : Command;
 [JsonDerivedType(typeof(Calendar), "calendar")]
 [JsonDerivedType(typeof(Upgrades), "upgrades")]
 [JsonDerivedType(typeof(SeasonPage), "season-page")]
+[JsonDerivedType(typeof(Skipper), "skipper")]
+[JsonDerivedType(typeof(Tickets), "tickets")]
+[JsonDerivedType(typeof(Noticeboard), "noticeboard")]
+[JsonDerivedType(typeof(ReadDocument), "read-document")]
+[JsonDerivedType(typeof(ExamQuestion), "exam-question")]
 public abstract record Query;
 
 public sealed record Briefing() : Query;
@@ -251,3 +285,21 @@ public sealed record Upgrades() : Query;
 
 /// <summary>The page the logbook wrote at the autumn lift (design note 010, step 4): miles, nights away, places, events, hours, money, what she is worth. Season null: the latest. Costs no time.</summary>
 public sealed record SeasonPage(int? Season = null) : Query;
+
+/// <summary>The skipper's log in words (design note 012, decision 2): miles, nights away, night hours, passages, the strongest wind, days aboard, tows. Costs no time.</summary>
+public sealed record Skipper() : Query;
+
+/// <summary>The tickets (design note 012, decision 3): each held or not, what it is for, its checklist against the log, and the next course. Costs no time.</summary>
+public sealed record Tickets() : Query;
+
+/// <summary>The notice board where she lies (design note 012, decision 6): dated cards, sorted by day. At sea there is none. Costs no time.</summary>
+public sealed record Noticeboard() : Query;
+
+/// <summary>
+/// Read a document of the logbook by its name as the player would say it ("radio course book", "season page 1"): its pages in words. A course book is
+/// held from the day the club hands it over and stays readable for good (design note 012, decision 8). Costs no time.
+/// </summary>
+public sealed record ReadDocument(string Name) : Query;
+
+/// <summary>The question the examiner is waiting on, numbered, with its four options lettered; none when no exam is open. Never the right letter. Costs no time.</summary>
+public sealed record ExamQuestion() : Query;

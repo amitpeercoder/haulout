@@ -46,7 +46,8 @@ public class InventoryTests
         var boat = BoatLoader.LoadSloop28();
         foreach (var item in boat.Chandlery.Where(i => i.ForComponent is not null))
         {
-            var c = boat.Get(item.ForComponent!);
+            // a part that comes aboard with an upgrade (the VHF antenna connector) is not a component until the upgrade is fitted
+            var c = boat.Components.Concat(boat.Upgrades.SelectMany(u => u.Also)).First(x => x.Id == item.ForComponent);
             Assert.Equal(item.PriceNok, c.ReplaceCostNok);
             foreach (var f in c.Faults.Where(f => f.FixedBy.Contains(Haulout.Sim.Faults.PlayerAction.Replace) && f.Diy is not null))
                 Assert.Equal(item.PriceNok, f.Diy!.PartsNok);
@@ -159,7 +160,7 @@ public class InventoryTests
         Assert.Empty(empty.Aboard);
         Assert.Equal("the yard chandlery", empty.Shop);
         // The ten spares and tools of before, the seven upgrades of design note 010, step 3 (the yard sells them: it orders them for you), and the joker valve and shackle of the second pass F.
-        Assert.Equal(19, empty.ForSale.Count);
+        Assert.Equal(21, empty.ForSale.Count);
         Assert.Contains(new ShopLine("impeller", 350, 15), empty.ForSale);
         Assert.Contains(new ShopLine("diesel heater", 14000, 15), empty.ForSale);
 
@@ -168,7 +169,7 @@ public class InventoryTests
         var full = Inv(g);
         Assert.Contains(new InventoryLine("alternator belt", 1, false), full.Aboard);
         Assert.Contains(new InventoryLine("remote start button", 1, true), full.Aboard);
-        Assert.Equal(19, full.ForSale.Count);
+        Assert.Equal(21, full.ForSale.Count);
     }
 
     [Fact]

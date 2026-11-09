@@ -56,7 +56,12 @@ public sealed partial class Game
     }
 
     /// <summary>The refusals before Replace: at sea the spare, in port the yard rule for work below the waterline.</summary>
-    private string? ReplaceGate(Component c) => AtSea ? SeaWorkRefusal() ?? SpareRefusal(c) : AfloatRefusal(c) ?? AntifoulingRefusal(c);
+    private string? ReplaceGate(Component c) => AloftRefusal(c) ?? (AtSea ? SeaWorkRefusal() ?? SpareRefusal(c) : AfloatRefusal(c) ?? AntifoulingRefusal(c));
+
+    /// <summary>A job up the mast (the antenna connector) is not done in more wind than the data allows (design note 012, step 3).</summary>
+    private string? AloftRefusal(Component c) =>
+        c.Spec.Aloft && _boat.Instruments.AloftMaxForce > 0 && Today.WindForce > _boat.Instruments.AloftMaxForce
+            ? "Too much wind to go up the mast: wait for a calm day." : null;
 
     /// <summary>What the shop at this port charges for the item (its markup applied); null when it doesn't stock it.</summary>
     private int? PriceHere(ChandleryItem item) =>

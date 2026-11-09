@@ -34,7 +34,7 @@ public sealed partial class Game
             var r = _boat.Reputation;
             int bills = r.OnTimeBillsPerPoint > 0 ? _billsOnTime / r.OnTimeBillsPerPoint : 0;
             int raw = bills + r.SlotKept * _slotsKept + r.Tow * _tows + r.MooringParted * _partings
-                + r.SlotMissed * _slotsMissed + r.BillPastLimit * _billsPastLimit + r.FerryReport * _ferryReports;
+                + r.SlotMissed * _slotsMissed + r.BillPastLimit * _billsPastLimit + r.FerryReport * _ferryReports + r.UnlicensedRadio * _radioReports;
             return Math.Clamp(raw, r.Min, r.Max);
         }
     }
@@ -64,7 +64,11 @@ public sealed partial class Game
     private void NightsDaily()
     {
         if (_boat.Trips is not { } trips || _sunk || !Afloat) return;
-        if (AtSea || CurrentPort is { } port && port.Id != trips.Home) _nightsAway++;
+        if (AtSea || CurrentPort is { } port && port.Id != trips.Home)
+        {
+            _nightsAway++;
+            SkipperNight();
+        }
     }
 
     // ------------------------------------------------------------------ the page
@@ -144,6 +148,8 @@ public sealed partial class Game
         string cost = $"She cost you {Money(spent)} this season" + (income > 0 ? $"; paydays put {Money(income)} into her account" : "");
         lines.Add($"{cost}. The broker would put her at {Money(value)}.");
         if (reputation.Length > 0) lines.Add(reputation);
+        // The skipper's block (design note 012, step 2): a few lines of the log in the same words the Skipper query uses.
+        if (_boat.Tickets.Enabled) lines.AddRange(SkipperLines(shortBlock: true));
 
         return new SeasonPageView(number, from, toDay, Math.Round(miles, 1), _nightsAway, places, made, missed, hours, vacation, unpaid,
             spent, income, value, reputation, lines);
@@ -153,6 +159,7 @@ public sealed partial class Game
     private void WriteSeasonPage(Turn t, int liftDay)
     {
         if (_seasonPages.Any(p => p.Season == _seasonIndex + 1)) return;
+        SkipperSeasonEnds(_pastPassages.Where(p => p.Day >= (_seasonFromDay ?? _startDay)).Sum(p => p.Nm));
         var page = BuildSeasonPage(liftDay);
         _seasonPages.Add(page);
         t.Narrative.AddRange(page.Lines);

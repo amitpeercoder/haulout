@@ -193,6 +193,7 @@ public sealed partial class Game
         if (startDay < Day + pick.NoticeDays)
             return Reject(action, $"Your friend needs {pick.NoticeDays} days' notice: the earliest is day {Day + pick.NoticeDays}.");
 
+        if (CrewBookedClash(startDay, startDay + e.Days - 1) is { } crewClash) return Reject(action, crewClash);
         _friendStart[year] = startDay;
         var clock = new GameClock(startDay);
         t.Narrative.Add($"You ring your friend. They'll come on {clock.WeekdayName}, day {startDay}, for a week.");

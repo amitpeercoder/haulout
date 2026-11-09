@@ -18,6 +18,7 @@ public class McpServerTests
         "list_for_sale", "accept_offer", "keep", "sale", "sleep",
         "calendar", "next_weekend", "wait_week", "order", "invite_friend", "plan_event",
         "install", "yard_install", "upgrades", "season_page",
+        "skipper", "tickets", "noticeboard", "enrol", "take_crewing_place", "read", "exam_question", "answer", "call",
     ];
 
     private static string RepoRoot()
@@ -119,7 +120,7 @@ public class McpServerTests
     [Fact]
     public async Task No_tool_or_parameter_description_carries_an_economy_figure_or_the_currency_code()
     {
-        Assert.Equal(71, ExpectedTools.Length);
+        Assert.Equal(80, ExpectedTools.Length);
         await using var client = await Connect();
         var tools = await client.ListToolsAsync();
         // Rule 5: the price is a query result, never a literal in the interface. A description may say "costs the tow"; it may not say how much.
@@ -231,6 +232,86 @@ public class McpServerTests
 
         Assert.Contains("hard", TextOf(await Call(client, "depart", [])), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not at sea", TextOf(await Call(client, "continue", [])), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task The_course_book_and_the_exam_tools_read_ask_and_refuse_in_plain_words()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("course book", tools["read"]);
+        Assert.Contains("never the right letter", tools["answer"]);
+        Assert.Contains("read <document> = read", TextOf(await Call(client, "help", [])));
+        Assert.Contains("exam = exam_question", TextOf(await Call(client, "help", [])));
+
+        Assert.Contains("You have no document called 'radio course book'.", TextOf(await Call(client, "read", new() { ["document"] = "radio course book" })));
+        Assert.Contains("There is no exam to sit.", TextOf(await Call(client, "exam_question", [])));
+        Assert.Contains("There is no exam to sit.", TextOf(await Call(client, "answer", new() { ["letter"] = "a" })));
+
+        await UntilNine(client);
+        Assert.Contains("The club secretary hands you the radio course book.", TextOf(await Call(client, "enrol", new() { ["course"] = "radio" })));
+        var book = TextOf(await Call(client, "read", new() { ["document"] = "radio course book" }));
+        Assert.StartsWith("The radio course book", book);
+        Assert.Contains("Page 1. Channel 16 and channel 70", book);
+        Assert.Contains("Page 7. The DSC alert, and keeping silent", book);
+        Assert.Contains("(course book:", TextOf(await Call(client, "logbook", [])));
+    }
+
+    [Fact]
+    public async Task The_club_tools_skipper_tickets_and_noticeboard_answer_in_plain_words_with_no_ids_and_their_descriptions_name_what_they_show()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("crewing places", tools["noticeboard"]);
+        Assert.Contains("broker's window", tools["noticeboard"]);
+        Assert.Contains("the season is posted", tools["noticeboard"]);
+        Assert.Contains("board = noticeboard", TextOf(await Call(client, "help", [])));
+
+        var skipper = TextOf(await Call(client, "skipper", []));
+        Assert.Contains("No miles under way yet.", skipper);
+        Assert.Contains("No tows.", skipper);
+        var tickets = TextOf(await Call(client, "tickets", []));
+        Assert.Contains("Radio ticket: Not held.", tickets);
+        Assert.Contains("[ ] 300 miles: you have 0.", tickets);
+        var board = TextOf(await Call(client, "noticeboard", []));
+        Assert.Contains("The club's board by the slipway, pinned by the committee:", board);
+        Assert.Contains("The radio course, Saturday, day 138", board);
+        Assert.Contains("Your log: the radio ticket: not yet.", board);
+        Assert.Contains("The broker's window, by the club:", board);
+        Assert.Contains("Her insurer wants the coastal skipper ticket: you don't.", board);
+        foreach (var text in new[] { skipper, tickets, board })
+            foreach (var id in HyphenatedIds()) Assert.DoesNotContain(id, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sleep_and_call_refuse_and_answer_in_plain_words_and_the_help_names_them()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("Turn in", tools["sleep"]);
+        Assert.Contains("VHF", tools["call"]);
+        Assert.Contains("turn in = sleep", TextOf(await Call(client, "help", [])));
+
+        Assert.Contains("You have no radio aboard.", TextOf(await Call(client, "call", new() { ["to"] = "harbour" })));
+        var slept = TextOf(await Call(client, "sleep", []));
+        Assert.Contains("You turn in.", slept);
+        Assert.Contains("up at", slept);
+        Assert.Contains("Slept until", TextOf(await Call(client, "logbook", [])));
+    }
+
+    [Fact]
+    public async Task Take_crewing_place_rings_the_owner_refuses_in_words_and_the_board_and_help_say_so()
+    {
+        await using var client = await Connect();
+        var tools = (await client.ListToolsAsync()).ToDictionary(t => t.Name, t => t.Description ?? "");
+        Assert.Contains("owner", tools["take_crewing_place"]);
+        Assert.Contains("crew = take_crewing_place", TextOf(await Call(client, "help", [])));
+        Assert.Contains("Crew wanted: a 36 ft cutter", TextOf(await Call(client, "noticeboard", [])));
+
+        Assert.Contains("Mari Heiane wants the coastal skipper ticket or a season's log", TextOf(await Call(client, "take_crewing_place", new() { ["card"] = "north" })));
+        var taken = TextOf(await Call(client, "take_crewing_place", new() { ["card"] = "delivery" }));
+        Assert.Contains("You ring Per Aune and say you will come", taken);
+        Assert.Contains("[taken]", TextOf(await Call(client, "noticeboard", [])));
     }
 
     [Fact]
@@ -354,6 +435,8 @@ public class McpServerTests
         Assert.Contains("Not listed for sale", TextOf(await Call(client, "sale", [])));
         Assert.Contains("She isn't listed", TextOf(await Call(client, "accept_offer", [])));
         Assert.Contains("Name a price above zero", TextOf(await Call(client, "list_for_sale", new() { ["ask_nok"] = 0 })));
+        Assert.Contains("opens at nine", TextOf(await Call(client, "list_for_sale", new() { ["ask_nok"] = 150000 }))); // the broker keeps the yard office's hours, on the hard too
+        await UntilNine(client);
         var listed = TextOf(await Call(client, "list_for_sale", new() { ["ask_nok"] = 150000 }));
         Assert.Contains("Holm & Datter, yacht brokers", listed);
         Assert.Contains("Base value of a 28-footer of her kind: +180000 NOK", listed);
@@ -376,6 +459,7 @@ public class McpServerTests
     public async Task A_sale_ends_the_game_over_the_wire_and_the_queries_still_answer()
     {
         await using var client = await Connect();
+        await UntilNine(client);
         await Call(client, "list_for_sale", new() { ["ask_nok"] = 100000 });
         for (int i = 0; i < 40 && !TextOf(await Call(client, "sale", [])).Contains("open until day", StringComparison.Ordinal); i++)
             await Call(client, "wait", new() { ["days"] = 1 });
@@ -450,6 +534,12 @@ public class McpServerTests
             foreach (var number in new[] { "vacationDaysUsed", "unpaidDays", "paydays", "eventsMade", "eventsMissed", "upgradesFitted" })
                 Assert.Equal(0, last.GetProperty(number).GetInt32());
             Assert.Equal(JsonValueKind.False, last.GetProperty("kept").ValueKind);
+
+            // The club (design note 012, step 6): the tickets held (the licence from the start), the set, the days away crewing and on courses, the exams passed.
+            Assert.Equal(["Boat licence"], last.GetProperty("ticketsHeld").EnumerateArray().Select(e => e.GetString()).ToArray());
+            Assert.Equal(JsonValueKind.False, last.GetProperty("vhfFitted").ValueKind);
+            foreach (var number in new[] { "crewingDays", "courseDays", "examsPassed" })
+                Assert.Equal(0, last.GetProperty(number).GetInt32());
         }
         finally { File.Delete(path); }
     }
